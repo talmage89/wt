@@ -1,3 +1,63 @@
+## BUG-011: TUI crashes with unhandled Ink error when stdin is not a TTY
+
+**Status**: open
+**Found**: 2026-02-23T18:00:00Z
+**Test run**: ~/wt-usage-tests/2026-02-23T18-00-00Z/
+
+### Description
+
+Running `wt` with no arguments inside a wt-managed container (or worktree slot) when stdin is not a TTY causes Ink to crash with an unhandled exception and a raw stack trace:
+
+```
+Error: Raw mode is not supported on the current process.stdin, which Ink uses as input stream by default.
+Read about how to prevent this error on https://github.com/vadimdemedes/ink/#israwmodesupported
+    at file:///workspace/node_modules/.pnpm/ink@6.8.0.../build/components/App.js:117:23
+    ...
+```
+
+Exit code 1 with a multi-line stack trace. This is confusing and unfriendly.
+
+**What happened**: `wt` (no args) inside a worktree slot with non-TTY stdin printed a partial TUI render, then crashed with Ink's "Raw mode is not supported" error and a full Node.js stack trace.
+
+**What should have happened**: `wt` should detect that stdin does not support raw mode before attempting to launch the TUI. If raw mode is unavailable, it should either:
+1. Fall back to displaying CLI help/usage (same as when outside a container), or
+2. Print a clean error message like `"wt: TUI requires an interactive terminal. Use 'wt <command>' for CLI usage."` and exit with code 1.
+
+No stack trace should be shown to the user.
+
+### Reproduction
+
+```bash
+cd ~/wt-usage-tests/2026-02-23T18-00-00Z/my-project/bison-dawn-thaw
+node /workspace/bin/wt.mjs 2>&1
+# → partial TUI render, then Ink crash with "Raw mode is not supported" + stack trace
+# → exit 1
+```
+
+Or more simply: pipe stdin from /dev/null:
+```bash
+node /workspace/bin/wt.mjs < /dev/null
+```
+
+### Fix
+
+Before rendering the Ink TUI, check `process.stdin.isTTY`. If it is not truthy, skip the TUI and either display help or print a friendly error. Example:
+
+```typescript
+if (!process.stdin.isTTY) {
+  console.error("wt: TUI requires an interactive terminal. Use 'wt <command>' for CLI usage.");
+  process.exit(1);
+}
+```
+
+This check should be placed in the CLI entry point (src/cli.ts) in the default command handler, before `render(<App />)` is called.
+
+### Vision reference
+
+VISION.md §8: "`wt` with no arguments opens a fullscreen TUI if the current working directory is inside a `wt`-managed container or worktree. If not, it displays CLI help/usage." — The TUI is a terminal feature; graceful degradation when no terminal is available is implied.
+
+---
+
 ## BUG-010: `wt stash drop` hangs/crashes when stdin is non-interactive (no data)
 
 **Status**: fixed

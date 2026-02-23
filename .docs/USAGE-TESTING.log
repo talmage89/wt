@@ -1,3 +1,14 @@
+## 2026-02-23T18-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-23T18-00-00Z/
+Tests performed:
+- wt with no args outside a container (/tmp): displayed help/usage text with all commands listed; exit 0 — correct per VISION §8 ("If not [inside a managed container], it displays CLI help/usage")
+- wt with no args inside worktree slot (non-TTY): ran `node /workspace/bin/wt.mjs` from inside bison-dawn-thaw slot; partial TUI render appeared briefly, then Ink crashed with "Error: Raw mode is not supported on the current process.stdin" plus a full Node.js stack trace; exit 1 — BUG FOUND
+Result: BUG FOUND
+Bug: BUG-011 — TUI crashes with unhandled Ink "Raw mode is not supported" error and full stack trace when stdin is not a TTY; should detect non-TTY and gracefully fall back to help output or a clean error message (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-23T17-30-00Z
 
 Location: ~/wt-usage-tests/2026-02-23T17-30-00Z/
