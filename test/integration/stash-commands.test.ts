@@ -11,7 +11,9 @@ import {
   runStashShow,
 } from "../../src/commands/stash.js";
 import { readState, writeState } from "../../src/core/state.js";
+import { readConfig, writeConfig } from "../../src/core/config.js";
 import { getStash } from "../../src/core/stash.js";
+import { establishSymlinks } from "../../src/core/symlinks.js";
 import { createTempDir, createTestRepo, cleanup } from "./helpers.js";
 
 const temps: string[] = [];
@@ -177,6 +179,93 @@ describe("wt stash apply", () => {
     await expect(runStashApply("main", { cwd: dir })).rejects.toThrow(
       "not checked out"
     );
+  });
+
+  it("succeeds when slot has managed shared symlinks at apply time (BUG-007)", async () => {
+    const dir = await mktemp();
+    const { wtDir, repoDir } = await setupContainer(dir);
+
+    // Configure a shared directory
+    const config = await readConfig(wtDir);
+    config.shared.directories = [".config"];
+    await writeConfig(wtDir, config);
+
+    // Create a canonical shared file
+    const canonicalDir = path.join(wtDir, "shared", ".config");
+    await fs.mkdir(canonicalDir, { recursive: true });
+    await fs.writeFile(path.join(canonicalDir, "app.json"), '{"key":"value"}');
+
+    // Establish symlinks in all existing slots (simulating wt sync)
+    const state = await readState(wtDir);
+    for (const slotName of Object.keys(state.slots)) {
+      await establishSymlinks(wtDir, path.join(dir, slotName), [".config"], "");
+    }
+
+    // Find the main slot and verify its symlink exists
+    const mainSlot = Object.entries(state.slots).find(
+      ([, s]) => s.branch === "main"
+    )?.[0]!;
+    const symlinkPath = path.join(dir, mainSlot, ".config", "app.json");
+    expect((await fs.lstat(symlinkPath)).isSymbolicLink()).toBe(true);
+
+    // Create dirty state (modify a tracked file) in the main slot
+    await fs.writeFile(
+      path.join(dir, mainSlot, "README.md"),
+      "# BUG-007 dirty state\n"
+    );
+
+    // Make main LRU so it will be evicted first
+    state.slots[mainSlot].last_used_at = new Date(0).toISOString();
+    await writeState(wtDir, state);
+
+    // Fill all vacant slots
+    const vacantCount = Object.values(state.slots).filter(
+      (s) => s.branch === null
+    ).length;
+    for (let i = 0; i < vacantCount; i++) {
+      await execa("git", ["branch", `bug007-fill-${i}`], { cwd: repoDir });
+      await runCheckout({ branch: `bug007-fill-${i}`, cwd: dir });
+    }
+
+    // One more checkout — triggers LRU eviction of main (which has the symlink)
+    await execa("git", ["branch", "bug007-evict"], { cwd: repoDir });
+    await runCheckout({ branch: "bug007-evict", cwd: dir, noRestore: true });
+
+    // Verify stash was saved for main
+    const stash = await getStash(wtDir, "main");
+    expect(stash).not.toBeNull();
+
+    // Re-checkout main with --no-restore (so the symlink gets re-created by
+    // establishSymlinks in checkout, but stash is NOT auto-applied)
+    const stateAfterEvict = await readState(wtDir);
+    const fill0Slot = Object.entries(stateAfterEvict.slots).find(
+      ([, s]) => s.branch === "bug007-fill-0"
+    )?.[0]!;
+    stateAfterEvict.slots[fill0Slot].last_used_at = new Date(0).toISOString();
+    await writeState(wtDir, stateAfterEvict);
+
+    await runCheckout({ branch: "main", cwd: dir, noRestore: true });
+
+    // Verify symlink was re-created by checkout
+    const stateWithMain = await readState(wtDir);
+    const mainSlotNew = Object.entries(stateWithMain.slots).find(
+      ([, s]) => s.branch === "main"
+    )?.[0]!;
+    const newSymlinkPath = path.join(dir, mainSlotNew, ".config", "app.json");
+    expect((await fs.lstat(newSymlinkPath)).isSymbolicLink()).toBe(true);
+
+    // Apply the stash — must NOT fail with "already exists, no checkout" (BUG-007)
+    await expect(runStashApply("main", { cwd: dir })).resolves.toBeUndefined();
+
+    // Stash cleaned up on success
+    expect(await getStash(wtDir, "main")).toBeNull();
+
+    // The dirty README.md content was restored
+    const content = await fs.readFile(
+      path.join(dir, mainSlotNew, "README.md"),
+      "utf8"
+    );
+    expect(content).toBe("# BUG-007 dirty state\n");
   });
 });
 

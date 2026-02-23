@@ -4,6 +4,7 @@ import { join } from "path";
 import { execa } from "execa";
 import { encodeBranch } from "./branch-encode.js";
 import * as git from "./git.js";
+import { removeSymlinks } from "./symlinks.js";
 
 export interface StashMetadata {
   branch: string;           // original branch name
@@ -61,17 +62,27 @@ function parseMetadata(parsed: Record<string, unknown>): StashMetadata {
 
 /**
  * Save dirty state for a branch being evicted from a slot.
- * 1. `git stash create --include-untracked` in the worktree
- * 2. Anchor with `git update-ref refs/wt/stashes/<encoded> <hash>`
- * 3. Write metadata TOML to `.wt/stashes/<encoded>.toml`
+ * 1. Remove managed shared symlinks so they are not captured in the stash.
+ *    (They are always recreated by wt sync / establishSymlinks on checkout.)
+ * 2. `git stash push --include-untracked` in the worktree
+ * 3. Anchor with `git update-ref refs/wt/stashes/<encoded> <hash>`
+ * 4. Write metadata TOML to `.wt/stashes/<encoded>.toml`
  * Returns true if a stash was created, false if worktree was clean.
  */
 export async function saveStash(
   wtDir: string,
   repoDir: string,
   branch: string,
-  worktreeDir: string
+  worktreeDir: string,
+  sharedDirs: string[] = []
 ): Promise<boolean> {
+  // Remove managed shared symlinks before stashing — they are wt infrastructure,
+  // not user state, and are always recreated on checkout. Including them in the
+  // stash causes "already exists, no checkout" errors on stash apply (BUG-007).
+  if (sharedDirs.length > 0) {
+    await removeSymlinks(wtDir, worktreeDir, sharedDirs);
+  }
+
   const hash = await git.stashCreate(worktreeDir);
   if (!hash) return false;
 

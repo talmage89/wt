@@ -1,7 +1,8 @@
 ## BUG-007: Stash apply fails for shared symlinks — "already exists, no checkout"
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-23T22:00:00Z
+**Fixed**: 2026-02-23T23:00:00Z
 **Test run**: ~/wt-usage-tests/2026-02-23T22-00-00/
 
 ### Description

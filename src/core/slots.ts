@@ -186,7 +186,7 @@ export async function adjustSlotCount(
 
       if (slot.branch !== null) {
         // Save stash if dirty, then clean so worktree remove succeeds
-        const stashed = await saveStash(wtDir, repoDir, slot.branch, slotPath);
+        const stashed = await saveStash(wtDir, repoDir, slot.branch, slotPath, config.shared.directories);
         if (stashed) {
           await hardReset(slotPath);
           await cleanUntracked(slotPath);

@@ -108,7 +108,7 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
     // the dirty state as a commit object. We must reset + clean manually so that
     // the subsequent branch checkout does not fail with "local changes would be
     // overwritten".
-    const stashed = await saveStash(paths.wtDir, paths.repoDir, evictedBranch, worktreeDir);
+    const stashed = await saveStash(paths.wtDir, paths.repoDir, evictedBranch, worktreeDir, config.shared.directories);
     if (stashed) {
       await git.hardReset(worktreeDir);
       await git.cleanUntracked(worktreeDir);
