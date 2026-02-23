@@ -5,6 +5,16 @@ import { runInit } from "./commands/init.js";
 import { runShellInit, type ShellType } from "./commands/shell-init.js";
 import { runCheckout } from "./commands/checkout.js";
 import { runSync } from "./commands/sync.js";
+import { runFetch } from "./commands/fetch.js";
+import {
+  runStashList,
+  runStashApply,
+  runStashDrop,
+  runStashShow,
+} from "./commands/stash.js";
+import { runList } from "./commands/list.js";
+import { runPin, runUnpin } from "./commands/pin.js";
+import { runClean } from "./commands/clean.js";
 
 const cli = yargs(hideBin(process.argv))
   .scriptName("wt")
@@ -64,56 +74,127 @@ const cli = yargs(hideBin(process.argv))
       }
     }
   )
-  .command("fetch", "Run centralized git fetch and archive scan", () => {}, () => {
-    process.stderr.write("wt: fetch not yet implemented\n");
-    process.exit(1);
-  })
   .command(
-    "stash <action>",
-    "Manage stashes (list|apply|drop|show)",
+    "fetch",
+    "Run a centralized git fetch and archive scan",
     () => {},
-    () => {
-      process.stderr.write("wt: stash not yet implemented\n");
-      process.exit(1);
+    async () => {
+      try {
+        await runFetch();
+      } catch (err: unknown) {
+        process.stderr.write(`wt: ${(err as Error).message}\n`);
+        process.exit(1);
+      }
     }
   )
-  .command("sync", "Sync shared symlinks and regenerate templates", () => {}, async () => {
-    try {
-      await runSync();
-    } catch (err: unknown) {
-      process.stderr.write(`wt: ${(err as Error).message}\n`);
-      process.exit(1);
+  .command(
+    "stash <action> [branch]",
+    "Manage stashes (list|apply|drop|show)",
+    (yargs) =>
+      yargs
+        .positional("action", {
+          type: "string",
+          choices: ["list", "apply", "drop", "show"] as const,
+          demandOption: true,
+          describe: "Stash subcommand",
+        })
+        .positional("branch", {
+          type: "string",
+          describe: "Branch name (defaults to current branch)",
+        }),
+    async (argv) => {
+      try {
+        switch (argv.action) {
+          case "list":
+            await runStashList();
+            break;
+          case "apply":
+            await runStashApply(argv.branch as string | undefined);
+            break;
+          case "drop":
+            await runStashDrop(argv.branch as string | undefined);
+            break;
+          case "show":
+            await runStashShow(argv.branch as string | undefined);
+            break;
+        }
+      } catch (err: unknown) {
+        process.stderr.write(`wt: ${(err as Error).message}\n`);
+        process.exit(1);
+      }
     }
-  })
-  .command("clean", "Review and delete archived stashes", () => {}, () => {
-    process.stderr.write("wt: clean not yet implemented\n");
-    process.exit(1);
-  })
+  )
+  .command(
+    "sync",
+    "Sync shared symlinks and regenerate templates",
+    () => {},
+    async () => {
+      try {
+        await runSync();
+      } catch (err: unknown) {
+        process.stderr.write(`wt: ${(err as Error).message}\n`);
+        process.exit(1);
+      }
+    }
+  )
+  .command(
+    "clean",
+    "Review and delete archived stashes",
+    () => {},
+    async () => {
+      try {
+        await runClean();
+      } catch (err: unknown) {
+        process.stderr.write(`wt: ${(err as Error).message}\n`);
+        process.exit(1);
+      }
+    }
+  )
   .command(
     ["list", "ls"],
     "List all worktree slots with status",
     () => {},
-    () => {
-      process.stderr.write("wt: list not yet implemented\n");
-      process.exit(1);
+    async () => {
+      try {
+        await runList();
+      } catch (err: unknown) {
+        process.stderr.write(`wt: ${(err as Error).message}\n`);
+        process.exit(1);
+      }
     }
   )
   .command(
     "pin [slot]",
     "Pin a worktree slot to prevent LRU eviction",
-    () => {},
-    () => {
-      process.stderr.write("wt: pin not yet implemented\n");
-      process.exit(1);
+    (yargs) =>
+      yargs.positional("slot", {
+        type: "string",
+        describe: "Slot name (defaults to current worktree)",
+      }),
+    async (argv) => {
+      try {
+        await runPin(argv.slot as string | undefined);
+      } catch (err: unknown) {
+        process.stderr.write(`wt: ${(err as Error).message}\n`);
+        process.exit(1);
+      }
     }
   )
   .command(
     "unpin [slot]",
     "Unpin a worktree slot",
-    () => {},
-    () => {
-      process.stderr.write("wt: unpin not yet implemented\n");
-      process.exit(1);
+    (yargs) =>
+      yargs.positional("slot", {
+        type: "string",
+        describe: "Slot name (defaults to current worktree)",
+      }),
+    async (argv) => {
+      try {
+        await runUnpin(argv.slot as string | undefined);
+      } catch (err: unknown) {
+        process.stderr.write(`wt: ${(err as Error).message}\n`);
+        process.exit(1);
+      }
     }
   )
   .demandCommand(1, "Run 'wt --help' for usage information")
