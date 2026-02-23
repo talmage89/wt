@@ -375,3 +375,15 @@ export async function setConfig(
     stdio: ["ignore", "pipe", "inherit"],
   });
 }
+
+/** Add a named remote to the repo. */
+export async function addRemote(
+  repoDir: string,
+  name: string,
+  url: string
+): Promise<void> {
+  await execa("git", ["remote", "add", name, url], {
+    cwd: repoDir,
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+}

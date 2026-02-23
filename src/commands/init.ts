@@ -12,6 +12,8 @@ import * as git from "../core/git.js";
 export interface InitOptions {
   /** If provided, bare-clone from this URL. Otherwise, restructure the cwd repo. */
   url?: string;
+  /** Working directory. Defaults to process.cwd(). */
+  cwd?: string;
 }
 
 /**
@@ -19,7 +21,7 @@ export interface InitOptions {
  * Returns the path to the active worktree slot (for shell navigation).
  */
 export async function runInit(options: InitOptions): Promise<string> {
-  const containerDir = process.cwd();
+  const containerDir = options.cwd ?? process.cwd();
 
   if (options.url) {
     return await initFromUrl(containerDir, options.url);
@@ -33,6 +35,12 @@ export async function runInit(options: InitOptions): Promise<string> {
 // ---------------------------------------------------------------------------
 
 async function initFromExistingRepo(containerDir: string): Promise<string> {
+  // Validate: not already initialized (check this FIRST — after init, .git is gone)
+  const wtDirCheck = join(containerDir, ".wt");
+  if (await exists(wtDirCheck)) {
+    throw new Error("This directory is already a wt-managed container.");
+  }
+
   // Validate: must be a git repository (.git/ must exist)
   const gitDir = join(containerDir, ".git");
   const isGitRepo = await exists(gitDir);
@@ -40,12 +48,6 @@ async function initFromExistingRepo(containerDir: string): Promise<string> {
     throw new Error(
       "Not a git repository. Use 'wt init <url>' to clone, or run from inside a git repository."
     );
-  }
-
-  // Validate: not already initialized
-  const wtDirCheck = join(containerDir, ".wt");
-  if (await exists(wtDirCheck)) {
-    throw new Error("This directory is already a wt-managed container.");
   }
 
   // Get current branch (may be null if detached HEAD)
@@ -167,12 +169,25 @@ async function initFromUrl(containerDir: string, url: string): Promise<string> {
   const wtDir = await createContainerStructure(containerDir);
   const repoDir = join(wtDir, "repo");
 
-  // Bare-clone into .wt/repo/
+  // Bare-clone into .wt/repo/.
   // Note: createContainerStructure creates .wt/repo/ as an empty dir;
   // git clone --bare into an existing empty directory works fine.
   await git.cloneBare(url, repoDir);
 
-  // Detect default branch from the bare clone
+  // git clone --bare uses a non-standard fetch refspec (+refs/heads/*:refs/heads/*)
+  // that does NOT create refs/remotes/origin/* tracking refs. Switch to the
+  // standard tracking refspec so subsequent fetches populate refs/remotes/origin/*.
+  await git.setConfig(
+    repoDir,
+    "remote.origin.fetch",
+    "+refs/heads/*:refs/remotes/origin/*"
+  );
+
+  // Fetch to populate refs/remotes/origin/* with the corrected refspec.
+  // This enables defaultBranch() to work and origin/<branch> refs for slot creation.
+  await git.fetch(repoDir);
+
+  // Detect default branch from remote tracking refs (now populated).
   const defaultBranchName = await git.defaultBranch(repoDir);
 
   // Create worktree slots, all detached at the default branch tip
