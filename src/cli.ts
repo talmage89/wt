@@ -3,6 +3,7 @@ import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { runInit } from "./commands/init.js";
 import { runShellInit, type ShellType } from "./commands/shell-init.js";
+import { runCheckout } from "./commands/checkout.js";
 
 const cli = yargs(hideBin(process.argv))
   .scriptName("wt")
@@ -50,9 +51,16 @@ const cli = yargs(hideBin(process.argv))
           default: false,
           describe: "Skip automatic stash restoration",
         }),
-    () => {
-      process.stderr.write("wt: checkout not yet implemented\n");
-      process.exit(1);
+    async (argv) => {
+      try {
+        await runCheckout({
+          branch: argv.branch as string,
+          noRestore: argv["no-restore"],
+        });
+      } catch (err: unknown) {
+        process.stderr.write(`wt: ${(err as Error).message}\n`);
+        process.exit(1);
+      }
     }
   )
   .command("fetch", "Run centralized git fetch and archive scan", () => {}, () => {

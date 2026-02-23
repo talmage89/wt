@@ -376,6 +376,24 @@ export async function setConfig(
   });
 }
 
+/**
+ * Run `git checkout -b <branch> --track origin/<branch>` in a worktree.
+ * Used to create a local tracking branch from a remote branch.
+ */
+export async function checkoutTrack(
+  worktreeDir: string,
+  branch: string
+): Promise<void> {
+  await execa(
+    "git",
+    ["checkout", "-b", branch, "--track", `origin/${branch}`],
+    {
+      cwd: worktreeDir,
+      stdio: ["ignore", "pipe", "inherit"],
+    }
+  );
+}
+
 /** Add a named remote to the repo. */
 export async function addRemote(
   repoDir: string,
