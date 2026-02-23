@@ -354,3 +354,24 @@ export async function cloneBare(url: string, dest: string): Promise<void> {
     stdio: ["ignore", "pipe", "inherit"],
   });
 }
+
+/** Get the commit hash for HEAD. */
+export async function currentCommit(dir: string): Promise<string> {
+  const result = await execa("git", ["rev-parse", "HEAD"], {
+    cwd: dir,
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+  return result.stdout.trim();
+}
+
+/** Set a git config value in the repo. */
+export async function setConfig(
+  repoDir: string,
+  key: string,
+  value: string
+): Promise<void> {
+  await execa("git", ["config", key, value], {
+    cwd: repoDir,
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+}

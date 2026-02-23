@@ -1,0 +1,289 @@
+import { access, readdir, rename, rm } from "fs/promises";
+import { join } from "path";
+import { execa } from "execa";
+import { createContainerStructure } from "../core/container.js";
+import { createSlots } from "../core/slots.js";
+import { writeState, defaultState } from "../core/state.js";
+import { writeConfig, defaultConfig } from "../core/config.js";
+import { writeNavFile } from "../core/nav.js";
+import { generateAllTemplates } from "../core/templates.js";
+import * as git from "../core/git.js";
+
+export interface InitOptions {
+  /** If provided, bare-clone from this URL. Otherwise, restructure the cwd repo. */
+  url?: string;
+}
+
+/**
+ * Initialize a wt-managed container.
+ * Returns the path to the active worktree slot (for shell navigation).
+ */
+export async function runInit(options: InitOptions): Promise<string> {
+  const containerDir = process.cwd();
+
+  if (options.url) {
+    return await initFromUrl(containerDir, options.url);
+  } else {
+    return await initFromExistingRepo(containerDir);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Init from existing git repository
+// ---------------------------------------------------------------------------
+
+async function initFromExistingRepo(containerDir: string): Promise<string> {
+  // Validate: must be a git repository (.git/ must exist)
+  const gitDir = join(containerDir, ".git");
+  const isGitRepo = await exists(gitDir);
+  if (!isGitRepo) {
+    throw new Error(
+      "Not a git repository. Use 'wt init <url>' to clone, or run from inside a git repository."
+    );
+  }
+
+  // Validate: not already initialized
+  const wtDirCheck = join(containerDir, ".wt");
+  if (await exists(wtDirCheck)) {
+    throw new Error("This directory is already a wt-managed container.");
+  }
+
+  // Get current branch (may be null if detached HEAD)
+  const startingBranch = await git.currentBranch(containerDir);
+
+  // Stash dirty state before restructuring
+  const stashHash = await git.stashCreate(containerDir);
+
+  // Create .wt/ directory structure
+  const wtDir = await createContainerStructure(containerDir);
+  const repoDir = join(wtDir, "repo");
+
+  // Remove the pre-created empty .wt/repo/ so we can rename .git into that spot
+  await rm(repoDir, { recursive: true, force: true });
+
+  // Move .git → .wt/repo/
+  await rename(gitDir, repoDir);
+
+  // Convert to a bare-style repo (no working tree)
+  await git.setConfig(repoDir, "core.bare", "true");
+
+  // Fetch remote (best-effort — repo might have no remote or be offline)
+  try {
+    await git.fetch(repoDir);
+  } catch {
+    // No remote or network failure — continue with local state
+  }
+
+  // Check if any remote tracking refs actually exist after fetch.
+  // git fetch succeeds silently for repos with no remotes, so we must
+  // verify refs exist before using origin/<branch> as a commit reference.
+  const hasRemote = await hasRemoteRefs(repoDir);
+
+  // Detect default branch
+  let defaultBranchName: string;
+  try {
+    defaultBranchName = await git.defaultBranch(repoDir);
+  } catch {
+    defaultBranchName = startingBranch ?? "main";
+  }
+  // If no remote, defaultBranch() may have returned "master" as fallback;
+  // prefer the actual starting branch name when there's no remote.
+  const effectiveDefault = hasRemote ? defaultBranchName : (startingBranch ?? defaultBranchName);
+
+  // Create worktree slots
+  const config = defaultConfig();
+  const slotCommit = hasRemote ? `origin/${effectiveDefault}` : "HEAD";
+  const slotNames = await createSlots(
+    repoDir,
+    containerDir,
+    config.slot_count,
+    slotCommit,
+    new Set()
+  );
+
+  // Checkout the starting branch in slot 0
+  const slot0Dir = join(containerDir, slotNames[0]);
+  if (startingBranch) {
+    // The starting branch exists locally in .wt/repo — direct checkout works
+    await git.checkout(slot0Dir, startingBranch);
+  }
+
+  // Restore stash if dirty state was saved
+  if (stashHash) {
+    const result = await git.stashApply(slot0Dir, stashHash);
+    if (result.conflicted) {
+      process.stderr.write(
+        `wt: stash for '${startingBranch ?? "HEAD"}' produced conflicts. Resolve manually.\n`
+      );
+    }
+  }
+
+  // Remove the original working tree files from the container root.
+  // These are now in git history; the slots hold the working copies.
+  const itemsToKeep = new Set([".wt", ...slotNames]);
+  await removeWorkingTreeFiles(containerDir, itemsToKeep);
+
+  // Build initial state
+  const now = new Date().toISOString();
+  const state = defaultState();
+  for (const name of slotNames) {
+    state.slots[name] = {
+      branch: name === slotNames[0] ? (startingBranch ?? null) : null,
+      last_used_at: now,
+      pinned: false,
+    };
+  }
+  if (startingBranch) {
+    state.branch_history.push({
+      branch: startingBranch,
+      last_checkout_at: now,
+    });
+  }
+
+  await writeState(wtDir, state);
+  await writeConfig(wtDir, config);
+  await generateAllTemplates(wtDir, containerDir, state.slots, config.templates);
+
+  // Write nav file so the shell function can cd into the active slot
+  await writeNavFile(slot0Dir);
+
+  return slot0Dir;
+}
+
+// ---------------------------------------------------------------------------
+// Init from URL (bare clone)
+// ---------------------------------------------------------------------------
+
+async function initFromUrl(containerDir: string, url: string): Promise<string> {
+  // Validate: directory must be empty
+  const items = await readdir(containerDir);
+  if (items.length > 0) {
+    throw new Error(
+      "Directory is not empty. Use 'wt init' from inside an existing repository, or run from an empty directory."
+    );
+  }
+
+  // Create .wt/ structure
+  const wtDir = await createContainerStructure(containerDir);
+  const repoDir = join(wtDir, "repo");
+
+  // Bare-clone into .wt/repo/
+  // Note: createContainerStructure creates .wt/repo/ as an empty dir;
+  // git clone --bare into an existing empty directory works fine.
+  await git.cloneBare(url, repoDir);
+
+  // Detect default branch from the bare clone
+  const defaultBranchName = await git.defaultBranch(repoDir);
+
+  // Create worktree slots, all detached at the default branch tip
+  const config = defaultConfig();
+  const slotNames = await createSlots(
+    repoDir,
+    containerDir,
+    config.slot_count,
+    `origin/${defaultBranchName}`,
+    new Set()
+  );
+
+  // Checkout the default branch in slot 0
+  const slot0Dir = join(containerDir, slotNames[0]);
+  await checkoutOrTrack(slot0Dir, defaultBranchName);
+
+  // Build initial state
+  const now = new Date().toISOString();
+  const state = defaultState();
+  for (const name of slotNames) {
+    state.slots[name] = {
+      branch: name === slotNames[0] ? defaultBranchName : null,
+      last_used_at: now,
+      pinned: false,
+    };
+  }
+  state.branch_history.push({
+    branch: defaultBranchName,
+    last_checkout_at: now,
+  });
+
+  await writeState(wtDir, state);
+  await writeConfig(wtDir, config);
+  await generateAllTemplates(wtDir, containerDir, state.slots, config.templates);
+
+  // Write nav file
+  await writeNavFile(slot0Dir);
+
+  return slot0Dir;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Check if a path exists.
+ */
+async function exists(p: string): Promise<boolean> {
+  try {
+    await access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Remove all items in containerDir except those in `keepItems`.
+ */
+async function removeWorkingTreeFiles(
+  containerDir: string,
+  keepItems: Set<string>
+): Promise<void> {
+  const items = await readdir(containerDir);
+  for (const item of items) {
+    if (!keepItems.has(item)) {
+      await rm(join(containerDir, item), { recursive: true, force: true });
+    }
+  }
+}
+
+/**
+ * Checkout a branch in a worktree. If the branch doesn't exist locally
+ * but origin/<branch> does, create a local tracking branch.
+ */
+async function checkoutOrTrack(
+  worktreeDir: string,
+  branch: string
+): Promise<void> {
+  try {
+    await git.checkout(worktreeDir, branch);
+  } catch {
+    // Branch not available locally — create tracking branch from origin
+    await execa(
+      "git",
+      ["checkout", "-b", branch, "--track", `origin/${branch}`],
+      {
+        cwd: worktreeDir,
+        stdio: ["ignore", "pipe", "inherit"],
+      }
+    );
+  }
+}
+
+/**
+ * Check if any remote tracking refs (refs/remotes/*) exist in the repo.
+ * Used to distinguish repos with no remotes from repos with unreachable remotes.
+ */
+async function hasRemoteRefs(repoDir: string): Promise<boolean> {
+  try {
+    const result = await execa(
+      "git",
+      ["for-each-ref", "--count=1", "--format=x", "refs/remotes/"],
+      {
+        cwd: repoDir,
+        stdio: ["ignore", "pipe", "inherit"],
+      }
+    );
+    return result.stdout.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
