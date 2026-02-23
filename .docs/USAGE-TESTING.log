@@ -1,3 +1,16 @@
+## 2026-02-23T24-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-23T24-00-00/
+Tests performed:
+- wt init twice (from inside already-initialized container): "Directory is not empty. Use 'wt init' from inside an existing repository, or run from an empty directory." (exit 1) — acceptable behavior
+- Delete a slot directory (ember-quartz-trunk), run wt list: wt silently reconciled — recreated a new vacant slot (glade-spruce-reed) to maintain slot count of 5; "Preparing worktree" message printed (expected git output); list showed 5 slots correctly — correct graceful handling per VISION §3.2
+- Corrupt state.toml (invalid TOML), run wt list: "Warning: .wt/state.toml is corrupted. Regenerating from git state." (stderr), state recovered from git, list showed correct slots with epoch timestamps (expected since real timestamps lost) — correct
+- Stash archival: faked stash last_used_at to 8 days ago, deleted feature/alpha from remote, ran wt fetch; archival triggered; patch file written to .wt/stashes/archive/feature--alpha.patch; stash metadata updated to status=archived — correct. However: "fatal: this operation must be run in a work tree" printed to stderr before archival succeeded — BUG FOUND
+Result: BUG FOUND
+Bug: BUG-008 — archiveStash leaks `fatal: this operation must be run in a work tree` from git stash show called against bare repo (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-23T22:00:00Z
 
 Location: ~/wt-usage-tests/2026-02-23T22-00-00/

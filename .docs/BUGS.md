@@ -1,3 +1,69 @@
+## BUG-008: archiveStash leaks "fatal: this operation must be run in a work tree"
+
+**Status**: open
+**Found**: 2026-02-23T24:00:00Z
+**Fixed**:
+**Test run**: ~/wt-usage-tests/2026-02-23T24-00-00/
+
+### Description
+
+When `wt fetch` (or `wt checkout`) triggers the archive scan and archives a stash, `archiveStash` in `src/core/stash.ts` first tries to export the stash patch via `git.stashShow(repoDir, meta.stash_ref)`. The `repoDir` argument is the bare repo at `.wt/repo/`. However, `git stash show` requires a work tree context and cannot be run from a bare repository. It emits:
+
+```
+fatal: this operation must be run in a work tree
+```
+
+This error leaks to the user's terminal via inherited stderr (`stdio: ["ignore", "pipe", "inherit"]` in `stashShow`). After the error, the try/catch in `archiveStash` falls back to `git diff --binary <commit> <stash_ref>`, which works correctly in a bare repo, and the archive succeeds. The bug is purely the leaked stderr output — the archive is created correctly.
+
+**What happened**: `wt fetch` output included:
+```
+fatal: this operation must be run in a work tree
+Warning: zstd not found. Archived stash stored uncompressed.
+Archived 1 stash(es): feature/alpha
+```
+
+**What should have happened**: No `fatal:` output. The archive should succeed silently (with only the "Archived N stash(es)" summary).
+
+### Reproduction
+
+```bash
+# 1. Init a container, checkout a branch, create dirty state
+mkdir test && cd test
+wt init <url>
+wt checkout feature/x
+echo "dirty" > untracked.txt
+
+# 2. Evict the branch (force via checkout of new branch when all slots full)
+# ... fill slots, checkout another branch to evict feature/x ...
+
+# 3. Fake the stash timestamp to 8+ days ago
+# Edit .wt/stashes/feature--x.toml: set last_used_at to an old date
+
+# 4. Delete the remote branch
+git -C .wt/repo branch -D feature/x   # or via remote
+
+# 5. Run wt fetch
+wt fetch
+# → "fatal: this operation must be run in a work tree"
+# → "Warning: zstd not found. Archived stash stored uncompressed."
+# → "Archived 1 stash(es): feature/x"
+```
+
+### Vision reference
+
+VISION.md §15.3: "All git errors are passed through to the user verbatim" — this applies to user-initiated operations, not internal archive machinery. The `git stash show` failure is expected (bare repo) and already handled by the fallback. The error should not leak.
+
+### Fix
+
+In `archiveStash` (src/core/stash.ts), the primary approach using `git stash show` will always fail in a bare repo. Since the bare repo is always used here, either:
+
+1. **Skip `git stash show` entirely** in `archiveStash` — always use the `git diff --binary <commit> <stash_ref>` fallback, which works correctly in a bare repo.
+2. **Suppress stderr** in `stashShow` when called from `archiveStash` — add an options parameter controlling stderr behavior.
+
+Option 1 is simpler. The `git stash show` path is unnecessary since we always operate on the bare repo in `archiveStash`. Change `archiveStash` to directly call `git diff --binary` instead of first trying `git stash show`.
+
+---
+
 ## BUG-007: Stash apply fails for shared symlinks — "already exists, no checkout"
 
 **Status**: fixed
