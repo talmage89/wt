@@ -1,3 +1,56 @@
+## BUG-004: `--no-restore` flag rejected by yargs strict mode ("Unknown argument: restore")
+
+**Status**: open
+**Found**: 2026-02-23T12:00:00Z
+**Fixed**: —
+**Test run**: ~/wt-usage-tests/2026-02-23T12-00-00/
+
+### Description
+
+`wt checkout --no-restore <branch>` fails immediately with:
+
+```
+wt checkout <branch>
+...
+Unknown argument: restore
+```
+
+The flag `--no-restore` is defined in the CLI via `.option("no-restore", { type: "boolean", default: false })`. However, yargs has a built-in boolean-negation convention: any `--no-X` flag is interpreted as "set `X` to false". In strict mode, yargs parses `--no-restore` as "negate the `restore` option" and then rejects `restore` as an unknown argument (because only `no-restore` is defined, not `restore`).
+
+**What happened**: Running `wt checkout --no-restore fix/bug-123` printed the help text and "Unknown argument: restore" with exit code 1.
+
+**What should have happened**: The checkout should proceed without auto-restoring the stash for the target branch.
+
+**Workaround**: `--noRestore` (camelCase) is accepted by yargs but is not the documented interface.
+
+### Reproduction
+
+```bash
+cd /some/wt-container
+# Create a stash on some branch, then:
+wt checkout --no-restore <branch>
+# → Unknown argument: restore (exit 1)
+```
+
+### Vision reference
+
+VISION.md §3.1, step 7: "If `--no-restore` was passed, the stash is preserved but not applied."
+VISION.md §9 (CLI Commands table): `wt checkout <branch>` … "Supports `--no-restore` to skip automatic stash restoration."
+
+### Fix
+
+In `src/cli.ts`, change the `checkout` command option from:
+```typescript
+.option("no-restore", { type: "boolean", default: false, describe: "..." })
+```
+to:
+```typescript
+.option("restore", { type: "boolean", default: true, describe: "Auto-restore stash on checkout (use --no-restore to skip)" })
+```
+Then in the handler, change `noRestore: argv["no-restore"]` to `noRestore: !argv.restore`. Yargs's boolean-negation mechanism will then correctly parse `--no-restore` as `restore = false`.
+
+---
+
 ## BUG-003: Shell function causes infinite recursion → segfault due to `command -v wt` returning function name
 
 **Status**: fixed

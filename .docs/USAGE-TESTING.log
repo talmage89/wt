@@ -1,3 +1,22 @@
+## 2026-02-23T12:00:00Z
+
+Location: ~/wt-usage-tests/2026-02-23T12-00-00/
+Tests performed:
+- BUG-003 fix verified: eval "$(wt shell-init bash)" then wt checkout — cwd changed correctly to slot directory, no segfault
+- wt pin (by name) and wt unpin: pinned all 5 slots including a vacant one; verified pinned=true in wt list; unpinned one slot successfully
+- All-slots-pinned error: with all 5 slots filled and pinned, wt checkout of new branch → "All worktree slots are pinned. Unpin a worktree or increase the slot count to continue." (exit 1) — correct per VISION.md §11
+- LRU eviction with dirty state (staged + unstaged + untracked): all three file types saved in stash and shown in wt stash show — BUG-001 fix confirmed working
+- wt stash list: shows branch, age, status (active), base commit correctly
+- wt stash show: displays full diff of stash including untracked files
+- wt stash drop: prompts for confirmation, deletes stash, wt stash list shows "No saved stashes"
+- wt stash show on branch with no stash: "wt: No stash found for branch 'feature/api'." (exit 1) — correct
+- Reconciliation: direct git checkout inside a slot (bypassing wt), then wt list silently updated state to show new branch — correct per VISION.md §3.2
+- --no-restore flag: wt checkout --no-restore <branch> → "Unknown argument: restore" (exit 1) — BUG FOUND
+Result: BUG FOUND
+Bug: BUG-004 — `--no-restore` flag rejected by yargs strict mode due to boolean-negation conflict (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-23T09:00:00Z
 
 Location: ~/wt-usage-tests/2026-02-23T09-00-00/
