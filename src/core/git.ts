@@ -186,7 +186,7 @@ export async function currentBranch(
       ["symbolic-ref", "--short", "HEAD"],
       {
         cwd: worktreeDir,
-        stdio: ["ignore", "pipe", "inherit"],
+        stdio: ["ignore", "pipe", "pipe"],
       }
     );
     const branch = result.stdout.trim();
@@ -207,7 +207,7 @@ export async function defaultBranch(repoDir: string): Promise<string> {
       ["symbolic-ref", "refs/remotes/origin/HEAD", "--short"],
       {
         cwd: repoDir,
-        stdio: ["ignore", "pipe", "inherit"],
+        stdio: ["ignore", "pipe", "pipe"],
       }
     );
     const ref = result.stdout.trim();
@@ -218,7 +218,7 @@ export async function defaultBranch(repoDir: string): Promise<string> {
     try {
       await execa("git", ["show-ref", "--verify", "refs/remotes/origin/main"], {
         cwd: repoDir,
-        stdio: ["ignore", "pipe", "inherit"],
+        stdio: ["ignore", "pipe", "pipe"],
       });
       return "main";
     } catch {
@@ -240,7 +240,7 @@ export async function remoteBranchExists(
       ["show-ref", "--verify", `refs/remotes/origin/${branch}`],
       {
         cwd: repoDir,
-        stdio: ["ignore", "pipe", "inherit"],
+        stdio: ["ignore", "pipe", "pipe"],
       }
     );
     return true;

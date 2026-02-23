@@ -1,8 +1,8 @@
 ## BUG-002: "fatal: ref HEAD is not a symbolic ref" printed for every vacant slot during reconciliation
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-23T08:00:00Z
-**Fixed**:
+**Fixed**: 2026-02-23T08:30:00Z
 **Test run**: ~/wt-usage-tests/2026-02-23T08-00-00/
 
 ### Description
