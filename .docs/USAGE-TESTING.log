@@ -1,3 +1,16 @@
+## 2026-02-23T09:00:00Z
+
+Location: ~/wt-usage-tests/2026-02-23T09-00-00/
+Tests performed:
+- wt shell-init bash: output defines a syntactically valid wt() function (verified with `type wt`)
+- wt checkout feature/slash-branch (branch with `/` in name): succeeded, slot assigned, wt list correct
+- shell integration cwd change: eval'd shell function, then called `wt checkout` — bash segfaulted (exit 139)
+- Root cause confirmed: `command -v wt` inside the shell function returns `wt` (the function name, not the binary path) because the shell function shadows the binary; `"$wt_bin" "$@"` thus calls the function recursively causing stack overflow
+Result: BUG FOUND
+Bug: BUG-003 — shell function infinite recursion → segfault because `command -v wt` returns function name instead of binary path (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-23T08:00:00Z
 
 Location: ~/wt-usage-tests/2026-02-23T08-00-00/

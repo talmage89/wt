@@ -1,3 +1,47 @@
+## BUG-003: Shell function causes infinite recursion → segfault due to `command -v wt` returning function name
+
+**Status**: open
+**Found**: 2026-02-23T09:00:00Z
+**Test run**: ~/wt-usage-tests/2026-02-23T09-00-00/
+
+### Description
+
+The shell function emitted by `wt shell-init bash` (and `shell-init zsh`) uses `command -v wt` to locate the `wt` binary before calling it. However, once the function is `eval`'d into the shell, `wt` is a shell function — and `command -v wt` in bash returns `wt` (the function name) rather than the binary path when a shell function with that name exists. The function then calls `"$wt_bin" "$@"` which resolves to `wt checkout ...`, which calls the shell function again, causing infinite recursion and an eventual bash stack overflow (segfault, exit 139).
+
+**What happened**: After `eval "$(wt shell-init bash)"`, running `wt checkout <branch>` segfaulted with exit code 139.
+
+**What should have happened**: The shell function should call the `wt` external binary (bypassing the shell function itself), navigate to the checkout target, and return the binary's exit code.
+
+### Reproduction
+
+```bash
+export PATH="/path/to/wt/bin:$PATH"
+eval "$(wt shell-init bash)"
+cd /some/wt-container
+wt checkout some-branch
+# → segfault (exit 139), bash stack overflow from infinite recursion
+```
+
+### Vision reference
+
+VISION.md Shell Integration section: `eval "$(wt shell-init <shell>)"` defines a `wt()` shell function that calls the `wt` binary and then reads a nav file to `cd` to the checked-out worktree directory.
+
+### Fix
+
+In `src/commands/shell-init.ts`, replace the pattern:
+```bash
+local wt_bin
+wt_bin="$(command -v wt)" || { echo "wt: binary not found" >&2; return 1; }
+"$wt_bin" "$@"
+```
+with:
+```bash
+command wt "$@"
+```
+`command wt` in bash/zsh explicitly bypasses shell functions and invokes the external `wt` binary directly. If no external binary is found, bash/zsh emit a "not found" error naturally. The same fix applies to the fish script: replace `$wt_bin $argv` with `command wt $argv`.
+
+---
+
 ## BUG-002: "fatal: ref HEAD is not a symbolic ref" printed for every vacant slot during reconciliation
 
 **Status**: fixed
