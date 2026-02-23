@@ -1,3 +1,19 @@
+## 2026-02-23T13-54-27Z
+
+Location: ~/wt-usage-tests/2026-02-23T13-54-27Z/
+Tests performed:
+- Branch names with dots (`release/v2.0.1`): checked out from remote, slot assigned (hart-kite-open), `wt list` showed correct branch name, branch-specific file (release-v2.0.1.txt) present in slot — correct per VISION §14 (dots are valid in filenames, no encoding needed) — PASS
+- Branch names with `#` (`hotfix/issue#42`): checked out from remote, slot assigned (frost-spur-verge), files present; created dirty state (hotfix-wip.txt untracked + file1.txt modified); forced eviction via LRU manipulation; stash metadata file encoded as `hotfix--issue%2342.toml` (correct: `/` → `--`, `#` → `%23` per VISION §14); `wt stash show hotfix/issue#42` displayed both dirty files; re-checkout restored all dirty state; stash cleaned up — full roundtrip correct — PASS
+- `wt stash show` on archived stash (BUG-014 secondary issue): archived hotfix/issue#42 stash (faked timestamp + deleted remote branch + `wt fetch`); `wt stash show hotfix/issue#42` displayed patch file contents (tracked modifications + untracked files including `# --- untracked files ---` separator); exit 0 — BUG-014 fix correctly addressed both primary issue (untracked capture) and secondary issue (archived stash display) — PASS
+- Archive scan timing — remote deleted but recent use: created feature/alpha stash with fresh `last_used_at`, deleted remote branch, ran `wt fetch`; stash remained active (NOT archived) — correct per VISION §5.3 (both conditions must be met: remote deleted AND last_used_at > archive_after_days) — PASS
+- Archive scan timing — old use but branch on remote: faked feature/alpha `last_used_at` to 13 days ago, re-created feature/alpha on remote, ran `wt fetch`; stash remained active (NOT archived) — correct per VISION §5.3 — PASS
+- Archive scan timing — both conditions met: deleted feature/alpha from remote again (with already-old timestamp), ran `wt fetch`; stash correctly archived — confirms archival requires BOTH conditions — PASS
+- Checkout nonexistent branch: `wt checkout totally-nonexistent-branch-xyz` → git error passed through verbatim ("error: pathspec 'totally-nonexistent-branch-xyz' did not match any file(s) known to git"), exit 1; target slot correctly reverted to vacant state (detached HEAD), no corruption; subsequent checkouts succeeded — correct per VISION §15.3 — PASS
+- Staged vs unstaged distinction preserved through eviction+restore: created three categories of dirty state in main slot (staged new file `A  new-staged.txt`, unstaged modification ` M file1.txt`, untracked `?? untracked.txt`); evicted main via LRU; re-checked out main into different slot; `git status --short` showed identical flags (`A  new-staged.txt`, ` M file1.txt`, `?? untracked.txt`); all file contents correct — staged/unstaged/untracked distinction perfectly preserved — PASS
+Result: PASS
+
+---
+
 ## 2026-02-23T13-42-08Z
 
 Location: ~/wt-usage-tests/2026-02-23T13-42-08Z/
