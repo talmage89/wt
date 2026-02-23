@@ -1,3 +1,16 @@
+## 2026-02-23T14-07-30Z
+
+Location: ~/wt-usage-tests/2026-02-23T14-07-30Z/
+Tests performed:
+- Binary file preservation through stash/restore roundtrip: created binary file (14 bytes, null bytes + PNG magic) and special-chars file (46 bytes, tabs + embedded nulls) as untracked in main slot; evicted main via LRU; `wt stash show main` confirmed both files in stash (shown as "Binary files differ"); re-checked out main into different slot (stork-knoll-slim); md5sums matched exactly (8696568ce69c9aa494e1d1a0041bca94, 2ac61f4629cd968c24a52d0195f1da0b); byte counts identical; stash cleaned up after successful restore — binary data survives full stash/restore roundtrip — PASS
+- Double eviction with --no-restore (stash overwrite): checked out feature/alpha, created eviction1.txt (untracked), evicted (stash 1 created); re-checked out feature/alpha with --no-restore (stash preserved, eviction1.txt NOT in working tree); added eviction2.txt + modified file1.txt; evicted again (stash 2 created); `wt stash show feature/alpha` showed only eviction2.txt + modified file1.txt — eviction1.txt from first stash silently lost; one stash per branch, second eviction replaces first; no warning shown — PASS (architecturally correct per one-stash-per-branch design, but silent data loss is notable; user chose --no-restore)
+- Config slot_count=0 edge case: set slot_count=0 in config.toml; `wt list` evicted all 5 slots, showed header with no rows (exit 0); stashes created for 2 dirty slots (main, feature/alpha); `wt checkout main` → "All worktree slots are pinned" (exit 1) — error message misleading (0 slots, not "all pinned"); restored slot_count=5; 5 new vacant slots created automatically; stashes still available for later restore — PASS (functionally correct, UX edge case with misleading error message)
+- Slot directory emptied but not deleted (partial corruption): emptied vault-lofty-dark contents via `rm -rf vault-lofty-dark/*` (directory still exists, .git file gone); `wt list` showed slot as "(vacant)" (correct detection); `wt checkout feature/beta` failed: "fatal: not a git repository" (exit 1); tried 3 different branches — ALL failed with same error; wt always selects the corrupted slot despite 3 healthy vacant slots being available; container stuck, no new checkouts possible — BUG FOUND
+Result: BUG FOUND
+Bug: BUG-015 — Slot with emptied directory (missing .git file) blocks all checkouts; corrupted slot always selected over healthy vacant slots (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-23T13-54-27Z
 
 Location: ~/wt-usage-tests/2026-02-23T13-54-27Z/

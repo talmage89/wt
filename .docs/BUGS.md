@@ -1,3 +1,75 @@
+## BUG-015: Slot with emptied directory (missing .git file) blocks all checkouts
+
+**Status**: open
+**Found**: 2026-02-23T14:10:00Z
+**Test run**: ~/wt-usage-tests/2026-02-23T14-07-30Z/
+
+### Description
+
+When a slot directory exists but its contents are missing (specifically the `.git` worktree link file), `wt` reconciliation marks the slot as "(vacant)" because it cannot determine the branch. However, `wt checkout` then selects this corrupted slot for checkout (it appears vacant and is LRU-eligible), and the `git checkout` command fails because the directory is not a git repository:
+
+```
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+wt: Command failed with exit code 128: git checkout -b feature/beta --track origin/feature/beta
+```
+
+This blocks ALL subsequent checkouts — wt always selects the same corrupted slot. Even though 3 other healthy vacant slots exist, they are never tried. The container is stuck until the user manually repairs or removes the corrupted slot directory.
+
+**What happened**: After `rm -rf vault-lofty-dark/*` (emptying slot contents but leaving directory), every `wt checkout` fails with "fatal: not a git repository" (exit 1). The corrupted slot is always selected over healthy vacant slots.
+
+**What should have happened**: Reconciliation should detect that the slot directory lacks a valid `.git` file and either:
+1. Repair the slot by running `git worktree prune` and recreating it (same as the deleted-directory recovery path), or
+2. Skip the corrupted slot and select a healthy vacant slot for checkout.
+
+The deleted-directory case (entire slot dir removed) IS handled correctly — wt recreates it. The emptied-directory case (dir present, contents gone) is not.
+
+### Reproduction
+
+```bash
+cd ~/wt-usage-tests/2026-02-23T14-07-30Z/my-project
+# Slots: isle-firm-oak (main), vault-lofty-dark (vacant), quiet-bud-plum (vacant), ...
+
+# Empty a slot's contents but leave the directory
+rm -rf vault-lofty-dark/* vault-lofty-dark/.*
+
+# wt list shows it as vacant (correct detection)
+wt list
+# → vault-lofty-dark  (vacant)  ...
+
+# Checkout fails — always picks the corrupted slot
+wt checkout feature/beta
+# → fatal: not a git repository (exit 1)
+
+# Try other branches — same failure every time
+wt checkout feature/gamma
+# → fatal: not a git repository (exit 1)
+```
+
+### Root cause
+
+In reconciliation, when `git symbolic-ref HEAD` or `git rev-parse HEAD` fails for a slot (because there's no `.git` file), the slot is marked as vacant with no error. During checkout, the slot selection algorithm picks the LRU vacant slot. The corrupted slot is LRU (or first in order) and is always selected.
+
+The checkout code then runs `git checkout -b <branch> --track origin/<branch>` in the corrupted slot directory, which fails because git doesn't recognize it as a repository.
+
+The fix for deleted directories (in reconciliation) detects missing directories and recreates worktrees. But it doesn't check for an existing directory with a missing/invalid `.git` file.
+
+### Fix
+
+During reconciliation, for each slot directory that exists, verify that the `.git` file is present and valid (i.e., `fs.stat(path.join(slotDir, '.git'))` succeeds). If the `.git` file is missing:
+
+1. Remove the empty directory
+2. Run `git worktree prune` to clean up the stale worktree metadata
+3. Recreate the slot via `git worktree add --detach`
+
+This unifies the recovery path with the deleted-directory case.
+
+### Vision reference
+
+VISION.md §3.2 (Reconciliation): "wt silently updates internal state if direct git operations are detected." — A corrupted slot directory is a more severe case than a branch change, but the same principle applies: wt should recover gracefully.
+
+---
+
 ## BUG-014: archiveStash loses untracked files — `git diff --binary` does not capture stash third parent
 
 **Status**: fixed
