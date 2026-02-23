@@ -22,6 +22,12 @@ import { findContainer } from "./core/container.js";
 if (process.argv.length <= 2) {
   const paths = await findContainer(process.cwd());
   if (paths) {
+    if (!process.stdin.isTTY) {
+      process.stderr.write(
+        "wt: TUI requires an interactive terminal. Use 'wt <command>' for CLI usage.\n"
+      );
+      process.exit(1);
+    }
     const { render } = await import("ink");
     const React = await import("react");
     const { App } = await import("./tui/App.js");

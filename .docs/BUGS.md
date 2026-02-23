@@ -1,7 +1,8 @@
 ## BUG-011: TUI crashes with unhandled Ink error when stdin is not a TTY
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-23T18:00:00Z
+**Fixed**: 2026-02-23T19:00:00Z
 **Test run**: ~/wt-usage-tests/2026-02-23T18-00-00Z/
 
 ### Description
