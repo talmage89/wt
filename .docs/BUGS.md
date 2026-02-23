@@ -1,3 +1,48 @@
+## BUG-006: BUG-005 fix not applied to binary — dist not rebuilt after source fix
+
+**Status**: open
+**Found**: 2026-02-23T20:00:00Z
+**Fixed**: —
+**Test run**: ~/wt-usage-tests/2026-02-23T20-00-00/
+
+### Description
+
+The fix for BUG-005 (`src/core/git.ts` — change `isTracked` stderr from `"inherit"` to `"pipe"`) was committed at 07:45:59 but `pnpm build` was never run afterward. The compiled binary at `dist/chunk-EHB43JQC.js` still has the old code:
+
+```js
+stdio: ["ignore", "pipe", "inherit"],  // OLD — stderr leaks
+```
+
+The source has the correct fix:
+```js
+stdio: ["ignore", "pipe", "pipe"],     // FIXED — stderr suppressed
+```
+
+**What happened**: Running `wt sync` with a shared `.claude` directory still prints git error lines to the terminal: `error: pathspec '.claude/CLAUDE.md' did not match any file(s) known to git` — identical to the original BUG-005 symptom.
+
+**What should have happened**: No error output, since the BUG-005 fix was marked as applied.
+
+### Reproduction
+
+```bash
+cd /any/wt-container
+# Configure [shared] directories = [".claude"] with canonical files
+node /workspace/bin/wt.mjs sync
+# → "error: pathspec '.claude/CLAUDE.md' did not match any file(s) known to git" × N
+```
+
+Or: `grep "stdio" /workspace/dist/chunk-EHB43JQC.js` — the `isTracked` function still shows `"inherit"` for stderr.
+
+### Vision reference
+
+VISION.md §15.3: internal git operations should not leak stderr to the user's terminal.
+
+### Fix
+
+Run `pnpm build` in `/workspace` to recompile the TypeScript source into dist. The source already contains the correct fix.
+
+---
+
 ## BUG-005: Internal git stderr leaked during shared symlink conflict check
 
 **Status**: fixed

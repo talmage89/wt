@@ -1,3 +1,17 @@
+## 2026-02-23T20:00:00Z
+
+Location: ~/wt-usage-tests/2026-02-23T20-00-00/
+Tests performed:
+- wt init from URL (bare clone) into fresh directory: 5 slots created, 1 on main, 4 vacant — correct
+- Post-checkout hook (.wt/hooks/post-checkout) with shell integration: created executable hook, ran `wt checkout feature/api` via eval'd shell function; hook called with correct args (worktree path = slot dir, branch = feature/api) — correct per VISION §4.3
+- Post-checkout hook across multiple checkouts: verified hook fires on each checkout with slot-specific worktree path and branch name — correct
+- Shared symlink conflict check (BUG-005 regression): configured [shared] directories = [".claude"], created .wt/shared/.claude/CLAUDE.md, ran wt sync — "error: pathspec '.claude/CLAUDE.md' did not match any file(s) known to git" still printed 5 times (once per slot)
+- Root cause: dist/chunk-EHB43JQC.js still has `stdio: ["ignore", "pipe", "inherit"]` in isTracked; pnpm build was NOT run after the BUG-005 source fix was committed at 07:45:59
+Result: BUG FOUND
+Bug: BUG-006 — BUG-005 fix not applied to binary; dist not rebuilt after source change (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-23T16:00:00Z
 
 Location: ~/wt-usage-tests/2026-02-23T16-00-00/
