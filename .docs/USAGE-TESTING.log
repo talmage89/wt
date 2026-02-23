@@ -1,3 +1,16 @@
+## 2026-02-23T21-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-23T20-00-00Z/
+Tests performed:
+- Single-slot configuration (slot_count=1): initialized 5-slot container, changed config to slot_count=1; `wt list` triggered reconciliation — 4 slots evicted, 1 remaining (vacant); `wt checkout main` into the vacant slot succeeded; created dirty state (modified file1.txt + untracked wip.txt); `wt checkout feature/alpha` evicted main with stash; `wt stash show main` confirmed both files captured; `wt checkout main` restored dirty state (wip.txt + modified file1.txt both present); pinned the only slot, `wt checkout feature/beta` → "All worktree slots are pinned. Unpin a worktree or increase the slot count to continue." (exit 1) — all correct per VISION §3.1, §5.1, §5.2, §11 — PASS
+- Commands from container root (not inside a slot): `wt list` from container root displayed all 5 slots correctly (exit 0); `wt checkout feature/alpha` from container root succeeded, slot assigned (exit 0); `wt fetch` from container root succeeded (exit 0); `wt pin` from container root without slot arg → "Not inside a worktree slot. Specify a slot name." (exit 1) — all correct — PASS
+- Pin a vacant slot: `wt pin light-aloft-small` on a vacant slot succeeded with "Pinned 'light-aloft-small' (branch: (vacant))" (exit 0); `wt list` showed pinned=true for vacant slot; `wt checkout feature/beta` used the pinned vacant slot (correct per VISION §11: "pins are irrelevant for vacant slots"); after checkout, slot retained pinned status; filled all 5 slots then checkout feature/delta — the pinned slot (light-aloft-small / feature/beta) was NOT evicted; LRU unpinned slot evicted instead — correct per VISION §11 — PASS
+- Stash commands with zero stashes: `wt stash list` → "No saved stashes." (exit 0); `wt stash show feature/alpha` → "No stash found for branch 'feature/alpha'." (exit 1); `wt stash apply feature/alpha` → "No stash found for branch 'feature/alpha'." (exit 1) — all correct, clean error messages — PASS
+- Init from existing repo with staged+unstaged+untracked dirty state: cloned remote, staged new file (staged-new.txt), modified tracked file (file1.txt), created untracked file (untracked.txt); `wt init` succeeded (exit 0), 5 slots created, main slot marked dirty; `git status` in main slot showed all 3 categories preserved: staged-new.txt still staged (Changes to be committed), file1.txt still unstaged-modified, untracked.txt present; `wt checkout main` from within the main slot was a no-op — no eviction, dirty state fully intact — correct per VISION §2.1 and §3.1 step 3 — PASS
+Result: PASS
+
+---
+
 ## 2026-02-23T19-30-00Z
 
 Location: ~/wt-usage-tests/2026-02-23T19-30-00/
