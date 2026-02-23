@@ -1,3 +1,16 @@
+## 2026-02-23T14-13-07Z
+
+Location: ~/wt-usage-tests/2026-02-23T14-13-07Z/
+Tests performed:
+- Corrupt config.toml (invalid TOML syntax): wrote garbage to .wt/config.toml; `wt list` → "wt: Invalid TOML document: incomplete key-value: cannot find end of key" (exit 1); `wt checkout feature/alpha` → same clean error (exit 1); `wt fetch` performed the fetch successfully but then failed on archive scan with same error (exit 1); no crash, no stack trace. With wrong-type config (`slot_count = "not a number"`), `wt list` succeeded (exit 0) using default values silently — robust fallback behavior — PASS
+- wt init from URL to empty bare repo (no commits, no branches): `wt init file:///path/to/empty-remote.git` → bare clone succeeded (with git warning "empty repository"), then "wt: Could not detect remote default branch. No remote branches found." (exit 1); clean error message, no crash, no stack trace; .wt/ directory partially created (repo/ exists but no config.toml, state.toml, or slots) — minor cleanup gap but error is clean — PASS
+- Checkout from inside a subdirectory of a slot: ran `wt checkout feature/alpha` from `ember-frond-lark/src/` (subdirectory); checkout succeeded (exit 0), feature/alpha assigned to vacant slot `slate-wetland-short`; nav file correctly pointed to slot root (not subdirectory); via shell function (`eval "$(wt shell-init bash)"`), checkout from subdirectory correctly changed CWD to target slot root — PASS
+- Manual deletion of stash metadata with orphaned git ref: created stash for main (dirty state: wip-main.txt + modified file1.txt); manually deleted `.wt/stashes/main.toml` leaving `refs/wt/stashes/main` ref intact; `wt stash list` → "No saved stashes." (exit 0); `wt stash show main` → "No stash found for branch 'main'." (exit 1); `wt checkout main` succeeded (exit 0) but dirty state silently lost (no metadata to trigger restore); orphaned git ref persists (minor resource leak); no crash, all operations clean — PASS (expected behavior when user manually deletes metadata)
+- Eviction after direct git checkout in slot (reconciliation + eviction interaction): directly ran `git checkout feature/alpha` inside `olive-cloud-dry` slot (was on feature/beta, bypassing wt); created dirty state (direct-wip.txt untracked + file1.txt modified); `wt list` correctly detected branch change to feature/alpha and dirty status via reconciliation; manipulated LRU timestamps to make olive-cloud-dry the eviction candidate; `wt checkout feature/beta` evicted olive-cloud-dry, stash created for feature/alpha with both files; `wt stash show feature/alpha` confirmed both dirty files; re-checked out feature/alpha into different slot (ember-frond-lark); both files fully restored (direct-wip.txt content + file1.txt modifications intact); stash cleaned up — full reconciliation → eviction → stash → restore roundtrip correct — PASS
+Result: PASS
+
+---
+
 ## 2026-02-23T14-07-30Z
 
 Location: ~/wt-usage-tests/2026-02-23T14-07-30Z/
