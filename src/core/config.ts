@@ -88,7 +88,9 @@ export async function writeConfig(wtDir: string, config: Config): Promise<void> 
     slot_count: config.slot_count,
     archive_after_days: config.archive_after_days,
     shared: { directories: config.shared.directories },
-    templates: config.templates,
   };
+  if (config.templates.length > 0) {
+    data.templates = config.templates;
+  }
   await writeFile(configPath, stringify(data), "utf8");
 }

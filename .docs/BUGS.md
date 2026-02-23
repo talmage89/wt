@@ -1,7 +1,8 @@
 ## BUG-013: Generated config.toml prevents adding templates via documented `[[templates]]` syntax
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-23T13:30:00Z
+**Fixed**: 2026-02-23T13:35:00Z
 **Test run**: ~/wt-usage-tests/2026-02-23T13-27-42Z/
 
 ### Description

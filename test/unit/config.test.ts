@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm } from "fs/promises";
+import { mkdtemp, rm, readFile, appendFile } from "fs/promises";
 import { writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -99,5 +99,27 @@ describe("writeConfig / round-trip", () => {
     // If readConfig succeeds without throwing, the TOML is valid
     const cfg = await readConfig(tmpDir);
     expect(cfg).toEqual(defaultConfig());
+  });
+
+  it("writeConfig with empty templates allows appending [[templates]] (BUG-013)", async () => {
+    // Write a default config (empty templates)
+    await writeConfig(tmpDir, defaultConfig());
+
+    // The generated TOML must NOT contain "templates = []"
+    const raw = await readFile(join(tmpDir, "config.toml"), "utf8");
+    expect(raw).not.toContain("templates");
+
+    // User appends [[templates]] per VISION §10 syntax
+    await appendFile(
+      join(tmpDir, "config.toml"),
+      `\n[[templates]]\nsource = "templates/env.test"\ntarget = ".env.test"\n`,
+      "utf8"
+    );
+
+    // readConfig must parse without error and return the template
+    const cfg = await readConfig(tmpDir);
+    expect(cfg.templates).toEqual([
+      { source: "templates/env.test", target: ".env.test" },
+    ]);
   });
 });
