@@ -54,20 +54,45 @@ export async function checkoutDetach(worktreeDir: string): Promise<void> {
 }
 
 /**
- * Run `git stash create --include-untracked`.
+ * Save dirty state (staged, unstaged, AND untracked files) as a stash commit.
+ * Uses `git stash push --include-untracked` which correctly creates a 3-parent
+ * stash commit that includes untracked files. Also cleans the working tree.
  * Returns the stash commit hash, or null if working tree is clean.
+ *
+ * Note: `git stash create --include-untracked` does NOT include untracked files
+ * despite its flag name — only `git stash push --include-untracked` does.
  */
 export async function stashCreate(worktreeDir: string): Promise<string | null> {
-  const result = await execa(
-    "git",
-    ["stash", "create", "--include-untracked"],
-    {
-      cwd: worktreeDir,
-      stdio: ["ignore", "pipe", "inherit"],
-    }
-  );
-  const hash = result.stdout.trim();
-  return hash.length > 0 ? hash : null;
+  // Pre-check: if nothing to stash, return early (stash push exits 0 but
+  // doesn't create a ref, making rev-parse fail).
+  const statusResult = await execa("git", ["status", "--porcelain"], {
+    cwd: worktreeDir,
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+  if (statusResult.stdout.trim() === "") return null;
+
+  // Create the stash — this also cleans the working tree.
+  await execa("git", ["stash", "push", "--include-untracked"], {
+    cwd: worktreeDir,
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+
+  // Read the stash commit hash from refs/stash.
+  const revResult = await execa("git", ["rev-parse", "refs/stash"], {
+    cwd: worktreeDir,
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+  const hash = revResult.stdout.trim();
+  if (!hash) return null;
+
+  // Drop from the stash stack — we anchor with refs/wt/stashes/* instead,
+  // so the stash stack doesn't grow unboundedly.
+  await execa("git", ["stash", "drop"], {
+    cwd: worktreeDir,
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+
+  return hash;
 }
 
 /**

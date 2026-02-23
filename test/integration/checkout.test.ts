@@ -281,6 +281,67 @@ describe("wt checkout — stash save/restore", () => {
     expect(await getStash(wtDir, "main")).toBeNull();
   });
 
+  it("should preserve untracked files through eviction and restore (BUG-001)", async () => {
+    const dir = await mktemp();
+    const { containerDir, wtDir, repoDir } = await setupContainer(dir);
+
+    const mainSlot = await findSlotWithBranch(containerDir, "main");
+    const mainSlotDir = path.join(containerDir, mainSlot!);
+
+    // Create an untracked file — git stash create -u silently loses these
+    await fs.writeFile(path.join(mainSlotDir, "untracked.txt"), "untracked content\n");
+    // Also create staged and unstaged changes to ensure all three categories work
+    await fs.writeFile(path.join(mainSlotDir, "README.md"), "# Dirty Modified\n");
+
+    // Fill all other slots so eviction is needed
+    await fillVacantSlots(containerDir, repoDir, ["b1", "b2", "b3", "b4"]);
+
+    // Force main's slot to be LRU so it gets evicted next
+    let state = await readState(wtDir);
+    const mSlot = Object.keys(state.slots).find(
+      (n) => state.slots[n].branch === "main"
+    )!;
+    state.slots[mSlot].last_used_at = new Date(0).toISOString();
+    await writeState(wtDir, state);
+
+    // Checkout b5 — evicts main, should capture untracked.txt in stash
+    await createLocalBranch(repoDir, "b5");
+    await runCheckout({ branch: "b5", cwd: containerDir });
+
+    // Stash should exist and reference a valid commit
+    const stash = await getStash(wtDir, "main");
+    expect(stash).not.toBeNull();
+
+    // Make b1's slot LRU so it gets evicted when we restore main
+    state = await readState(wtDir);
+    const b1Slot = Object.keys(state.slots).find(
+      (n) => state.slots[n].branch === "b1"
+    )!;
+    state.slots[b1Slot].last_used_at = new Date(0).toISOString();
+    await writeState(wtDir, state);
+
+    // Re-checkout main — stash should be restored including untracked file
+    await runCheckout({ branch: "main", cwd: containerDir });
+
+    const mainSlotNow = await findSlotWithBranch(containerDir, "main");
+    expect(mainSlotNow).not.toBeNull();
+    const restoredDir = path.join(containerDir, mainSlotNow!);
+
+    // Untracked file must have been restored
+    expect(await exists(path.join(restoredDir, "untracked.txt"))).toBe(true);
+    expect(
+      await fs.readFile(path.join(restoredDir, "untracked.txt"), "utf8")
+    ).toBe("untracked content\n");
+
+    // Tracked file modification should also be restored
+    expect(
+      await fs.readFile(path.join(restoredDir, "README.md"), "utf8")
+    ).toBe("# Dirty Modified\n");
+
+    // Stash cleaned up after successful restore
+    expect(await getStash(wtDir, "main")).toBeNull();
+  });
+
   it("should skip stash restore when --no-restore is set", async () => {
     const dir = await mktemp();
     const { containerDir, wtDir, repoDir } = await setupContainer(dir);

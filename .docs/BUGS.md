@@ -1,8 +1,8 @@
 ## BUG-001: Untracked files lost during slot eviction (stash create does not include untracked)
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-23T07:05:00Z
-**Fixed**: —
+**Fixed**: 2026-02-23T07:20:00Z
 **Test run**: ~/wt-usage-tests/2026-02-23T10-00-00/
 
 ### Description
