@@ -1,8 +1,8 @@
 ## BUG-008: archiveStash leaks "fatal: this operation must be run in a work tree"
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-23T24:00:00Z
-**Fixed**:
+**Fixed**: 2026-02-24T08:15:00Z
 **Test run**: ~/wt-usage-tests/2026-02-23T24-00-00/
 
 ### Description

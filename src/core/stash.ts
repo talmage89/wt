@@ -269,7 +269,7 @@ export async function isZstdAvailable(): Promise<boolean> {
 
 /**
  * Archive a single active stash:
- * 1. Export patch via `git stash show -p`
+ * 1. Export patch via `git diff --binary <commit> <stash_ref>` (bare-repo safe)
  * 2. Compress with zstd (or store uncompressed if zstd unavailable)
  * 3. Delete git ref
  * 4. Update metadata: status="archived", archived_at, archive_path
@@ -286,19 +286,14 @@ export async function archiveStash(
   const archiveDir = join(wtDir, "stashes", "archive");
   await mkdir(archiveDir, { recursive: true });
 
-  // Export patch — use git diff to reliably capture all changes
-  let patch: string;
-  try {
-    patch = await git.stashShow(repoDir, meta.stash_ref);
-  } catch {
-    // Fallback: use git diff between base commit and stash ref
-    const result = await execa(
-      "git",
-      ["diff", "--binary", meta.commit, meta.stash_ref],
-      { cwd: repoDir, stdio: ["ignore", "pipe", "inherit"] }
-    );
-    patch = result.stdout;
-  }
+  // Export patch via git diff --binary (works in bare repos).
+  // git stash show requires a work tree and always fails on bare repos (BUG-008).
+  const diffResult = await execa(
+    "git",
+    ["diff", "--binary", meta.commit, meta.stash_ref],
+    { cwd: repoDir, stdio: ["ignore", "pipe", "pipe"] }
+  );
+  const patch = diffResult.stdout;
 
   let archivePath: string;
   if (await isZstdAvailable()) {
