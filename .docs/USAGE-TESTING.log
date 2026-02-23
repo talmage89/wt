@@ -1,3 +1,15 @@
+## 2026-02-23T14-38-59Z
+
+Location: ~/wt-usage-tests/2026-02-23T14-38-59Z/
+Tests performed:
+- Removing shared directory from config then running `wt sync` (orphan symlink behavior): configured `[shared] directories = [".config", ".tools"]`, synced (all 5 slots got correct symlinks for both dirs); removed `.tools` from config (now only `[".config"]`), re-ran `wt sync`; `.config` symlinks maintained correctly; `.tools` symlinks persisted as orphans (still valid — canonical file exists); deleted canonical `.wt/shared/.tools/lint.json` to make orphan symlinks broken; re-ran `wt sync` — broken `.tools` symlinks NOT cleaned up (sync only processes configured directories); `.config` symlinks unaffected. Behavior is consistent with VISION §6.4 (sync scans "all configured shared directories") — no cleanup defined for de-configured directories. Edge case noted: removing a directory from config leaves orphan symlinks that must be manually cleaned. — PASS (edge case noted)
+- `wt` commands from inside `.wt/` metadata directory: ran `wt list` from `.wt/` (container root's metadata dir) — correct output, exit 0; `wt checkout feature/alpha` from `.wt/` — succeeded, slot assigned correctly; `wt checkout feature/beta` from `.wt/repo/` (bare repo subdirectory) — succeeded, slot assigned correctly; `wt list` from `.wt/stashes/` — correct output; `wt pin` / `wt unpin` from `.wt/stashes/` — both succeeded with correct messages. Container detection correctly walks up from `.wt/` subdirectories to find the container root. — PASS
+- File permissions (executable bit) preserved through stash/restore roundtrip: created executable `my-script.sh` (755, untracked), non-executable `data.json` (644, untracked), and modified tracked `src/index.js` (755) in main slot; evicted main via LRU; `wt stash show main` confirmed modes preserved in diff (`new file mode 100755` for script, `100644` for data); re-checked out main into same slot; permissions exactly preserved: `my-script.sh` 755, `data.json` 644, `src/index.js` 755; all file contents correct — PASS
+- Local-only branch (never on remote) through full stash lifecycle: created `local-only-experiment` branch directly in bare repo via `git branch`; `wt checkout local-only-experiment` succeeded (exit 0), slot assigned correctly; created dirty state (untracked `experiment.txt` + modified `file1.txt`); evicted via LRU manipulation; `wt stash show local-only-experiment` confirmed both files captured; re-checked out `local-only-experiment` — stash auto-restored; `experiment.txt` content correct ("local experiment WIP"), `file1.txt` modification intact; stash cleaned up after successful restore. Full lifecycle works for branches that exist only locally and have no remote tracking. — PASS
+Result: PASS
+
+---
+
 ## 2026-02-23T14-31-51Z
 
 Location: ~/wt-usage-tests/2026-02-23T14-31-51Z/
