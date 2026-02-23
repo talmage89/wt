@@ -1,3 +1,22 @@
+## 2026-02-23T13-21-46Z
+
+Location: ~/wt-usage-tests/2026-02-23T13-21-46Z/
+Tests performed:
+- wt pin with nonexistent slot name: `wt pin nonexistent-slot-xyz` → "wt: Slot 'nonexistent-slot-xyz' not found." (exit 1) — clean error message — PASS
+- wt unpin with nonexistent slot name: `wt unpin nonexistent-slot-xyz` → "wt: Slot 'nonexistent-slot-xyz' not found." (exit 1) — clean error message — PASS
+- wt pin on already-pinned slot: `wt pin slate-jade-burrow` twice → first "Pinned 'slate-jade-burrow'..." (exit 0), second "Slot 'slate-jade-burrow' is already pinned." (exit 0) — idempotent, no crash — PASS
+- wt unpin on already-unpinned slot: `wt unpin slate-jade-burrow` twice → first "Unpinned 'slate-jade-burrow'..." (exit 0), second "Slot 'slate-jade-burrow' is not pinned." (exit 0) — idempotent, no crash — PASS
+- wt stash apply with no args from container root (not inside a slot): → "wt: Not inside a worktree slot. Specify a branch name." (exit 1) — correct per VISION §5.2.1 "defaults to the current branch" — when there is no current branch, error is clean — PASS
+- wt stash show with no args from container root: → "wt: Not inside a worktree slot. Specify a branch name." (exit 1) — PASS
+- wt stash drop with no args from container root (non-interactive): → "wt: Not inside a worktree slot. Specify a branch name." (exit 1) — does not hang, does not crash, clean error — PASS
+- wt stash apply for a branch with stash but not checked out: `wt stash apply fix/urgent` from inside main slot → "wt: Branch 'fix/urgent' is not checked out in any slot. Run 'wt checkout fix/urgent' first." (exit 1) — correct per VISION §5.2.1 — PASS
+- wt checkout to local-only branch (never pushed to remote): created branch via `git checkout -b local-only-branch` inside a slot, committed a file, then evicted it via `wt checkout main`; later `wt checkout local-only-branch` found it in the existing slot (reconciliation detected it), navigated to it; content (local-only.txt) intact — PASS
+- wt init on repo with no remote configured: created local git repo with no remote, ran `wt init`; succeeded (exit 0), 5 slots created, main checked out; `wt fetch` on no-remote container printed "Fetched latest from remote." (exit 0) — no crash, essentially a no-op; `wt checkout feature/local` after creating a local branch worked correctly — PASS
+- wt stash show for evicted dirty slot: `wt stash show fix/urgent` displayed correct diff with wip.txt (untracked file captured in stash) — PASS
+Result: PASS
+
+---
+
 ## 2026-02-23T21-30-00Z
 
 Location: ~/wt-usage-tests/2026-02-23T21-30-00Z/
