@@ -1,7 +1,8 @@
 ## BUG-005: Internal git stderr leaked during shared symlink conflict check
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-23T16:00:00Z
+**Fixed**: 2026-02-23T17:00:00Z
 **Test run**: ~/wt-usage-tests/2026-02-23T16-00-00/
 
 ### Description

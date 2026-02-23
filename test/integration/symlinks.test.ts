@@ -240,6 +240,36 @@ describe("syncAllSymlinks", () => {
     }
   });
 
+  it("does not leak git stderr when checking untracked shared files (BUG-005)", async () => {
+    const dir = await mktemp();
+    const { containerDir, wtDir, state } = await setupContainer(dir);
+
+    // Create multiple canonical files (none git-tracked)
+    const canonicalDir = path.join(wtDir, "shared", ".claude");
+    await fs.mkdir(canonicalDir, { recursive: true });
+    await fs.writeFile(path.join(canonicalDir, "settings.json"), "data");
+    await fs.writeFile(path.join(canonicalDir, "keybindings.json"), "data");
+
+    // Capture stderr — must not contain git error lines
+    const stderrChunks: string[] = [];
+    const originalWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk: string | Uint8Array): boolean => {
+      if (typeof chunk === "string") stderrChunks.push(chunk);
+      else stderrChunks.push(Buffer.from(chunk).toString());
+      return true;
+    };
+
+    try {
+      await syncAllSymlinks(wtDir, containerDir, state.slots, [".claude"]);
+    } finally {
+      process.stderr.write = originalWrite;
+    }
+
+    const stderr = stderrChunks.join("");
+    expect(stderr).not.toContain("error: pathspec");
+    expect(stderr).not.toContain("did not match any file");
+  });
+
   it("is a no-op with empty shared dirs config", async () => {
     const dir = await mktemp();
     const { containerDir, wtDir, state } = await setupContainer(dir);

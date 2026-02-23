@@ -354,7 +354,7 @@ export async function isTracked(
 ): Promise<boolean> {
   const result = await execa("git", ["ls-files", "--error-unmatch", filePath], {
     cwd: worktreeDir,
-    stdio: ["ignore", "pipe", "inherit"],
+    stdio: ["ignore", "pipe", "pipe"],
     reject: false,
   });
   return result.exitCode === 0;
