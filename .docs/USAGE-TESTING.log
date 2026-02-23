@@ -1,3 +1,24 @@
+## 2026-02-23T22:00:00Z
+
+Location: ~/wt-usage-tests/2026-02-23T22-00-00/
+Tests performed:
+- zsh shell-init output: syntactically valid wt() function, uses `command wt "$@"` (BUG-003 fix present), reads /tmp/wt-nav-$$ (matching process.ppid in binary), post-checkout hook integration — correct
+- fish shell-init output: syntactically valid fish function, uses `command wt $argv`, reads /tmp/wt-nav-$fish_pid — correct; zsh/fish not available in test env, static analysis only
+- Non-existent branch checkout: `wt checkout nonexistent-branch-xyz` → git error passes through verbatim + "wt: Command failed with exit code 1" (exit 1) — correct per VISION §15.3
+- git-tracked file wins over shared symlink: configured [shared] directories = [".config"], but branch feature/tracked-config has .config/app.json git-tracked; ran wt checkout feature/tracked-config; warning "wt: Skipping symlink for .config/app.json: file is tracked by git in branch feature/tracked-config." printed; slot has regular file (git content), NOT a symlink — correct per VISION §6.3
+- Non-tracked slots get the symlink: ran wt sync; main slot got lrwxrwxrwx .config/app.json -> ../../.wt/shared/.config/app.json — correct
+- wt clean with no archived stashes: "No archived stashes to clean." (exit 0) — correct
+- wt pin from inside slot (no args): pinned correctly, "Pinned 'narrow-ardent-snipe' (branch: main). It will not be evicted." — correct
+- wt unpin from inside slot (no args): unpinned correctly — correct
+- wt pin from outside container (/tmp): "wt: Not inside a wt-managed container." (exit 1) — correct
+- wt pin from container root (no slot arg): "wt: Not inside a worktree slot. Specify a slot name." (exit 1) — correct
+- wt checkout --no-restore: slot checked out, auto-restore skipped, stash retained in stash list — correct (BUG-004 fix confirmed again)
+- wt stash apply with tracked-file merge conflict AND shared-symlink collision: applied stash for feature/conflict-test (stash from old commit, branch at new commit); got both: (a) merge conflict markers in shared-file.txt, and (b) "already exists, no checkout" error for .config/app.json shared symlink — BUG FOUND
+Result: BUG FOUND
+Bug: BUG-007 — stash apply fails for shared symlinks because wt sync creates them before stash apply, causing "already exists, no checkout" error; shared symlinks should not be included in stashes (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-23T20:00:00Z
 
 Location: ~/wt-usage-tests/2026-02-23T20-00-00/
