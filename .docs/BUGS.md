@@ -1,3 +1,59 @@
+## BUG-012: `wt init <url>` fails when remote default branch is not "main" or "master"
+
+**Status**: open
+**Found**: 2026-02-23T21:30:00Z
+**Test run**: ~/wt-usage-tests/2026-02-23T21-30-00Z/
+
+### Description
+
+When `wt init <url>` is run against a remote whose default branch is something other than "main" or "master" (e.g., "develop"), initialization fails with:
+
+```
+fatal: invalid reference: origin/master
+wt: Command failed with exit code 128: git worktree add --detach <path> origin/master
+```
+
+**What happened**: `wt init file:///path/to/remote-repo.git` (where default branch is "develop") cloned, fetched, then tried to create worktree slots detached at `origin/master` — which doesn't exist. Exit 1.
+
+**What should have happened**: `wt init` should detect the remote's actual default branch ("develop") and create worktree slots detached at `origin/develop`. Initialization should succeed.
+
+### Root cause
+
+In `src/core/git.ts`, `defaultBranch()` tries three approaches in sequence:
+1. `git symbolic-ref refs/remotes/origin/HEAD --short` — fails because `refs/remotes/origin/HEAD` is never set after a bare clone + fetch (bare clones don't create this ref automatically).
+2. Falls back to checking `refs/remotes/origin/main` — doesn't exist.
+3. Falls back to returning `"master"` unconditionally — doesn't exist either.
+
+The fallback chain assumes the default branch is either "main" or "master", which is not always true.
+
+### Reproduction
+
+```bash
+# Create a remote with "develop" as default branch
+git init --bare --initial-branch=develop /tmp/test-remote.git
+git clone /tmp/test-remote.git /tmp/work && cd /tmp/work
+git checkout -b develop && echo "content" > file.txt && git add . && git commit -m "init"
+git push -u origin develop && cd /tmp
+
+# Try wt init
+mkdir /tmp/my-project && cd /tmp/my-project
+node /workspace/bin/wt.mjs init file:///tmp/test-remote.git
+# → fatal: invalid reference: origin/master
+# → exit 1
+```
+
+### Fix
+
+After the fetch in `initFromUrl()` (src/commands/init.ts, line 188), run `git remote set-head origin --auto` to set `refs/remotes/origin/HEAD` based on the remote's actual HEAD. This makes `git symbolic-ref refs/remotes/origin/HEAD --short` work correctly in `defaultBranch()`.
+
+Alternatively, improve the fallback in `defaultBranch()`: instead of blindly returning "master", enumerate all `refs/remotes/origin/*` branches and pick the first one (or raise a clear error if none exist).
+
+### Vision reference
+
+VISION.md §2.2: "Create all configured worktree slots (default: 5) via `git worktree add --detach`, each detached at `origin/main` (or the remote default branch)." — The parenthetical "(or the remote default branch)" explicitly requires detecting the actual default branch, not assuming it is "main" or "master".
+
+---
+
 ## BUG-011: TUI crashes with unhandled Ink error when stdin is not a TTY
 
 **Status**: fixed

@@ -1,3 +1,13 @@
+## 2026-02-23T21-30-00Z
+
+Location: ~/wt-usage-tests/2026-02-23T21-30-00Z/
+Tests performed:
+- wt init from URL with non-main default branch ("develop"): created bare remote with `--initial-branch=develop`, pushed branches develop, feature/alpha, feature/beta, feature/gamma; ran `wt init file:///path/to/remote-repo.git` into empty directory; bare clone succeeded, fetch populated refs/remotes/origin/{develop,feature/alpha,feature/beta,feature/gamma}; BUT `refs/remotes/origin/HEAD` was NOT set (bare clone + fetch does not create it); `defaultBranch()` fell through to check `refs/remotes/origin/main` (doesn't exist), then returned "master" unconditionally; `git worktree add --detach ... origin/master` → "fatal: invalid reference: origin/master" (exit 128); init failed — BUG FOUND
+Result: BUG FOUND
+Bug: BUG-012 — `wt init <url>` fails when remote default branch is not "main" or "master"; `defaultBranch()` fallback blindly returns "master" instead of detecting actual remote default branch (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-23T21-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-23T20-00-00Z/
