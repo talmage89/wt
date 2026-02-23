@@ -1,0 +1,13 @@
+## 2026-02-23T07:05:00Z
+
+Location: ~/wt-usage-tests/2026-02-23T10-00-00/
+Tests performed:
+- wt init from local repo URL (bare clone path)
+- wt checkout of remote-only branches (feature/auth, feature/api, fix/bug-123, feature/db)
+- wt list output format and slot assignment verification
+- Stash save on LRU eviction: slot with staged + unstaged + untracked changes evicted
+- Stash restore on branch re-checkout: verified staged/unstaged restored, untracked NOT restored
+- git stash create --include-untracked confirmed to omit untracked files (2-parent only)
+- git stash push --include-untracked confirmed to include untracked files (3-parent)
+Result: BUG FOUND
+Bug: BUG-001 — untracked files silently lost during slot eviction due to git stash create not supporting --include-untracked (see .docs/BUGS.md)
