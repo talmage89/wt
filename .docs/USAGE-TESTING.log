@@ -1,3 +1,16 @@
+## 2026-02-23T25-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-23T25-00-00Z/
+Tests performed:
+- Template with unknown `{{UNKNOWN_VAR}}` variable (retry after BUG-013 fix): configured `[[templates]]` with source containing `{{WORKTREE_DIR}}`, `{{BRANCH_NAME}}`, and `{{UNKNOWN_VAR}}`; `wt sync` succeeded (exit 0); all 7 slots got generated `.env.local`; `{{WORKTREE_DIR}}` expanded to slot name, `{{BRANCH_NAME}}` expanded to branch (empty for vacant), `{{UNKNOWN_VAR}}` left as literal string `{{UNKNOWN_VAR}}`; no error, no crash — reasonable behavior since vision §7.2 only defines two variables; checkout also regenerated template correctly with branch-specific values — PASS
+- `wt init <url>` into directory with a single dotfile: created directory with `.hidden` file, ran `wt init file://...`; exit 1, "wt: Directory is not empty. Use 'wt init' from inside an existing repository, or run from an empty directory." — correct per VISION §15.1; confirmed truly empty directory succeeds — PASS
+- Slot count increase with templates configured: changed slot_count from 5 to 7 in config.toml; `wt list` triggered reconciliation, created 2 new vacant slots with "Preparing worktree" messages; new slots received template-generated `.env.local` with correct `WORKTREE=<new-slot-name>`, empty `BRANCH=`, and literal `{{UNKNOWN_VAR}}`; reconciliation correctly runs template generation for new slots — PASS
+- `wt checkout` of branch already checked out from different slot: feature/alpha already in pure-trunk-swamp; ran `wt checkout feature/alpha` from flame-ruff-short (main); exit 0, no eviction, main slot unchanged; nav file written pointing to pure-trunk-swamp (the existing feature/alpha slot); `wt list` confirmed no slot changes — correct per VISION §3.1 step 3 (navigate to existing slot) — PASS
+- Eviction+restore cycle with templates configured: filled all 7 slots; added real dirty state to main slot (flame-ruff-short): modified file1.txt + untracked wip-main.txt + template-generated .env.local; forced eviction via `wt checkout feature/eta`; stash created for main containing all 3 files (including .env.local with WORKTREE=flame-ruff-short); re-checked out main into pure-trunk-swamp (different slot); all user files restored (wip-main.txt, modified file1.txt); .env.local regenerated with WORKTREE=pure-trunk-swamp (new slot name, not stashed old name) — template "always overwrite" (VISION §7.1) correctly overwrites stashed template content; stash cleaned up after successful restore — PASS
+Result: PASS
+
+---
+
 ## 2026-02-23T13-27-42Z
 
 Location: ~/wt-usage-tests/2026-02-23T13-27-42Z/
