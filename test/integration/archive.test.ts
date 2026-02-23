@@ -308,6 +308,79 @@ describe("dropStash", () => {
 });
 
 // ---------------------------------------------------------------------------
+// archiveStash: untracked files (BUG-014)
+// ---------------------------------------------------------------------------
+
+describe("archiveStash captures untracked files", () => {
+  it("includes untracked files from stash third parent in the archive patch", async () => {
+    const containerDir = await mktemp();
+    const { remoteDir: _r, wtDir, repoDir } = await setupRemoteContainer(containerDir);
+
+    // Checkout feature-branch
+    await runCheckout({ branch: "feature-branch", cwd: containerDir, noRestore: true });
+
+    const state = await readState(wtDir);
+    const featureSlot = Object.entries(state.slots).find(
+      ([, s]) => s.branch === "feature-branch"
+    )?.[0];
+    expect(featureSlot).toBeDefined();
+
+    // Create dirty state: one tracked modification AND one untracked file
+    await fs.writeFile(
+      path.join(containerDir, featureSlot!, "feature.txt"),
+      "modified for archive test\n"
+    );
+    await fs.writeFile(
+      path.join(containerDir, featureSlot!, "untracked-file.txt"),
+      "untracked content for archive\n"
+    );
+
+    // Force feature-branch to be LRU
+    state.slots[featureSlot!].last_used_at = new Date(0).toISOString();
+    await writeState(wtDir, state);
+
+    // Fill remaining slots to force eviction
+    const slotCount = Object.keys(state.slots).length;
+    for (let i = 0; i < slotCount - 1; i++) {
+      await execa("git", ["branch", `archive-fill-${i}`], { cwd: repoDir });
+      await runCheckout({ branch: `archive-fill-${i}`, cwd: containerDir });
+    }
+    await execa("git", ["branch", "archive-evict"], { cwd: repoDir });
+    await runCheckout({ branch: "archive-evict", cwd: containerDir, noRestore: true });
+
+    const stashMeta = await getStash(wtDir, "feature-branch");
+    expect(stashMeta).not.toBeNull();
+    expect(stashMeta!.status).toBe("active");
+
+    // Verify the stash has a third parent (untracked files)
+    const thirdParent = await execa(
+      "git",
+      ["rev-parse", "--verify", `${stashMeta!.stash_ref}^3`],
+      { cwd: repoDir, reject: false }
+    );
+    expect(thirdParent.exitCode).toBe(0);
+
+    // Archive the stash (mock zstd unavailable for easy patch reading)
+    vi.spyOn(
+      await import("../../src/core/stash.js"),
+      "isZstdAvailable"
+    ).mockResolvedValueOnce(false);
+
+    await archiveStash(wtDir, repoDir, "feature-branch");
+
+    const archivedMeta = await getStash(wtDir, "feature-branch");
+    expect(archivedMeta!.status).toBe("archived");
+    expect(archivedMeta!.archive_path).toBeDefined();
+
+    // Read the patch file and verify it contains BOTH tracked and untracked changes
+    const patchContent = await fs.readFile(archivedMeta!.archive_path!, "utf8");
+    expect(patchContent).toContain("feature.txt");
+    expect(patchContent).toContain("untracked-file.txt");
+    expect(patchContent).toContain("untracked content for archive");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // archiveStash: zstd fallback
 // ---------------------------------------------------------------------------
 
@@ -448,6 +521,49 @@ describe("wt clean with archive scan", () => {
     }
 
     expect(lines.join("")).toContain("No archived stashes");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// stash show for archived stashes (BUG-014 secondary)
+// ---------------------------------------------------------------------------
+
+describe("wt stash show for archived stash", () => {
+  it("displays the patch file content for an archived stash", async () => {
+    const containerDir = await mktemp();
+    const { remoteDir: _r, wtDir, repoDir } = await setupRemoteContainer(containerDir);
+
+    await createStashForFeatureBranch(containerDir, wtDir, repoDir);
+
+    // Mock zstd unavailable for easy patch reading
+    vi.spyOn(
+      await import("../../src/core/stash.js"),
+      "isZstdAvailable"
+    ).mockResolvedValueOnce(false);
+
+    await archiveStash(wtDir, repoDir, "feature-branch");
+
+    const meta = await getStash(wtDir, "feature-branch");
+    expect(meta!.status).toBe("archived");
+
+    // Import and call runStashShow — should display patch content, not throw
+    const { runStashShow } = await import("../../src/commands/stash.js");
+
+    const lines: string[] = [];
+    const origWrite = process.stdout.write.bind(process.stdout);
+    process.stdout.write = (chunk: string | Uint8Array): boolean => {
+      if (typeof chunk === "string") lines.push(chunk);
+      return true;
+    };
+    try {
+      await runStashShow("feature-branch", { cwd: containerDir });
+    } finally {
+      process.stdout.write = origWrite;
+    }
+
+    const output = lines.join("");
+    // Should contain the diff of the tracked file modification
+    expect(output).toContain("feature.txt");
   });
 });
 

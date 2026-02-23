@@ -1,7 +1,8 @@
 ## BUG-014: archiveStash loses untracked files — `git diff --binary` does not capture stash third parent
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-23T13:45:00Z
+**Fixed**: 2026-02-23T14:00:00Z
 **Test run**: ~/wt-usage-tests/2026-02-23T13-42-08Z/
 
 ### Description

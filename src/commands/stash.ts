@@ -238,9 +238,23 @@ export async function runStashShow(
     throw new Error(`No stash found for branch '${resolvedBranch}'.`);
   }
   if (stash.status === "archived") {
-    throw new Error(
-      `Stash is archived. Cannot show diff from archived stash.`
-    );
+    // BUG-014 secondary: archived stashes have a patch file — display it.
+    if (!stash.archive_path) {
+      throw new Error(`Stash is archived but no archive file found.`);
+    }
+    const { readFile } = await import("fs/promises");
+    let content: string;
+    if (stash.archive_path.endsWith(".zst")) {
+      const { execa } = await import("execa");
+      const result = await execa("zstd", ["-d", "-c", stash.archive_path], {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      content = result.stdout;
+    } else {
+      content = await readFile(stash.archive_path, "utf8");
+    }
+    process.stdout.write(content + "\n");
+    return;
   }
 
   // git stash show requires a non-bare working tree — use the first available slot

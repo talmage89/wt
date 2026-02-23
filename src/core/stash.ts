@@ -293,7 +293,31 @@ export async function archiveStash(
     ["diff", "--binary", meta.commit, meta.stash_ref],
     { cwd: repoDir, stdio: ["ignore", "pipe", "pipe"] }
   );
-  const patch = diffResult.stdout;
+  let patch = diffResult.stdout;
+
+  // BUG-014: Stashes created with `git stash push --include-untracked` store
+  // untracked files in a third parent. `git diff` above only captures tracked
+  // file changes. Check for a third parent and append its contents.
+  try {
+    await execa(
+      "git",
+      ["rev-parse", "--verify", `${meta.stash_ref}^3`],
+      { cwd: repoDir, stdio: ["ignore", "pipe", "pipe"] }
+    );
+    // Third parent exists — export untracked files.
+    // The third parent is a root commit (no parents), so --root is required
+    // to produce a diff against the empty tree showing all files as additions.
+    const untrackedResult = await execa(
+      "git",
+      ["diff-tree", "--root", "-r", "-p", "--binary", "--no-commit-id", `${meta.stash_ref}^3`],
+      { cwd: repoDir, stdio: ["ignore", "pipe", "pipe"] }
+    );
+    if (untrackedResult.stdout) {
+      patch += "\n# --- untracked files ---\n" + untrackedResult.stdout;
+    }
+  } catch {
+    // No third parent — stash has no untracked files, nothing to append
+  }
 
   let archivePath: string;
   if (await isZstdAvailable()) {
