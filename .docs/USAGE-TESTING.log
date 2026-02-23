@@ -1,3 +1,15 @@
+## 2026-02-23T17-30-00Z
+
+Location: ~/wt-usage-tests/2026-02-23T17-30-00Z/
+Tests performed:
+- wt init from repo with existing local branches: cloned remote, created local branches (feature/alpha, feature/beta) before running `wt init`; init succeeded (exit 0), 5 slots created, 1 on main; bare repo at .wt/repo/ retained both local branches (feature/alpha, feature/beta) and all remote-tracking branches; `wt checkout feature/alpha` succeeded, slot assigned correctly — correct per VISION §2.1 (move existing repo into .wt/repo/)
+- Slot count decrease with dirty worktrees: filled all 5 slots (main, feature/alpha-delta); created dirty state in 3 slots (main: modified file1.txt + untracked main-wip.txt; feature/alpha: untracked alpha-wip.txt; feature/beta: staged beta-staged.txt); decreased slot_count from 5 to 2 in config.toml; `wt list` triggered reconciliation — 3 LRU dirty slots evicted, 2 remaining (feature/gamma, feature/delta); `wt stash list` showed 3 active stashes (main, feature/alpha, feature/beta); `wt stash show` for each confirmed correct content preservation (modified, untracked, staged files all captured); slot directories removed — correct per VISION §10.1 (slot decrease evicts LRU) and §5.1 (dirty state stashed on eviction)
+- Missing template source file: configured two [[templates]] entries — one with existing source (.env.development) and one with nonexistent source (nonexistent.yml); `wt sync` printed "wt: template source not found: <path>" once per slot (5 times) for the missing source; exit 0 (non-fatal); existing template generated correctly in all 5 slots with proper {{WORKTREE_DIR}} and {{BRANCH_NAME}} expansion; missing template's target NOT generated (correct skip); vacant slots got empty BRANCH_NAME — correct graceful handling
+- Post-checkout hook with double-slash branch name: created .wt/hooks/post-checkout (writes $1 and $2 to file); ran `wt checkout feature/hook-test/deep` via shell function (eval'd shell-init bash); hook fired correctly with $1=slot absolute path, $2=feature/hook-test/deep (full branch name including slashes, not encoded); template .env.development also correctly expanded with BRANCH=feature/hook-test/deep — correct per VISION §4.3 and §7.2
+Result: PASS
+
+---
+
 ## 2026-02-23T16-30-00Z
 
 Location: ~/wt-usage-tests/2026-02-23T16-30-00Z/
