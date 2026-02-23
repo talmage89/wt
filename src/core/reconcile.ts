@@ -6,30 +6,59 @@ import * as git from "./git.js";
 
 /**
  * Reconcile internal state with actual git state.
- * For each slot directory in the container:
- *   - Detect current branch (or detached HEAD)
- *   - Update state.slots[name].branch accordingly
- *   - Preserve pinned status and LRU timestamps
- * Handles: direct `git checkout` by user, deleted worktrees, etc.
- * Returns the updated state (also writes it).
  *
- * This function is silent — no user-facing output.
+ * Enhanced algorithm (Phase 8.3):
+ * 1. Run `git worktree list --porcelain` from .wt/repo to get all registered
+ *    worktrees with their paths and branches.
+ * 2. List all subdirectories of containerDir that are NOT .wt.
+ * 3. Cross-reference:
+ *    a. Dir exists AND in git worktree list → normal, update branch in state.
+ *    b. Dir exists but NOT in git worktree list → orphaned directory;
+ *       warn to stderr and remove from state.
+ *    c. In git worktree list but dir missing → stale registration;
+ *       run `git worktree prune` and remove from state.
+ * 4. Remove state entries whose dirs no longer exist.
+ * 5. Run `git worktree prune` if any stale registrations were found.
+ * 6. Write and return updated state.
+ *
+ * This function is silent except for orphaned-directory warnings.
  */
 export async function reconcile(
   wtDir: string,
   containerDir: string,
   state: State
 ): Promise<State> {
-  // List all entries in containerDir
+  const repoDir = join(wtDir, "repo");
+
+  // Step 1: Get all registered worktrees from git
+  let registeredWorktrees: Array<{ path: string; head: string; branch: string | null }> = [];
+  let gitWorktreeAvailable = false;
+  try {
+    registeredWorktrees = await git.worktreeList(repoDir);
+    gitWorktreeAvailable = true;
+  } catch {
+    // If git worktree list fails, fall back to directory-based reconcile only
+  }
+
+  // Build a Set of registered worktree paths (excluding the main bare repo)
+  const registeredPaths = new Set<string>();
+  if (gitWorktreeAvailable) {
+    for (const w of registeredWorktrees) {
+      // The main repo itself may appear; skip it
+      if (w.path !== repoDir) {
+        registeredPaths.add(w.path);
+      }
+    }
+  }
+
+  // Step 2: List all slot directories in containerDir
   let entries: string[];
   try {
     entries = await readdir(containerDir);
   } catch {
-    // If we can't read the container, return state unchanged
     return state;
   }
 
-  // Find all slot directories (exclude .wt)
   const existingSlots = new Set<string>();
   for (const entry of entries) {
     if (entry === ".wt") continue;
@@ -44,9 +73,23 @@ export async function reconcile(
     }
   }
 
-  // For each existing slot directory, sync branch state
+  // Step 3: Process each existing slot directory
+  let needsPrune = false;
+
   for (const slotName of existingSlots) {
     const slotPath = join(containerDir, slotName);
+
+    if (gitWorktreeAvailable && !registeredPaths.has(slotPath)) {
+      // Case b: dir exists but NOT in git worktree list → orphaned directory
+      process.stderr.write(
+        `wt: warning: slot "${slotName}" exists on disk but is not registered as a git worktree. Removing from state.\n`
+      );
+      delete state.slots[slotName];
+      continue;
+    }
+
+    // Case a: dir exists and is registered (or git worktree list unavailable)
+    // Update branch in state to match git reality
     const actualBranch = await git.currentBranch(slotPath).catch(() => null);
 
     if (!(slotName in state.slots)) {
@@ -62,10 +105,32 @@ export async function reconcile(
     }
   }
 
-  // Remove slots whose directories no longer exist
+  // Step 4: Remove state entries whose directories no longer exist
   for (const slotName of Object.keys(state.slots)) {
     if (!existingSlots.has(slotName)) {
       delete state.slots[slotName];
+    }
+  }
+
+  // Step 3c: Check for stale worktree registrations (registered but dir missing)
+  if (gitWorktreeAvailable) {
+    for (const registeredPath of registeredPaths) {
+      try {
+        await stat(registeredPath);
+      } catch {
+        // Registered path no longer exists on disk → stale registration
+        needsPrune = true;
+        break; // One prune call will clean all stale entries
+      }
+    }
+  }
+
+  // Step 5: Run git worktree prune if needed
+  if (needsPrune) {
+    try {
+      await git.worktreePrune(repoDir);
+    } catch {
+      // Non-fatal: prune failure doesn't break anything
     }
   }
 

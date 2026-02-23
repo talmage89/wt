@@ -197,3 +197,60 @@ describe("reconcile — preserves pinned and timestamps", () => {
     expect(updated.slots[slotName].last_used_at).toBe(customTime);
   });
 });
+
+describe("reconcile — orphaned directory (not in git worktree list)", () => {
+  it("should warn and skip a plain directory that is not a registered git worktree", async () => {
+    const dir = await mktemp();
+    const { containerDir, wtDir } = await setupContainer(dir);
+
+    // Create a plain directory in the container — NOT a git worktree
+    const orphanPath = path.join(containerDir, "orphan-slot");
+    await fs.mkdir(orphanPath);
+
+    const freshState = await readState(wtDir);
+    const originalSlotCount = Object.keys(freshState.slots).length;
+
+    const updated = await reconcile(wtDir, containerDir, freshState);
+
+    // Orphaned dir should NOT be added to state
+    expect("orphan-slot" in updated.slots).toBe(false);
+    // All legitimate worktrees should still be tracked
+    expect(Object.keys(updated.slots).length).toBe(originalSlotCount);
+  });
+});
+
+describe("reconcile — stale worktree registration pruned", () => {
+  it("should prune and remove a slot whose directory was deleted without git worktree remove", async () => {
+    const dir = await mktemp();
+    const { containerDir, wtDir, repoDir } = await setupContainer(dir);
+
+    const state = await readState(wtDir);
+    const slotName = Object.keys(state.slots)[0];
+    const slotPath = path.join(containerDir, slotName);
+
+    // Delete the directory directly (bypassing git worktree remove)
+    await fs.rm(slotPath, { recursive: true, force: true });
+
+    // Verify it's gone from disk
+    await expect(fs.access(slotPath)).rejects.toThrow();
+
+    // Before reconcile, git worktree list should still show it as registered
+    const beforeWorktrees = await execa("git", ["worktree", "list"], {
+      cwd: repoDir,
+    });
+    expect(beforeWorktrees.stdout).toContain(slotName);
+
+    // Reconcile should remove from state and trigger git worktree prune
+    const freshState = await readState(wtDir);
+    const updated = await reconcile(wtDir, containerDir, freshState);
+
+    // Slot should be removed from state
+    expect(slotName in updated.slots).toBe(false);
+
+    // After reconcile, git worktree list should no longer show the stale entry
+    const afterWorktrees = await execa("git", ["worktree", "list"], {
+      cwd: repoDir,
+    });
+    expect(afterWorktrees.stdout).not.toContain(slotName);
+  });
+});
