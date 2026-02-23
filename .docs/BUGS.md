@@ -1,8 +1,8 @@
 ## BUG-006: BUG-005 fix not applied to binary — dist not rebuilt after source fix
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-23T20:00:00Z
-**Fixed**: —
+**Fixed**: 2026-02-23T21:00:00Z
 **Test run**: ~/wt-usage-tests/2026-02-23T20-00-00/
 
 ### Description
