@@ -150,7 +150,7 @@ Run `wt` with no arguments inside a managed container to open a fullscreen TUI w
 ### From source
 
 ```sh
-git clone https://github.com/anthropics/wt.git
+git clone https://github.com/talmage89/wt.git
 cd wt
 pnpm install
 pnpm build
