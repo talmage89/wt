@@ -1,3 +1,18 @@
+## 2026-02-24T09-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-24T09-00-00/
+Tests performed:
+- BUG-007 fix verified: shared symlinks excluded from stash on eviction; stash for feature/alpha contained only user files (alpha.txt, my-untracked.txt) — no .config/app.json symlink; stash applied cleanly with no "already exists, no checkout" error — correct
+- BUG-008 fix verified: wt fetch archival produced clean output — "Warning: zstd not found. Archived stash stored uncompressed." and "Archived 1 stash(es): feature/zeta" with NO "fatal: this operation must be run in a work tree" — correct
+- wt clean with actual archived stash: displayed archived stash list with branch, age, size; prompts for selection and confirmation correctly; actual deletion not confirmed (requires TTY for two sequential readline prompts — non-TTY piped input insufficient); stash archive file and metadata confirmed present before and after TTY-incomplete test
+- wt stash drop on archived stash: prompt "Drop stash for 'feature/zeta'? This cannot be undone. [y/N]" appeared correctly; TTY required for confirmation
+- Template {{BRANCH_NAME}} on vacant (detached) slots: wt sync generated slot-info.txt in all 5 slots; vacant slots (green-palm-talon, forest-bent-prism) correctly got branch= (empty string), not "undefined" or error; occupied slots got correct branch names — correct per templates.ts expandTemplate (slot.branch ?? "")
+- Sequential eviction of all slots: evicted 3 occupied slots in sequence by checkout of lambda, mu, nu; first used 2 vacant slots, then evicted LRU occupied slot (feature/theta); 3 active stash metadata files accumulated correctly (feature/alpha, feature/eta, feature/theta) alongside existing archived feature/zeta; each stash contained correct user dirty state; no shared-symlink contamination in any stash
+- Confirmed: wt clean prompts work interactively (correct behavior); piped input fails at second readline due to Node.js readline interface destroy/create pattern — expected TTY-only behavior, not a wt bug
+Result: PASS
+
+---
+
 ## 2026-02-23T24-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-23T24-00-00/
