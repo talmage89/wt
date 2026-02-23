@@ -1,3 +1,52 @@
+## BUG-005: Internal git stderr leaked during shared symlink conflict check
+
+**Status**: open
+**Found**: 2026-02-23T16:00:00Z
+**Test run**: ~/wt-usage-tests/2026-02-23T16-00-00/
+
+### Description
+
+When `wt sync` or `wt checkout` reconciles shared symlinks, `wt` internally checks whether each file is git-tracked in the worktree (Section 6.3 conflict detection). The implementation runs a git command (likely `git show HEAD:<path>` or `git ls-files --error-unmatch <path>`) with inherited stderr. For untracked files — which is the normal case, since shared files are expected to be gitignored — git emits:
+
+```
+error: pathspec '.claude/CLAUDE.md' did not match any file(s) known to git
+Did you forget to 'git add'?
+error: pathspec '.claude/settings.json' did not match any file(s) known to git
+Did you forget to 'git add'?
+```
+
+These messages are printed once per shared file per slot on every `wt sync` and on every `wt checkout` (during step 9, symlink reconciliation). With 2 shared files and 5 slots, `wt sync` produces 10 such error lines. The symlinks are correctly created despite the error output — the bug is purely the stderr leakage.
+
+**What happened**: `wt sync` printed `error: pathspec '.claude/CLAUDE.md' did not match any file(s) known to git` 10 times (2 files × 5 slots) before correctly creating all symlinks.
+
+**What should have happened**: No git error output for internal git-tracked conflict checks. The "git errors pass through verbatim" rule (VISION §15.3) applies to user-initiated git operations, not internal state queries.
+
+### Reproduction
+
+```bash
+mkdir symlink-test && cd symlink-test
+wt init <url>
+# Configure [shared] directories = [".claude"] in .wt/config.toml
+mkdir -p .wt/shared/.claude
+echo '{}' > .wt/shared/.claude/settings.json
+wt sync
+# → "error: pathspec '.claude/settings.json' did not match any file(s) known to git" × 5 (one per slot)
+wt checkout <branch>
+# → same error messages during symlink reconciliation (step 9)
+```
+
+### Vision reference
+
+VISION.md §6.3: "If a file is configured as shared but is tracked by git in the current branch of a worktree: Git wins. The symlink is not created."
+
+VISION.md §15.3: "All git errors are passed through to the user verbatim" — this applies to user-initiated operations (`git checkout`, `git fetch`, `git stash apply`), not internal state queries like checking whether a file is git-tracked.
+
+### Fix
+
+In the shared symlink reconciliation code, suppress stderr when running the internal git check for tracked files (use `stdio: ["ignore", "pipe", "pipe"]` or `stderr: 'pipe'`). A non-zero exit code simply means the file is not tracked — the symlink should be created. The error text itself is irrelevant internal noise.
+
+---
+
 ## BUG-004: `--no-restore` flag rejected by yargs strict mode ("Unknown argument: restore")
 
 **Status**: fixed

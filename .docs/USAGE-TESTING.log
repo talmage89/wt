@@ -1,3 +1,20 @@
+## 2026-02-23T16:00:00Z
+
+Location: ~/wt-usage-tests/2026-02-23T16-00-00/
+Tests performed:
+- wt init from existing repo (no URL): repo moved to .wt/repo/, 5 slots created, 1 slot on main, 4 vacant — correct
+- Slot count increase: changed slot_count from 5 to 7 in config.toml, ran wt list; 2 new vacant slots created automatically — correct
+- Slot count decrease: changed slot_count from 7 to 4, ran wt list; 3 LRU slots removed (directories and git worktree entries cleaned up) — correct
+- Slot count decrease below pinned count: pinned all 4 remaining slots, set slot_count=2, ran wt list → "wt: Cannot reduce slot count to 2: 4 worktrees are pinned. Unpin worktrees first or choose a higher count." (exit 1) — correct per VISION §10.1
+- Checkout branch already in a slot: wt checkout main (already in slot widgeon-husk-flat) → exit 0, nav file pointed to correct slot, no eviction — correct per VISION §3.1 step 3
+- Shared symlinks via wt sync: configured [shared] directories = [".claude"], created canonical files in .wt/shared/.claude/, ran wt sync; all 5 slots got correct symlinks pointing to canonical files — correct
+- Shared symlinks on checkout: wt checkout feature/slot-count ran symlink reconciliation (step 9), symlinks created correctly in the target slot — correct
+- BUG FOUND: wt sync and wt checkout print raw git error output "error: pathspec '.claude/CLAUDE.md' did not match any file(s) known to git" for every untracked shared file in every slot during the git-tracked conflict check
+Result: BUG FOUND
+Bug: BUG-005 — internal git stderr leaked during shared symlink conflict check (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-23T14:00:00Z
 
 Location: ~/wt-usage-tests/2026-02-23T14-00-00/
