@@ -1,3 +1,89 @@
+## BUG-016: Eviction fails when slot has unresolved merge conflicts from stash apply
+
+**Status**: open
+**Found**: 2026-02-23T14:25:00Z
+**Test run**: ~/wt-usage-tests/2026-02-23T14-19-16Z/
+
+### Description
+
+When a slot has unresolved merge conflicts (from a prior `git stash apply` that produced conflicts), eviction of that slot fails because `git stash push --include-untracked` cannot operate on an index with unmerged entries:
+
+```
+error: could not write index
+wt: Command failed with exit code 1: git stash push --include-untracked
+
+shared-file.txt: needs merge
+```
+
+This blocks ALL subsequent `wt checkout` commands that would need to evict the conflicted slot. The user is stuck unless they manually resolve the conflicts in the slot first.
+
+**What happened**: After `wt checkout feature/rebase-test` produced merge conflicts (stash from old base applied to new branch tip), the slot had `UU shared-file.txt` (unmerged). Attempting `wt checkout feature/epsilon` tried to evict the conflicted slot (it was LRU). `git stash push --include-untracked` failed with "error: could not write index" / "needs merge". Checkout failed with exit 1.
+
+**What should have happened**: `wt` should detect the unmerged state before attempting eviction and provide a clear error message, such as: `"Cannot evict slot '<name>': unresolved merge conflicts exist. Resolve conflicts or run 'git checkout --merge .' in <slot> first."` Alternatively, `wt` could resolve the unmerged state automatically (e.g., `git add` the conflicting files in their current state before stashing, preserving the conflict markers as content).
+
+### Reproduction
+
+```bash
+TS=$(date -u +%Y-%m-%dT%H-%M-%SZ)
+mkdir -p ~/wt-usage-tests/$TS && cd ~/wt-usage-tests/$TS
+
+# Create remote with a branch
+git init --bare test-remote.git
+cd /tmp && git clone ~/wt-usage-tests/$TS/test-remote.git work
+cd /tmp/work && echo "base" > shared.txt && git add . && git commit -m "init"
+git checkout -b feature/conflict main && echo "conflict content" > shared.txt
+git add . && git commit -m "conflict"
+git push --all && cd ~/wt-usage-tests/$TS && rm -rf /tmp/work
+
+# Init container, fill all 5 slots
+mkdir my-project && cd my-project
+wt init file://~/wt-usage-tests/$TS/test-remote.git
+wt checkout feature/conflict
+
+# Create dirty state and evict
+echo "my changes" >> <slot>/shared.txt
+# ... evict feature/conflict via LRU ...
+
+# Force-push remote to new content
+cd /tmp && git clone ~/wt-usage-tests/$TS/test-remote.git work2
+cd /tmp/work2 && git checkout feature/conflict
+echo "totally different" > shared.txt && git add . && git commit --amend -m "amended"
+git push -f origin feature/conflict && rm -rf /tmp/work2
+
+# Update local branch, checkout (conflict on stash apply)
+cd ~/wt-usage-tests/$TS/my-project
+git -C .wt/repo fetch origin
+git -C .wt/repo branch -f feature/conflict origin/feature/conflict
+wt checkout feature/conflict
+# → "Stash for feature/conflict produced conflicts. Resolve manually."
+
+# Now try to evict the conflicted slot
+wt checkout some-other-branch
+# → "error: could not write index" / "needs merge" (exit 1)
+```
+
+### Root cause
+
+In `src/core/stash.ts`, `saveStash()` calls `git stash push --include-untracked` without first checking for unmerged index entries. Git's stash command cannot create a stash when the index has unmerged paths. The error propagates up and aborts the checkout.
+
+### Fix
+
+Before calling `git stash push`, check for unmerged entries via `git diff --name-only --diff-filter=U` (or check `git status --porcelain` for `UU`/`AA`/etc. prefixes). If unmerged entries exist:
+
+1. **Option A (user-friendly error)**: Emit a clear error like `"Cannot evict '<slot>': unresolved merge conflicts. Resolve conflicts in <slot> first."` and skip eviction. Try the next LRU candidate slot instead, or fail if no other candidates exist.
+
+2. **Option B (auto-resolve)**: Run `git add .` in the slot to mark all conflicts as resolved (preserving conflict markers as file content), then proceed with `git stash push --include-untracked`. This preserves the user's work-in-progress (including conflict markers) in the stash.
+
+Option A is safer and more predictable. Option B risks confusing users who expect conflict markers to still be "unmerged" when they return.
+
+### Vision reference
+
+VISION.md §5.1: "If the slot has dirty state (any output from `git status`), create a stash." — Unmerged entries produce output from `git status`, so they are "dirty state" that should be stashed. However, `git stash push` cannot handle unmerged entries, creating an implementation gap.
+
+VISION.md §15.2: "The stash ref and metadata are retained so the user can retry or inspect later." — The retained stash combined with unmerged state creates a slot that cannot be evicted.
+
+---
+
 ## BUG-015: Slot with emptied directory (missing .git file) blocks all checkouts
 
 **Status**: fixed

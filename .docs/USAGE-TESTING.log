@@ -1,3 +1,15 @@
+## 2026-02-23T14-19-16Z
+
+Location: ~/wt-usage-tests/2026-02-23T14-19-16Z/
+Tests performed:
+- Shared symlink toggle on branch switch (git-tracked ↔ untracked): configured `[shared] directories = [".config"]` with canonical `.config/app.json`; `wt sync` correctly skipped symlinks for all slots (all on commits where `.config/app.json` is git-tracked); checked out `feature/no-config` (deleted `.config/app.json` from tree) into `low-wetland-lean` — symlink created correctly (`lrwxrwxrwx -> ../../.wt/shared/.config/app.json`), content from canonical file; checked out `feature/tracks-config` (has `.config/app.json` tracked) into `hushed-lone-grand` — regular file, NOT symlink, content `{"app":"tracked-version"}` (git-tracked version), warning "Skipping symlink... tracked by git" printed; re-checked out `feature/no-config` — symlink reappeared in `low-wetland-lean`. Full round-trip: symlink appears when file not tracked, disappears when tracked, reappears when switching back — correct per VISION §6.3 — PASS
+- Stash with ONLY untracked files (no tracked changes): created 3 untracked files (including nested `new-dir/nested.txt`) in `feature/alpha` slot with zero staged/unstaged tracked changes; evicted alpha via LRU; `wt stash show feature/alpha` confirmed all 3 files captured in stash diff; re-checked out `feature/alpha` into different slot (`wren-dim-verge`); all 3 files restored with correct content; `git status --short` showed `?? new-dir/`, `?? untracked1.txt`, `?? untracked2.txt`; stash cleaned up — untracked-only stash survives full save/restore roundtrip — PASS
+- Re-eviction of slot with unresolved merge conflicts: created stash for `feature/rebase-test` at commit `ee144b4` (dirty: modified `shared-file.txt` + untracked `re-eviction-test.txt`); force-pushed remote branch to new commit `bafd1d1` (different `shared-file.txt` content); updated local branch; checkout `feature/rebase-test` triggered stash apply with merge conflict (`UU shared-file.txt` with `<<<<<<< Updated upstream` markers); stash retained as expected per VISION §15.2; then attempted `wt checkout feature/epsilon` which tried to evict the conflicted slot — `git stash push --include-untracked` FAILED with "error: could not write index" / "shared-file.txt: needs merge" (exit 1); checkout blocked — BUG FOUND
+Result: BUG FOUND
+Bug: BUG-016 — Eviction fails when slot has unresolved merge conflicts from stash apply; `git stash push` cannot handle unmerged index entries, blocking all subsequent checkouts that would evict the conflicted slot (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-23T14-13-07Z
 
 Location: ~/wt-usage-tests/2026-02-23T14-13-07Z/
