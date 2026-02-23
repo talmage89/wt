@@ -13,6 +13,7 @@ import {
 } from "../core/slots.js";
 import { saveStash, restoreStash, touchStash } from "../core/stash.js";
 import { generateTemplates } from "../core/templates.js";
+import { establishSymlinks } from "../core/symlinks.js";
 import { writeNavFile } from "../core/nav.js";
 
 export interface CheckoutOptions {
@@ -123,8 +124,13 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
     config.templates
   );
 
-  // 12. RECONCILE SYMLINKS — skipped in Phase 3 (implemented in Phase 4)
-  // TODO: await establishSymlinks(paths.wtDir, worktreeDir, config.shared.directories, options.branch)
+  // 12. ESTABLISH SYMLINKS
+  await establishSymlinks(
+    paths.wtDir,
+    worktreeDir,
+    config.shared.directories,
+    options.branch
+  );
 
   // 13. UPDATE STATE
   markSlotUsed(state, targetSlot, options.branch);

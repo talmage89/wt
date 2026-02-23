@@ -4,6 +4,7 @@ import { hideBin } from "yargs/helpers";
 import { runInit } from "./commands/init.js";
 import { runShellInit, type ShellType } from "./commands/shell-init.js";
 import { runCheckout } from "./commands/checkout.js";
+import { runSync } from "./commands/sync.js";
 
 const cli = yargs(hideBin(process.argv))
   .scriptName("wt")
@@ -76,9 +77,13 @@ const cli = yargs(hideBin(process.argv))
       process.exit(1);
     }
   )
-  .command("sync", "Sync shared symlinks and regenerate templates", () => {}, () => {
-    process.stderr.write("wt: sync not yet implemented\n");
-    process.exit(1);
+  .command("sync", "Sync shared symlinks and regenerate templates", () => {}, async () => {
+    try {
+      await runSync();
+    } catch (err: unknown) {
+      process.stderr.write(`wt: ${(err as Error).message}\n`);
+      process.exit(1);
+    }
   })
   .command("clean", "Review and delete archived stashes", () => {}, () => {
     process.stderr.write("wt: clean not yet implemented\n");
