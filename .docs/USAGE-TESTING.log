@@ -1,3 +1,14 @@
+## 2026-02-24T12-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-24T12-00-00Z/
+Tests performed:
+- wt init from repo with dirty state (staged tracked file committed, unstaged modification, untracked file): init succeeded (exit 0); dirty state preserved in the main slot (lime-muted-close); `wt list` showed slot as "dirty"; 4 vacant slots created correctly — correct behavior per VISION §2
+- Shared symlink removed when checking out to a branch that git-tracks the shared file: configured [shared] directories=[".config"], created .wt/shared/.config/app.json, ran wt sync (all 5 slots got symlinks including vacant ones); then `wt checkout feature/tracked-config` (which has .config/app.json tracked in git): checkout FAILED — "error: The following untracked working tree files would be overwritten by checkout: .config/app.json" — BUG FOUND
+Result: BUG FOUND
+Bug: BUG-009 — `wt checkout` fails when target slot has a shared symlink that the target branch git-tracks; symlinks not removed from target slot before git checkout (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-24T11-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-24T11-00-00Z/

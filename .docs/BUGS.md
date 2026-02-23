@@ -1,3 +1,55 @@
+## BUG-009: `wt checkout` fails when target slot has a shared symlink the target branch git-tracks
+
+**Status**: open
+**Found**: 2026-02-24T12:00:00Z
+**Test run**: ~/wt-usage-tests/2026-02-24T12-00-00Z/
+
+### Description
+
+When `wt checkout <branch>` is called and the target slot already contains a shared symlink (e.g. `.config/app.json -> ../../.wt/shared/.config/app.json`) for a file that is **git-tracked** in `<branch>`, git refuses to check out:
+
+```
+error: The following untracked working tree files would be overwritten by checkout:
+	.config/app.json
+Please move or remove them before you switch branches.
+Aborting
+fatal: a branch named 'feature/tracked-config' already exists
+wt: Command failed with exit code 128
+```
+
+**What happened**: `wt checkout feature/tracked-config` returned exit 1 with git's error; the slot was not checked out.
+
+**What should have happened**: Checkout succeeds. The shared symlink is removed before `git checkout` runs (it is managed infrastructure, not user data), and step 12 (establish symlinks) correctly skips creating it because the branch tracks the file.
+
+### Reproduction
+
+```bash
+# Init container with shared [.config] configured
+wt init <remote>
+# edit .wt/config.toml: [shared] directories = [".config"]
+mkdir -p .wt/shared/.config && echo '{"shared":true}' > .wt/shared/.config/app.json
+wt sync   # installs symlink in all slots including vacant ones
+
+# Checkout a branch that has .config/app.json tracked in git
+wt checkout feature/tracked-config
+# → error: The following untracked working tree files would be overwritten by checkout:
+#        .config/app.json
+```
+
+### Root cause
+
+In `src/commands/checkout.ts`, the git checkout (step 9) runs before symlink reconciliation (step 12). The eviction block (step 8) only removes symlinks if the slot has dirty state (via `saveStash` → `removeSymlinks`). For **vacant slots** or **clean slots being evicted**, symlinks are left in place, causing git to refuse the checkout.
+
+### Fix
+
+Before `git.checkout(worktreeDir, ...)` in step 9, call `removeSymlinks(paths.wtDir, worktreeDir, config.shared.directories)` to clear all managed symlinks from the target slot. Step 12 will re-establish them after checkout (skipping any file that the new branch tracks).
+
+### Vision reference
+
+VISION.md §6.3: "When the user switches that worktree to a branch where the file is not tracked, the symlink is established." Implies that on checkout to a branch that **does** track the file, the symlink must not be present. The implementation must ensure this before git sees the working tree.
+
+---
+
 ## BUG-008: archiveStash leaks "fatal: this operation must be run in a work tree"
 
 **Status**: fixed
