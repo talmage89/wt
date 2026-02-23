@@ -1,8 +1,8 @@
 ## BUG-004: `--no-restore` flag rejected by yargs strict mode ("Unknown argument: restore")
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-23T12:00:00Z
-**Fixed**: —
+**Fixed**: 2026-02-23T13:00:00Z
 **Test run**: ~/wt-usage-tests/2026-02-23T12-00-00/
 
 ### Description

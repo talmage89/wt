@@ -76,16 +76,16 @@ const cli = yargs(hideBin(process.argv))
     (yargs) =>
       yargs
         .positional("branch", { type: "string", demandOption: true })
-        .option("no-restore", {
+        .option("restore", {
           type: "boolean",
-          default: false,
-          describe: "Skip automatic stash restoration",
+          default: true,
+          describe: "Automatically restore stash on checkout (use --no-restore to skip)",
         }),
     async (argv) => {
       try {
         await runCheckout({
           branch: argv.branch as string,
-          noRestore: argv["no-restore"],
+          noRestore: !argv.restore,
         });
       } catch (err: unknown) {
         process.stderr.write(`wt: ${(err as Error).message}\n`);
