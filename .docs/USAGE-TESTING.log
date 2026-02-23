@@ -1,3 +1,16 @@
+## 2026-02-23T19-30-00Z
+
+Location: ~/wt-usage-tests/2026-02-23T19-30-00/
+Tests performed:
+- Post-checkout hook with non-zero exit code: created `.wt/hooks/post-checkout` that writes args to a file then `exit 1`; ran checkout via shell function (`eval "$(wt shell-init bash)"`); hook fired correctly ($1=slot path, $2=branch name), stderr output visible ("Hook running but will exit with error"), checkout succeeded with exit 0 despite hook failure; VISION §4.3 does not specify behavior on hook failure, non-blocking behavior is reasonable — PASS
+- `wt stash apply` on archived stash: evicted feature/alpha (dirty), faked timestamp to 8 days ago, deleted remote branch, ran `wt fetch` — archival triggered correctly; then `wt stash apply feature/alpha` → "wt: Stash for 'feature/alpha' is archived. Use 'wt clean' to manage archived stashes." (exit 1) — correct, clear error message directing user to proper workflow — PASS
+- Template source modification then re-sync: configured `[[templates]]` with source pointing to `.wt/templates/env.development`; ran `wt sync` — all 5 slots got `.env.development` with correct `{{WORKTREE_DIR}}` and `{{BRANCH_NAME}}` expansion; modified template source (VERSION=1.0→2.0, added NEW_SETTING=enabled); ran `wt sync` again — all 5 slots regenerated with new content (VERSION=2.0 and NEW_SETTING=enabled present in all) — correct per VISION §7.1 "always overwrite" — PASS
+- Triple-slash branch name through full stash lifecycle: checked out `feature/deep/nested/path`, created dirty state (deep-wip.txt untracked, file1.txt modified), forced eviction via LRU manipulation + checkout main; stash metadata file encoded as `feature--deep--nested--path.toml` (correct per VISION §14); `wt stash show feature/deep/nested/path` displayed correct diff with all 3 files; re-checked out feature/deep/nested/path — stash auto-restored, deep-wip.txt and modified file1.txt present in new slot; stash cleaned up — full roundtrip correct — PASS
+- All 5 slots occupied+dirty, checkout new branch: filled all 5 slots with branches, added real user dirty state (untracked wip file + modified file2.txt) to every slot plus template-generated .env.development; checkout feature/epsilon — LRU slot (heavy-wax-marten / fix/urgent) correctly evicted with stash creation; `wt stash show fix/urgent` confirmed all 3 dirty files captured (template .env.development, modified file2.txt, untracked user-wip-heavy-wax-marten.txt); feature/epsilon checked out successfully in the evicted slot — correct per VISION §3.1 step 4b (LRU eviction) and §5.1 (dirty state stashing) — PASS
+Result: PASS
+
+---
+
 ## 2026-02-23T18-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-23T18-00-00Z/
