@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { PassThrough } from "node:stream";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { execa } from "execa";
@@ -290,6 +291,49 @@ describe("wt stash drop", () => {
     await expect(
       runStashDrop("nonexistent-branch", { cwd: dir, confirmYes: true })
     ).rejects.toThrow("No stash found");
+  });
+
+  it("aborts cleanly when stdin closes without data (BUG-010)", async () => {
+    const dir = await mktemp();
+    const { wtDir, repoDir } = await setupContainer(dir);
+
+    await createStashViaEviction(dir, wtDir, repoDir);
+    expect(await getStash(wtDir, "main")).not.toBeNull();
+
+    // Replace process.stdin with a PassThrough that immediately closes (simulates /dev/null)
+    const origStdin = process.stdin;
+    const fakeStdin = new PassThrough();
+    Object.defineProperty(process, "stdin", {
+      value: fakeStdin,
+      writable: true,
+      configurable: true,
+    });
+
+    // Capture stdout
+    const lines: string[] = [];
+    const origWrite = process.stdout.write.bind(process.stdout);
+    process.stdout.write = (chunk: string | Uint8Array): boolean => {
+      if (typeof chunk === "string") lines.push(chunk);
+      return true;
+    };
+
+    try {
+      // Close stdin after promptConfirm attaches listeners
+      setTimeout(() => fakeStdin.end(), 10);
+      await runStashDrop("main", { cwd: dir });
+    } finally {
+      process.stdout.write = origWrite;
+      Object.defineProperty(process, "stdin", {
+        value: origStdin,
+        writable: true,
+        configurable: true,
+      });
+    }
+
+    // Stash should NOT be dropped — promptConfirm defaulted to "N"
+    expect(await getStash(wtDir, "main")).not.toBeNull();
+    const output = lines.join("");
+    expect(output).toContain("Aborted");
   });
 });
 

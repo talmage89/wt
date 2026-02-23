@@ -1,7 +1,8 @@
 ## BUG-010: `wt stash drop` hangs/crashes when stdin is non-interactive (no data)
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-24T14:00:00Z
+**Fixed**: 2026-02-23T12:37:00Z
 **Test run**: ~/wt-usage-tests/2026-02-24T14-00-00Z/
 
 ### Description

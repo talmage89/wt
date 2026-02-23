@@ -256,17 +256,24 @@ export async function runStashShow(
 
 /**
  * Prompt the user for a yes/no confirmation on stdin.
+ * Resolves false (defaulting to "N") if stdin closes without data.
  */
 async function promptConfirm(question: string): Promise<boolean> {
   process.stdout.write(question);
   return new Promise((resolve) => {
-    let answer = "";
     process.stdin.setEncoding("utf8");
     process.stdin.resume();
-    process.stdin.once("data", (chunk: string) => {
-      answer = chunk.trim().toLowerCase();
+    const onData = (chunk: string) => {
+      process.stdin.removeListener("close", onClose);
       process.stdin.pause();
+      const answer = chunk.trim().toLowerCase();
       resolve(answer === "y" || answer === "yes");
-    });
+    };
+    const onClose = () => {
+      process.stdin.removeListener("data", onData);
+      resolve(false);
+    };
+    process.stdin.once("data", onData);
+    process.stdin.once("close", onClose);
   });
 }
