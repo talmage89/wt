@@ -1,3 +1,15 @@
+## 2026-02-24T10-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-24T10-00-00/
+Tests performed:
+- Stash apply after branch rebase (conflict scenario): saved stash at base 7ac0cb1 (shared-file.txt = "base content"), force-updated local branch tip to fe86946 (shared-file.txt = "rebased content..."), re-checked out feature/rebase-test; wt detected conflict and printed "wt: Stash for feature/rebase-test produced conflicts. Resolve manually." (exit 0); shared-file.txt contained correct conflict markers (<<<<<<< Updated upstream / ======= / >>>>>>> Stashed changes); stash retained in stash list at status=active — correct per VISION §5.2
+- Real file migration via wt sync: configured [shared] directories=[".config"], created real (non-symlink) .config/app.json in pool-wren-husk slot with content {"key":"migrated-value"}; ran wt sync; canonical file moved to .wt/shared/.config/app.json with original content preserved; pool-wren-husk slot got symlink -> ../../.wt/shared/.config/app.json; all 4 other slots also got correct symlinks — correct per VISION §6.2 "move it to .wt/shared/ and replace it with a symlink"
+- Broken symlink cleanup via wt sync: deleted canonical .wt/shared/.config/app.json; verified all 5 slots had broken symlinks; ran wt sync; all 5 broken symlinks removed cleanly (no errors, no residual files) — correct per VISION §6.2 "If a symlink is broken (target deleted), remove it"
+- Manual git worktree add in container: ran `git worktree add manual-slot feature/branch-a` directly in the bare repo; wt list showed only the 5 managed slots (ignored manual-slot), no errors, exit 0 — correct graceful handling; wt does not manage externally-added worktrees
+Result: PASS
+
+---
+
 ## 2026-02-24T09-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-24T09-00-00/
