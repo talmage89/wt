@@ -5,6 +5,7 @@ import { runInit } from "../../src/commands/init.js";
 import { readState } from "../../src/core/state.js";
 import { readConfig } from "../../src/core/config.js";
 import * as git from "../../src/core/git.js";
+import { execa } from "execa";
 import {
   createTempDir,
   createTestRepo,
@@ -218,6 +219,33 @@ describe("wt init <url> (from URL)", () => {
     await expect(
       runInit({ url: "file:///nonexistent", cwd: dir })
     ).rejects.toThrow("not empty");
+  });
+
+  it("should detect non-main/master default branch (BUG-012)", async () => {
+    // Create a remote repo with "develop" as the default branch
+    const workDir = await mktemp();
+    await execa("git", ["init", "-b", "develop"], { cwd: workDir });
+    await execa("git", ["config", "user.email", "test@wt.test"], { cwd: workDir });
+    await execa("git", ["config", "user.name", "WT Test"], { cwd: workDir });
+    await fs.writeFile(path.join(workDir, "README.md"), "# Develop\n");
+    await execa("git", ["add", "."], { cwd: workDir });
+    await execa("git", ["commit", "-m", "Initial commit on develop"], { cwd: workDir });
+
+    const remoteBase = await mktemp();
+    const remoteDir = path.join(remoteBase, "remote.git");
+    await execa("git", ["clone", "--bare", workDir, remoteDir]);
+    await cleanup(workDir);
+
+    // Init from this remote — should detect "develop" as the default branch
+    const dir = await mktemp();
+    await runInit({ url: remoteDir, cwd: dir });
+
+    const state = await readState(path.join(dir, ".wt"));
+    const activeSlots = Object.values(state.slots).filter(
+      (s) => s.branch !== null
+    );
+    expect(activeSlots.length).toBe(1);
+    expect(activeSlots[0].branch).toBe("develop");
   });
 });
 

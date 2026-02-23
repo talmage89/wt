@@ -1,7 +1,8 @@
 ## BUG-012: `wt init <url>` fails when remote default branch is not "main" or "master"
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-23T21:30:00Z
+**Fixed**: 2026-02-23T22:00:00Z
 **Test run**: ~/wt-usage-tests/2026-02-23T21-30-00Z/
 
 ### Description

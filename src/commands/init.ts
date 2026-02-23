@@ -187,6 +187,18 @@ async function initFromUrl(containerDir: string, url: string): Promise<string> {
   // This enables defaultBranch() to work and origin/<branch> refs for slot creation.
   await git.fetch(repoDir);
 
+  // Set refs/remotes/origin/HEAD to the remote's actual default branch.
+  // Bare clone + fetch does not create this ref automatically, but
+  // defaultBranch() relies on it as the primary detection method.
+  try {
+    await execa("git", ["remote", "set-head", "origin", "--auto"], {
+      cwd: repoDir,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch {
+    // Non-fatal: defaultBranch() has fallbacks for this case
+  }
+
   // Detect default branch from remote tracking refs (now populated).
   const defaultBranchName = await git.defaultBranch(repoDir);
 

@@ -199,8 +199,14 @@ export async function currentBranch(
 
 /**
  * Detect the remote default branch (e.g., "main" or "master").
+ * Tries multiple detection strategies:
+ * 1. refs/remotes/origin/HEAD (set by `git remote set-head origin --auto`)
+ * 2. Check for refs/remotes/origin/main
+ * 3. Check for refs/remotes/origin/master
+ * 4. Enumerate all refs/remotes/origin/* and pick the first
  */
 export async function defaultBranch(repoDir: string): Promise<string> {
+  // 1. Try symbolic-ref for origin/HEAD
   try {
     const result = await execa(
       "git",
@@ -211,20 +217,57 @@ export async function defaultBranch(repoDir: string): Promise<string> {
       }
     );
     const ref = result.stdout.trim();
-    // Strips "origin/" prefix
-    return ref.replace(/^origin\//, "");
+    if (ref) return ref.replace(/^origin\//, "");
   } catch {
-    // Fallback: check if main or master exists
-    try {
-      await execa("git", ["show-ref", "--verify", "refs/remotes/origin/main"], {
+    // Fall through to next strategy
+  }
+
+  // 2. Check if "main" exists on remote
+  try {
+    await execa("git", ["show-ref", "--verify", "refs/remotes/origin/main"], {
+      cwd: repoDir,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    return "main";
+  } catch {
+    // Fall through
+  }
+
+  // 3. Check if "master" exists on remote
+  try {
+    await execa("git", ["show-ref", "--verify", "refs/remotes/origin/master"], {
+      cwd: repoDir,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    return "master";
+  } catch {
+    // Fall through
+  }
+
+  // 4. Enumerate all remote branches and pick the first one
+  try {
+    const result = await execa(
+      "git",
+      ["for-each-ref", "--format=%(refname:short)", "refs/remotes/origin/"],
+      {
         cwd: repoDir,
         stdio: ["ignore", "pipe", "pipe"],
-      });
-      return "main";
-    } catch {
-      return "master";
+      }
+    );
+    const branches = result.stdout
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0 && l !== "origin/HEAD");
+    if (branches.length > 0) {
+      return branches[0].replace(/^origin\//, "");
     }
+  } catch {
+    // Fall through
   }
+
+  throw new Error(
+    "Could not detect remote default branch. No remote branches found."
+  );
 }
 
 /**
