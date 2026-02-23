@@ -1,3 +1,45 @@
+## BUG-002: "fatal: ref HEAD is not a symbolic ref" printed for every vacant slot during reconciliation
+
+**Status**: open
+**Found**: 2026-02-23T08:00:00Z
+**Fixed**:
+**Test run**: ~/wt-usage-tests/2026-02-23T08-00-00/
+
+### Description
+
+Every `wt` command that triggers reconciliation (i.e., all commands) calls `git.currentBranch(slotPath)` for each worktree slot directory. `currentBranch` runs `git symbolic-ref --short HEAD` with `stdio: ["ignore", "pipe", "inherit"]`, which means git's stderr is inherited by the process. When a slot is in detached HEAD state (vacant slots always are), this command fails with:
+
+```
+fatal: ref HEAD is not a symbolic ref
+```
+
+This error is printed once per vacant slot to the user's terminal, regardless of which `wt` command they run. With 5 slots and 4 vacant, the user sees this message 4 times on every `wt list`, `wt checkout`, etc.
+
+**What happened**: Running `wt list` on a fresh container with 5 slots (1 on `main`, 4 vacant) printed "fatal: ref HEAD is not a symbolic ref" 4 times before showing the slot table.
+
+**What should have happened**: No git error output for internal state-checking operations. The "git errors pass through verbatim" rule in VISION.md §15.3 applies to user-initiated git operations (checkout, fetch, stash apply), not internal reconciliation queries.
+
+### Reproduction
+
+```bash
+mkdir my-project && cd my-project
+wt init file:///path/to/remote.git
+wt list
+# Output: 4 × "fatal: ref HEAD is not a symbolic ref" before the slot table
+```
+
+### Vision reference
+
+VISION.md §15.3: "All git errors are passed through to the user verbatim. `wt` does not wrap, reinterpret, or suppress git error messages. If `git checkout`, `git fetch`, `git stash apply`, or any other git operation fails, the user sees git's native error output."
+
+The key phrase is "if `git checkout`, `git fetch`, `git stash apply`, **or any other git operation** fails" — this refers to user-facing operations, not internal state queries like `git symbolic-ref HEAD` used to determine whether a slot is detached. The fix is to pipe stderr for `currentBranch` (and any other internal-only git calls) rather than inheriting it.
+
+### Fix
+
+In `src/core/git.ts`, change `currentBranch` to use `stdio: ["ignore", "pipe", "pipe"]` (or `stderr: 'pipe'`) so that the expected failure for detached HEAD is silently discarded. The function already returns `null` on failure; the stderr output is noise.
+
+---
+
 ## BUG-001: Untracked files lost during slot eviction (stash create does not include untracked)
 
 **Status**: fixed

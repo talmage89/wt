@@ -1,3 +1,16 @@
+## 2026-02-23T08:00:00Z
+
+Location: ~/wt-usage-tests/2026-02-23T08-00-00/
+Tests performed:
+- wt init from local file:// URL (bare clone) — succeeded
+- wt list from inside container: showed 1 active slot (main) + 4 vacant slots correctly
+- Observed: "fatal: ref HEAD is not a symbolic ref" printed 4 times for vacant (detached HEAD) slots during reconciliation
+- Bug confirmed: currentBranch() in reconcile uses stdio inherit for stderr, leaking internal git errors to terminal
+Result: BUG FOUND
+Bug: BUG-002 — "fatal: ref HEAD is not a symbolic ref" printed for every vacant slot on every wt command (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-23T07:05:00Z
 
 Location: ~/wt-usage-tests/2026-02-23T10-00-00/
