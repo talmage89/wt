@@ -1,3 +1,67 @@
+## BUG-010: `wt stash drop` hangs/crashes when stdin is non-interactive (no data)
+
+**Status**: open
+**Found**: 2026-02-24T14:00:00Z
+**Test run**: ~/wt-usage-tests/2026-02-24T14-00-00Z/
+
+### Description
+
+`wt stash drop` (and `wt clean`) use a `promptConfirm()` helper that listens for a `"data"` event on `process.stdin`. When stdin is non-interactive (e.g., redirected from `/dev/null`, a closed pipe, or any context where stdin reaches EOF without sending data), the `"data"` event never fires. The Promise returned by `promptConfirm()` never resolves, and Node.js exits with a non-standard exit code and warning:
+
+```
+Drop stash for 'main'? This cannot be undone. [y/N] Warning: Detected unsettled top-level await at file:///workspace/dist/cli.js:949
+await cli.parseAsync();
+^
+
+(exit code 13)
+```
+
+The stash is NOT dropped (which is safe), but:
+1. Exit code 13 is non-standard — scripts expecting exit 0 (aborted) or 1 (error) will misinterpret this
+2. The Node.js "unsettled top-level await" warning is confusing noise
+3. The behavior is a crash rather than a clean abort
+
+**What happened**: `timeout 5 wt stash drop main </dev/null` printed the prompt, then immediately crashed with exit code 13 and the Node.js warning.
+
+**What should have happened**: When stdin is non-interactive (EOF with no data), `promptConfirm` should default to "N" and print "Aborted." cleanly, exiting with code 0 (or 1).
+
+### Reproduction
+
+```bash
+cd /some/wt-container
+# Ensure there is a stash for 'main' (create dirty state and evict main slot)
+wt stash drop main </dev/null
+# → prints prompt, then Node.js "unsettled top-level await" warning, exit 13
+```
+
+### Root cause
+
+In `src/commands/stash.ts`, `promptConfirm()` only attaches a `"data"` event listener:
+```typescript
+process.stdin.once("data", (chunk: string) => { ... resolve(...) });
+```
+It does not handle `"close"`, `"end"`, or `"error"` events. When stdin closes without data (EOF), the promise is permanently unsettled. Node.js detects this during shutdown and emits the "unsettled top-level await" warning.
+
+### Fix
+
+In `promptConfirm()`, also listen for the `"close"` (or `"end"`) event and resolve `false` (defaulting to "N"):
+```typescript
+process.stdin.once("data", (chunk: string) => {
+  process.stdin.removeListener("close", onClose);
+  process.stdin.pause();
+  resolve(chunk.trim().toLowerCase() === "y" || chunk.trim().toLowerCase() === "yes");
+});
+const onClose = () => resolve(false);
+process.stdin.once("close", onClose);
+```
+Alternatively, check `process.stdin.isTTY` before prompting and abort immediately with a message like "wt: stdin is not a terminal. Use --yes to confirm destructive operations."
+
+### Vision reference
+
+VISION.md §9 (CLI Commands): `wt stash drop` and `wt clean` are described as interactive operations. Graceful degradation when non-interactive is implied by good CLI design.
+
+---
+
 ## BUG-009: `wt checkout` fails when target slot has a shared symlink the target branch git-tracks
 
 **Status**: fixed

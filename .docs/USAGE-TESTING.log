@@ -1,3 +1,19 @@
+## 2026-02-24T14-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-24T14-00-00Z/
+Tests performed:
+- wt fetch: ran `wt fetch` on fresh container; printed "Fetched latest from remote." exit 0; no spurious output — correct per VISION §12
+- wt stash show [branch]: created dirty state (staged.txt + dirty.txt as untracked) in feature-alpha slot, forced eviction via multiple checkouts; `wt stash show feature-alpha` output a clean unified diff showing both files with correct content — correct per VISION §5.2.1
+- wt unpin without slot argument (current worktree): pinned hawk-plain-delta (main) via `wt pin hawk-plain-delta`; cd into hawk-plain-delta slot; ran `wt unpin` with no args; correctly detected current slot and unpinned with message "Unpinned 'hawk-plain-delta' (branch: main). It can now be evicted via LRU." exit 0; wt list confirmed pinned=false — correct per VISION §11
+- wt clean with no archived stashes: ran `wt clean` on container with no stashes; printed "No archived stashes to clean." exit 0; no crash or hang — correct graceful empty-state handling
+- wt checkout nonexistent branch (no remote): ran `wt checkout totally-nonexistent-branch-xyz`; git error passed through verbatim ("error: pathspec 'totally-nonexistent-branch-xyz' did not match any file(s) known to git"); exit 1; the target slot (hawk-plain-delta) was correctly left in detached HEAD state and marked vacant; re-running `wt checkout main` succeeded and recovered the slot — correct behavior per VISION §15.3 and §3.1 error handling
+- wt stash drop with piped input: `printf 'n\n' | wt stash drop feature-alpha` → "Aborted." exit 0; `printf 'y\n' | wt stash drop feature-alpha` → "Stash dropped for 'feature-alpha'." exit 0; stash list confirmed empty — correct
+- wt stash drop with stdin=/dev/null (non-interactive): `wt stash drop main </dev/null` → printed prompt, then Node.js "Warning: Detected unsettled top-level await" + exit code 13; stash was NOT dropped (safe), but exit code and warning are wrong — BUG FOUND
+Result: BUG FOUND
+Bug: BUG-010 — `wt stash drop` crashes with exit 13 and Node.js warning when stdin is non-interactive (no data); `promptConfirm()` does not handle stdin close/EOF event (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-24T12-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-24T12-00-00Z/
