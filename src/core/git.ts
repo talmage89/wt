@@ -71,6 +71,14 @@ export async function stashCreate(worktreeDir: string): Promise<string | null> {
   });
   if (statusResult.stdout.trim() === "") return null;
 
+  // BUG-016: If the index has unmerged entries (from a conflicted stash apply),
+  // `git stash push` cannot operate. Resolve by staging all conflicts via
+  // `git add .` — this preserves conflict markers as file content in the stash,
+  // so the user's work-in-progress (including conflict markers) is not lost.
+  if (await hasUnmergedEntries(worktreeDir)) {
+    await addAll(worktreeDir);
+  }
+
   // Create the stash — this also cleans the working tree.
   await execa("git", ["stash", "push", "--include-untracked"], {
     cwd: worktreeDir,
@@ -516,6 +524,32 @@ export async function worktreePrune(repoDir: string): Promise<void> {
   await execa("git", ["worktree", "prune"], {
     cwd: repoDir,
     stdio: ["ignore", "pipe", "inherit"],
+  });
+}
+
+/**
+ * Check if the working tree has unmerged entries (merge conflicts).
+ * Returns true if there are unresolved conflicts in the index.
+ */
+export async function hasUnmergedEntries(worktreeDir: string): Promise<boolean> {
+  const result = await execa(
+    "git",
+    ["diff", "--name-only", "--diff-filter=U"],
+    {
+      cwd: worktreeDir,
+      stdio: ["ignore", "pipe", "pipe"],
+    }
+  );
+  return result.stdout.trim().length > 0;
+}
+
+/**
+ * Run `git add .` to stage all changes (including resolving merge conflicts).
+ */
+export async function addAll(worktreeDir: string): Promise<void> {
+  await execa("git", ["add", "."], {
+    cwd: worktreeDir,
+    stdio: ["ignore", "pipe", "pipe"],
   });
 }
 

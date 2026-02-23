@@ -1,7 +1,8 @@
 ## BUG-016: Eviction fails when slot has unresolved merge conflicts from stash apply
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-23T14:25:00Z
+**Fixed**: 2026-02-23T14:30:00Z
 **Test run**: ~/wt-usage-tests/2026-02-23T14-19-16Z/
 
 ### Description

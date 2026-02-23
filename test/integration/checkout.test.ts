@@ -516,6 +516,117 @@ describe("wt checkout — error handling", () => {
   });
 });
 
+describe("wt checkout — BUG-016: eviction of slot with unresolved merge conflicts", () => {
+  it("should evict a slot that has unresolved merge conflicts from stash apply", async () => {
+    const dir = await mktemp();
+
+    // Create repo with a file we'll conflict on
+    await createTestRepo(dir);
+    const mainSlotPre = await (() => {
+      // We need to set up the conflict scenario:
+      // 1. Checkout main, create dirty state (modify a tracked file)
+      // 2. Evict main
+      // 3. Amend main's commit (simulate remote rebase)
+      // 4. Re-checkout main → stash apply produces merge conflicts
+      // 5. Try to evict the conflicted slot → this is the bug
+      return Promise.resolve(null);
+    })();
+
+    await runInit({ cwd: dir });
+    const wtDir = path.join(dir, ".wt");
+    const repoDir = path.join(dir, ".wt", "repo");
+
+    // Find and populate main slot
+    let state = await readState(wtDir);
+    const mainSlot = Object.keys(state.slots).find(
+      (n) => state.slots[n].branch === "main"
+    )!;
+    const mainSlotDir = path.join(dir, mainSlot);
+
+    // Create dirty state in main slot: modify README.md
+    await fs.writeFile(path.join(mainSlotDir, "README.md"), "my local changes\n");
+
+    // Fill all other slots so eviction is needed
+    await fillVacantSlots(dir, repoDir, ["b1", "b2", "b3", "b4"]);
+
+    // Force main's slot to be LRU
+    state = await readState(wtDir);
+    state.slots[mainSlot].last_used_at = new Date(0).toISOString();
+    await writeState(wtDir, state);
+
+    // Evict main by checking out b5
+    await createLocalBranch(repoDir, "b5");
+    await runCheckout({ branch: "b5", cwd: dir });
+
+    // Verify stash was created for main
+    const stash = await getStash(wtDir, "main");
+    expect(stash).not.toBeNull();
+
+    // Now amend main's commit in the bare repo to create a conflict scenario.
+    // We need to change README.md on main so that stash apply will conflict.
+    // Clone the bare repo, amend, and push back.
+    const tmpWork = await mktemp();
+    const tmpWorkDir = path.join(tmpWork, "work");
+    await execa("git", ["clone", repoDir, tmpWorkDir]);
+    await execa("git", ["config", "user.email", "test@wt.test"], { cwd: tmpWorkDir });
+    await execa("git", ["config", "user.name", "WT Test"], { cwd: tmpWorkDir });
+    await fs.writeFile(path.join(tmpWorkDir, "README.md"), "completely different content\n");
+    await execa("git", ["add", "."], { cwd: tmpWorkDir });
+    await execa("git", ["commit", "--amend", "-m", "Amended initial commit"], { cwd: tmpWorkDir });
+    // Push force back to the bare repo (origin = repoDir)
+    await execa("git", ["push", "--force", "origin", "main"], { cwd: tmpWorkDir });
+
+    // Now make a slot LRU so it gets evicted when we checkout main
+    state = await readState(wtDir);
+    const b1Slot = Object.keys(state.slots).find(
+      (n) => state.slots[n].branch === "b1"
+    )!;
+    state.slots[b1Slot].last_used_at = new Date(0).toISOString();
+    await writeState(wtDir, state);
+
+    await runCheckout({ branch: "main", cwd: dir });
+
+    // main should now be in a slot, but with merge conflicts
+    state = await readState(wtDir);
+    const mainSlotNow = Object.keys(state.slots).find(
+      (n) => state.slots[n].branch === "main"
+    )!;
+    const mainSlotDirNow = path.join(dir, mainSlotNow);
+
+    // Verify there are unmerged entries (conflict markers in README.md)
+    const statusOut = (
+      await execa("git", ["status", "--porcelain"], { cwd: mainSlotDirNow })
+    ).stdout;
+    // UU or AA or similar conflict marker should be present
+    expect(statusOut).toContain("README.md");
+
+    // NOW: try to evict this conflicted slot by checking out another branch.
+    // BUG-016: This used to fail with "error: could not write index" / "needs merge"
+    state = await readState(wtDir);
+    state.slots[mainSlotNow].last_used_at = new Date(0).toISOString();
+    await writeState(wtDir, state);
+
+    await createLocalBranch(repoDir, "b6");
+
+    // This must not throw — the fix resolves unmerged entries before stashing
+    await expect(
+      runCheckout({ branch: "b6", cwd: dir })
+    ).resolves.toBeDefined();
+
+    // Verify b6 is now checked out in a slot
+    state = await readState(wtDir);
+    const b6Slot = Object.keys(state.slots).find(
+      (n) => state.slots[n].branch === "b6"
+    );
+    expect(b6Slot).toBeDefined();
+
+    // A stash should have been created for main (preserving the conflict markers as content)
+    const mainStash = await getStash(wtDir, "main");
+    expect(mainStash).not.toBeNull();
+    expect(mainStash!.status).toBe("active");
+  });
+});
+
 describe("wt checkout — BUG-009: symlinks removed before git checkout", () => {
   it("should succeed when target slot has a shared symlink for a git-tracked file", async () => {
     const dir = await mktemp();
