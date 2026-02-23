@@ -1,3 +1,17 @@
+## 2026-02-24T11-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-24T11-00-00Z/
+Tests performed:
+- wt ls alias: produced identical output to wt list (5 slots, correct branch/status/pinned/last-used columns) — correct alias per VISION §9
+- wt co alias: successfully checked out feature/alpha via `wt co feature/alpha`; slot assigned, wt ls confirmed — correct alias per VISION §9
+- Non-executable .wt/hooks/post-checkout: created hook with chmod -x; ran wt co feature/beta; hook NOT executed (no /tmp/hook-fired.txt created), checkout succeeded exit 0 — correct per VISION §4.3 "if it exists and is executable"; made hook executable and confirmed it fires via shell function (hook writes /tmp/hook-fired.txt)
+- wt stash apply with no branch argument (defaults to current branch): created dirty state in feature/alpha slot (modified + untracked files), evicted via checkout of new branch feature/zeta (stash created), re-checked out feature/alpha with --no-restore (stash preserved), then ran `wt stash apply` from inside the feature/alpha slot with NO arguments; correctly defaulted to current branch feature/alpha; applied stash and cleaned up; alpha.txt modified + untracked.txt + untracked2.txt all restored — correct per VISION §5.2.1 "defaults to the current branch"
+- wt checkout with unreachable remote: set origin to file:///nonexistent/path/repo; ran wt co feature/epsilon (already in slot): git fetch error passed through verbatim ("fatal: '/nonexistent/path/repo' does not appear to be a git repository"), checkout continued, exit 0 — correct non-fatal fetch per checkout code; ran wt co feature/beta (not in slot but exists locally): fetch error printed verbatim, checkout succeeded, exit 0 — correct per VISION §15.3 (git errors pass through)
+- wt sync with no [shared] section / empty directories: removed [shared] section entirely from config.toml; ran wt sync — silent exit 0; restored config with [shared] directories=[] (empty); wt sync again — silent exit 0; wt ls worked correctly — correct no-op handling per VISION §6.4
+Result: PASS
+
+---
+
 ## 2026-02-24T10-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-24T10-00-00/
