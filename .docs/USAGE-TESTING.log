@@ -1,3 +1,17 @@
+## 2026-02-23T16-30-00Z
+
+Location: ~/wt-usage-tests/2026-02-23T16-30-00Z/
+Tests performed:
+- Branch encoding in stash operations (single slash): checked out feature/auth, created dirty state (staged.txt, file1.txt modified, auth-wip.txt untracked), evicted via checkout of other branches; `wt stash list` showed feature/auth correctly; stash metadata file encoded as feature--auth.toml; `wt stash show feature/auth` displayed all 3 files with correct diffs — correct per VISION §14 (encoding) and §5.2.1
+- Branch encoding in stash operations (double slash): checked out feature/deep/nested, created dirty state (nested-wip.txt staged, README.md modified), evicted; stash metadata encoded as feature--deep--nested.toml; `wt stash show feature/deep/nested` showed both files; `printf 'y\n' | wt stash drop feature/deep/nested` succeeded, metadata file deleted — correct per VISION §14 (double slash → double --)
+- Unpin and immediately evict: pinned all 5 slots; `wt checkout feature/deep/nested` → "All worktree slots are pinned. Unpin a worktree or increase the slot count to continue." (exit 1) — correct per VISION §11; unpinned wane-fox-fjord (fix/bug-123); `wt checkout feature/deep/nested` succeeded — wane-fox-fjord (the only unpinned slot) was correctly selected for eviction; fix/bug-123 evicted, feature/deep/nested checked in — correct per VISION §3.1 step 4b (LRU among unpinned)
+- Multiple [shared] directories simultaneously: configured [shared] directories = [".config", ".tools"] with 2 files in .config/ and 1 file in .tools/; `wt sync` produced no errors; all 5 slots received correct symlinks for all 3 files across both directories; symlink targets resolved to correct canonical content; editing through one slot's symlink was visible through another slot's symlink (single canonical copy) — correct per VISION §6.2
+- wt init in non-empty non-git directory: created directory with data.txt, ran `wt init` → "wt: Not a git repository. Use 'wt init <url>' to clone, or run from inside a git repository." (exit 1) — correct per VISION §15.1; also tested `wt init <url>` into directory with a dotfile → "wt: Directory is not empty. Use 'wt init' from inside an existing repository, or run from an empty directory." (exit 1) — correct per VISION §15.1
+- Stash list with multiple active stashes: created dirty state in 3 slots (real user files, not just symlinks), triggered sequential evictions via checkout of feature/x, feature/y, feature/z; `wt stash list` correctly showed 2 active stashes (feature/auth and main) — the other evicted slots only had shared symlinks as dirty state (removed before stashing per BUG-007 fix), so no stash was created for them; `wt stash show` for both stashes displayed correct diffs with all user files — correct per VISION §5.1 and §5.2.1
+Result: PASS
+
+---
+
 ## 2026-02-23T15-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-23T15-00-00Z/
