@@ -1,7 +1,8 @@
 ## BUG-015: Slot with emptied directory (missing .git file) blocks all checkouts
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-23T14:10:00Z
+**Fixed**: 2026-02-23T14:15:00Z
 **Test run**: ~/wt-usage-tests/2026-02-23T14-07-30Z/
 
 ### Description

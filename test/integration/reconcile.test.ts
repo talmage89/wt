@@ -219,6 +219,84 @@ describe("reconcile — orphaned directory (not in git worktree list)", () => {
   });
 });
 
+describe("reconcile — corrupted slot (directory emptied, .git missing)", () => {
+  it("should repair a slot whose directory exists but has no .git file (BUG-015)", async () => {
+    const dir = await mktemp();
+    const { containerDir, wtDir, repoDir } = await setupContainer(dir);
+
+    const state = await readState(wtDir);
+    const slotNames = Object.keys(state.slots);
+
+    // Pick a vacant slot (branch === null) to corrupt
+    const vacantSlot = slotNames.find((n) => state.slots[n].branch === null)!;
+    expect(vacantSlot).toBeDefined();
+
+    const slotPath = path.join(containerDir, vacantSlot);
+
+    // Verify the .git file exists before corruption
+    await expect(fs.access(path.join(slotPath, ".git"))).resolves.toBeUndefined();
+
+    // Empty the slot directory contents (simulates `rm -rf slot/*`)
+    const entries = await fs.readdir(slotPath, { withFileTypes: true });
+    for (const entry of entries) {
+      await fs.rm(path.join(slotPath, entry.name), { recursive: true, force: true });
+    }
+
+    // Verify .git is gone but directory exists
+    await expect(fs.access(slotPath)).resolves.toBeUndefined();
+    await expect(fs.access(path.join(slotPath, ".git"))).rejects.toThrow();
+
+    // Reconcile should detect corruption and repair the slot
+    const freshState = await readState(wtDir);
+    const updated = await reconcile(wtDir, containerDir, freshState);
+
+    // Slot should still exist in state (repaired, not removed)
+    expect(vacantSlot in updated.slots).toBe(true);
+    // It should be vacant after repair
+    expect(updated.slots[vacantSlot].branch).toBeNull();
+
+    // The repaired slot should be a valid git worktree now
+    const repairedSlotPath = path.join(containerDir, vacantSlot);
+    await expect(fs.access(path.join(repairedSlotPath, ".git"))).resolves.toBeUndefined();
+
+    // Git operations should work in the repaired slot
+    const result = await execa("git", ["status"], { cwd: repairedSlotPath });
+    expect(result.exitCode).toBe(0);
+  });
+
+  it("should allow checkout into a repaired slot after reconciliation", async () => {
+    const dir = await mktemp();
+    const { containerDir, wtDir, repoDir } = await setupContainer(dir);
+
+    // Create a branch we can checkout
+    await execa("git", ["branch", "test-repair"], { cwd: repoDir });
+
+    const state = await readState(wtDir);
+    const slotNames = Object.keys(state.slots);
+    const vacantSlot = slotNames.find((n) => state.slots[n].branch === null)!;
+    const slotPath = path.join(containerDir, vacantSlot);
+
+    // Empty the slot
+    const entries = await fs.readdir(slotPath, { withFileTypes: true });
+    for (const entry of entries) {
+      await fs.rm(path.join(slotPath, entry.name), { recursive: true, force: true });
+    }
+
+    // Reconcile repairs the slot
+    const freshState = await readState(wtDir);
+    await reconcile(wtDir, containerDir, freshState);
+
+    // Now git checkout should work in the repaired slot
+    await execa("git", ["checkout", "test-repair"], {
+      cwd: path.join(containerDir, vacantSlot),
+    });
+    const { stdout } = await execa("git", ["symbolic-ref", "--short", "HEAD"], {
+      cwd: path.join(containerDir, vacantSlot),
+    });
+    expect(stdout.trim()).toBe("test-repair");
+  });
+});
+
 describe("reconcile — stale worktree registration pruned", () => {
   it("should prune and remove a slot whose directory was deleted without git worktree remove", async () => {
     const dir = await mktemp();
