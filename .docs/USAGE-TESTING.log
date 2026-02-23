@@ -1,3 +1,15 @@
+## 2026-02-23T13-42-08Z
+
+Location: ~/wt-usage-tests/2026-02-23T13-42-08Z/
+Tests performed:
+- Eviction with only staged changes (no unstaged/untracked): staged a new file (staged-only.txt) in main slot, no unstaged or untracked files; filled all 5 slots, manipulated LRU ordering, forced eviction of main via checkout of feature/eta; stash created; `wt stash show main` confirmed staged-only.txt captured; re-checked out main into different slot (spar-lake-deer); staged-only.txt restored AND still in staging area ("Changes to be committed"); stash cleaned up — correct per VISION §5.1 and §5.2 — PASS
+- Archive stash with untracked files — data loss bug: evicted main again (now with staged-only.txt staged + archive-test-file.txt untracked); stash created with 3 parents (confirmed third parent contains archive-test-file.txt via `git ls-tree`); faked last_used_at to 13 days ago, deleted main from remote, ran `wt fetch`; archival triggered; BUT archived patch file `.wt/stashes/archive/main.patch` only contains staged-only.txt — archive-test-file.txt (untracked) is MISSING; root cause: `git diff --binary <commit> <stash_ref>` does not capture untracked files from stash's third parent — BUG FOUND
+- Secondary: `wt stash show` on archived stash returns "Stash is archived. Cannot show diff from archived stash." (exit 1); since the patch file IS the diff, this should be displayable
+Result: BUG FOUND
+Bug: BUG-014 — archiveStash loses untracked files; `git diff --binary` does not capture stash third parent (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-23T25-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-23T25-00-00Z/

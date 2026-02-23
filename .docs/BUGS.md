@@ -1,3 +1,93 @@
+## BUG-014: archiveStash loses untracked files — `git diff --binary` does not capture stash third parent
+
+**Status**: open
+**Found**: 2026-02-23T13:45:00Z
+**Test run**: ~/wt-usage-tests/2026-02-23T13-42-08Z/
+
+### Description
+
+When `archiveStash` exports a stash to a patch file, it runs `git diff --binary <commit> <stash_ref>`. This produces a diff between the base commit and the stash merge commit's tree. However, a stash created with `git stash push --include-untracked` stores untracked files in a **third parent** of the stash commit, not in the main commit's tree. The `git diff` command only captures tracked file changes (staged and unstaged modifications to tracked files), silently dropping all untracked files from the archive.
+
+**What happened**: Main slot had `staged-only.txt` (staged new file) and `archive-test-file.txt` (untracked). Slot was evicted, stash created with 3 parents (confirmed third parent contains `archive-test-file.txt`). Stash was archived via `wt fetch`. The resulting `.wt/stashes/archive/main.patch` only contains `staged-only.txt`. `archive-test-file.txt` is silently lost.
+
+**What should have happened**: The archived patch file should contain ALL dirty state from the stash, including untracked files from the third parent. After archival, the patch should be a complete representation of the stash.
+
+### Secondary issue
+
+`wt stash show` on an archived stash returns "Stash is archived. Cannot show diff from archived stash." (exit 1). Since the archived patch file IS the diff, `wt stash show` should be able to display the patch file contents for archived stashes.
+
+### Reproduction
+
+```bash
+TS=$(date -u +%Y-%m-%dT%H-%M-%SZ)
+mkdir -p ~/wt-usage-tests/$TS && cd ~/wt-usage-tests/$TS
+
+# Create remote, init container
+git init --bare test-remote.git
+cd /tmp && git clone ~/wt-usage-tests/$TS/test-remote.git work
+cd /tmp/work && echo "base" > file1.txt && git add . && git commit -m "init"
+for b in feature/{a,b,c,d,e}; do git checkout -b $b main; echo "$b" > b.txt; git add . && git commit -m "$b"; done
+git push --all && cd ~/wt-usage-tests/$TS && rm -rf /tmp/work
+mkdir my-project && cd my-project
+wt init file://~/wt-usage-tests/$TS/test-remote.git
+
+# Fill all 5 slots
+for b in feature/{a,b,c,d}; do wt checkout $b; done
+
+# Create dirty state with untracked file in main slot
+MAIN_SLOT=$(wt list | grep main | awk '{print $1}')
+cd $MAIN_SLOT
+echo "untracked content" > untracked-file.txt
+echo "staged content" > staged-file.txt && git add staged-file.txt
+
+# Evict main (create 6th branch to force eviction)
+cd /tmp && git clone ~/wt-usage-tests/$TS/test-remote.git work2
+cd /tmp/work2 && git checkout -b feature/f main && echo "f" > f.txt && git add . && git commit -m "f" && git push origin feature/f
+cd ~/wt-usage-tests/$TS/my-project && rm -rf /tmp/work2
+# Touch other slots to make main LRU
+wt checkout feature/a && wt checkout feature/b && wt checkout feature/c && wt checkout feature/d
+wt checkout feature/f  # evicts main
+
+# Verify stash has both files
+wt stash show main  # should show both staged-file.txt and untracked-file.txt
+
+# Fake timestamp and delete remote branch to trigger archival
+# Edit .wt/stashes/main.toml: set last_used_at to 10 days ago
+# Delete main from remote
+wt fetch  # triggers archival
+
+# Check archive — untracked-file.txt is MISSING
+cat .wt/stashes/archive/main.patch
+# Only shows staged-file.txt, not untracked-file.txt
+```
+
+### Root cause
+
+In `src/core/stash.ts` line 291-295, `archiveStash` runs:
+```typescript
+const diffResult = await execa("git", ["diff", "--binary", meta.commit, meta.stash_ref], { cwd: repoDir, ... });
+```
+
+`git diff <commit> <stash_ref>` compares the base commit tree against the stash commit's tree. The stash commit's tree only contains tracked files. Untracked files are stored in the stash's third parent (`<stash_ref>^3`), which `git diff` doesn't inspect.
+
+### Fix
+
+The archive export needs to also capture untracked files from the stash's third parent. Approach:
+
+1. Check if the stash has a third parent: `git rev-parse --verify <stash_ref>^3`
+2. If it does, export untracked files: `git diff-tree -r -p --binary --no-commit-id <stash_ref>^3` (diff the third parent's tree against the empty tree)
+3. Concatenate both diffs into the patch file, separated by a marker comment (e.g., `# --- untracked files ---`)
+
+Or use `git format-patch` / `git show` approaches that can handle the three-parent stash structure.
+
+### Vision reference
+
+VISION.md §5.3: "Archived — Compressed patch file (`.wt/stashes/archive/<branch>.patch.zst`) + metadata TOML." — The patch file must contain all dirty state (staged, unstaged, AND untracked) to be a faithful archive.
+
+VISION.md §5.1: "Dirty state is defined as everything that appears in `git status`: staged changes, unstaged changes, and untracked files."
+
+---
+
 ## BUG-013: Generated config.toml prevents adding templates via documented `[[templates]]` syntax
 
 **Status**: fixed
