@@ -1,6 +1,7 @@
-import { findContainer, currentSlotName } from "../core/container.js";
+import { findContainer, validateContainer, currentSlotName } from "../core/container.js";
 import { readState, writeState } from "../core/state.js";
 import { reconcile } from "../core/reconcile.js";
+import { acquireLock } from "../core/lock.js";
 
 export interface PinOptions {
   cwd?: string;
@@ -19,32 +20,38 @@ export async function runPin(
   if (!paths) {
     throw new Error("Not inside a wt-managed container.");
   }
+  await validateContainer(paths);
 
-  let state = await readState(paths.wtDir);
-  state = await reconcile(paths.wtDir, paths.container, state);
+  const release = await acquireLock(paths.wtDir);
+  try {
+    let state = await readState(paths.wtDir);
+    state = await reconcile(paths.wtDir, paths.container, state);
 
-  // Resolve slot
-  const resolvedSlot = slotName ?? currentSlotName(cwd, paths);
-  if (!resolvedSlot) {
-    throw new Error("Not inside a worktree slot. Specify a slot name.");
+    // Resolve slot
+    const resolvedSlot = slotName ?? currentSlotName(cwd, paths);
+    if (!resolvedSlot) {
+      throw new Error("Not inside a worktree slot. Specify a slot name.");
+    }
+
+    if (!(resolvedSlot in state.slots)) {
+      throw new Error(`Slot '${resolvedSlot}' not found.`);
+    }
+
+    if (state.slots[resolvedSlot].pinned) {
+      process.stdout.write(`Slot '${resolvedSlot}' is already pinned.\n`);
+      return;
+    }
+
+    state.slots[resolvedSlot].pinned = true;
+    await writeState(paths.wtDir, state);
+
+    const branch = state.slots[resolvedSlot].branch ?? "(vacant)";
+    process.stdout.write(
+      `Pinned '${resolvedSlot}' (branch: ${branch}). It will not be evicted.\n`
+    );
+  } finally {
+    await release();
   }
-
-  if (!(resolvedSlot in state.slots)) {
-    throw new Error(`Slot '${resolvedSlot}' not found.`);
-  }
-
-  if (state.slots[resolvedSlot].pinned) {
-    process.stdout.write(`Slot '${resolvedSlot}' is already pinned.\n`);
-    return;
-  }
-
-  state.slots[resolvedSlot].pinned = true;
-  await writeState(paths.wtDir, state);
-
-  const branch = state.slots[resolvedSlot].branch ?? "(vacant)";
-  process.stdout.write(
-    `Pinned '${resolvedSlot}' (branch: ${branch}). It will not be evicted.\n`
-  );
 }
 
 /**
@@ -60,30 +67,36 @@ export async function runUnpin(
   if (!paths) {
     throw new Error("Not inside a wt-managed container.");
   }
+  await validateContainer(paths);
 
-  let state = await readState(paths.wtDir);
-  state = await reconcile(paths.wtDir, paths.container, state);
+  const release = await acquireLock(paths.wtDir);
+  try {
+    let state = await readState(paths.wtDir);
+    state = await reconcile(paths.wtDir, paths.container, state);
 
-  // Resolve slot
-  const resolvedSlot = slotName ?? currentSlotName(cwd, paths);
-  if (!resolvedSlot) {
-    throw new Error("Not inside a worktree slot. Specify a slot name.");
+    // Resolve slot
+    const resolvedSlot = slotName ?? currentSlotName(cwd, paths);
+    if (!resolvedSlot) {
+      throw new Error("Not inside a worktree slot. Specify a slot name.");
+    }
+
+    if (!(resolvedSlot in state.slots)) {
+      throw new Error(`Slot '${resolvedSlot}' not found.`);
+    }
+
+    if (!state.slots[resolvedSlot].pinned) {
+      process.stdout.write(`Slot '${resolvedSlot}' is not pinned.\n`);
+      return;
+    }
+
+    state.slots[resolvedSlot].pinned = false;
+    await writeState(paths.wtDir, state);
+
+    const branch = state.slots[resolvedSlot].branch ?? "(vacant)";
+    process.stdout.write(
+      `Unpinned '${resolvedSlot}' (branch: ${branch}). It can now be evicted via LRU.\n`
+    );
+  } finally {
+    await release();
   }
-
-  if (!(resolvedSlot in state.slots)) {
-    throw new Error(`Slot '${resolvedSlot}' not found.`);
-  }
-
-  if (!state.slots[resolvedSlot].pinned) {
-    process.stdout.write(`Slot '${resolvedSlot}' is not pinned.\n`);
-    return;
-  }
-
-  state.slots[resolvedSlot].pinned = false;
-  await writeState(paths.wtDir, state);
-
-  const branch = state.slots[resolvedSlot].branch ?? "(vacant)";
-  process.stdout.write(
-    `Unpinned '${resolvedSlot}' (branch: ${branch}). It can now be evicted via LRU.\n`
-  );
 }

@@ -1,8 +1,9 @@
 import path from "path";
-import { findContainer } from "../core/container.js";
+import { findContainer, validateContainer } from "../core/container.js";
 import { readState, writeState } from "../core/state.js";
 import { readConfig } from "../core/config.js";
 import { reconcile } from "../core/reconcile.js";
+import { acquireLock } from "../core/lock.js";
 import * as git from "../core/git.js";
 import {
   findSlotForBranch,
@@ -35,7 +36,10 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
   if (!paths) {
     throw new Error("Not inside a wt-managed container.");
   }
+  await validateContainer(paths);
 
+  const release = await acquireLock(paths.wtDir);
+  try {
   // 2. READ STATE + CONFIG
   let state = await readState(paths.wtDir);
   const config = await readConfig(paths.wtDir);
@@ -178,4 +182,7 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
   // 15. NAVIGATE
   await writeNavFile(worktreeDir);
   return worktreeDir;
+  } finally {
+    await release();
+  }
 }

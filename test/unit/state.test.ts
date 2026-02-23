@@ -97,6 +97,29 @@ last_checkout_at = "2024-01-03T00:00:00.000Z"
   });
 });
 
+describe("readState — corrupted TOML", () => {
+  it("returns defaultState and warns to stderr when TOML is malformed", async () => {
+    await writeFile(join(tmpDir, "state.toml"), "[[[[not valid toml!!!!", "utf8");
+
+    const stderrChunks: string[] = [];
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk: string | Uint8Array) => {
+      stderrChunks.push(String(chunk));
+      return true;
+    };
+
+    let result;
+    try {
+      result = await readState(tmpDir);
+    } finally {
+      process.stderr.write = origWrite;
+    }
+
+    expect(result).toEqual(defaultState());
+    expect(stderrChunks.join("")).toContain("corrupted");
+  });
+});
+
 describe("writeState / round-trip", () => {
   it("round-trips a state with active and vacant slots", async () => {
     const state = {

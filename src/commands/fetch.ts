@@ -1,7 +1,8 @@
-import { findContainer } from "../core/container.js";
+import { findContainer, validateContainer } from "../core/container.js";
 import { readState, writeState } from "../core/state.js";
 import { readConfig } from "../core/config.js";
 import { reconcile } from "../core/reconcile.js";
+import { acquireLock } from "../core/lock.js";
 import * as git from "../core/git.js";
 import { archiveScan } from "../core/stash.js";
 
@@ -24,23 +25,29 @@ export async function runFetch(options: FetchOptions = {}): Promise<void> {
   if (!paths) {
     throw new Error("Not inside a wt-managed container.");
   }
+  await validateContainer(paths);
 
-  let state = await readState(paths.wtDir);
-  state = await reconcile(paths.wtDir, paths.container, state);
-  await writeState(paths.wtDir, state);
+  const release = await acquireLock(paths.wtDir);
+  try {
+    let state = await readState(paths.wtDir);
+    state = await reconcile(paths.wtDir, paths.container, state);
+    await writeState(paths.wtDir, state);
 
-  await git.fetch(paths.repoDir);
-  process.stdout.write("Fetched latest from remote.\n");
+    await git.fetch(paths.repoDir);
+    process.stdout.write("Fetched latest from remote.\n");
 
-  const config = await readConfig(paths.wtDir);
-  const { archived } = await archiveScan(
-    paths.wtDir,
-    paths.repoDir,
-    config.archive_after_days
-  );
-  if (archived.length > 0) {
-    process.stderr.write(
-      `Archived ${archived.length} stash(es): ${archived.join(", ")}\n`
+    const config = await readConfig(paths.wtDir);
+    const { archived } = await archiveScan(
+      paths.wtDir,
+      paths.repoDir,
+      config.archive_after_days
     );
+    if (archived.length > 0) {
+      process.stderr.write(
+        `Archived ${archived.length} stash(es): ${archived.join(", ")}\n`
+      );
+    }
+  } finally {
+    await release();
   }
 }

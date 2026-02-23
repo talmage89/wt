@@ -43,7 +43,15 @@ export async function readState(wtDir: string): Promise<State> {
     throw err;
   }
 
-  const parsed = parse(raw) as Record<string, unknown>;
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = parse(raw) as Record<string, unknown>;
+  } catch {
+    process.stderr.write(
+      "Warning: .wt/state.toml is corrupted. Regenerating from git state.\n"
+    );
+    return defaultState();
+  }
 
   const slots: Record<string, SlotState> = {};
   if (parsed["slots"] && typeof parsed["slots"] === "object") {

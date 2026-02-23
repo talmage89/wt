@@ -76,6 +76,17 @@ export async function createContainerStructure(
 }
 
 /**
+ * Validate that the container is not corrupted.
+ * Checks that .wt/repo/ exists.
+ * Throws a user-facing error if the container is missing its repo.
+ */
+export async function validateContainer(paths: ContainerPaths): Promise<void> {
+  if (!(await isDir(paths.repoDir))) {
+    throw new Error("Container is corrupted: .wt/repo/ is missing.");
+  }
+}
+
+/**
  * Determine which worktree slot the given directory is inside, if any.
  * Returns the slot name (directory name) or null.
  */

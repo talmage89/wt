@@ -1,7 +1,8 @@
 import path from "node:path";
-import { findContainer, currentSlotName } from "../core/container.js";
+import { findContainer, validateContainer, currentSlotName } from "../core/container.js";
 import { readState, writeState } from "../core/state.js";
 import { reconcile } from "../core/reconcile.js";
+import { acquireLock } from "../core/lock.js";
 import {
   listStashes,
   getStash,
@@ -40,6 +41,7 @@ export async function runStashList(options: StashOptions = {}): Promise<void> {
   if (!paths) {
     throw new Error("Not inside a wt-managed container.");
   }
+  await validateContainer(paths);
 
   const stashes = await listStashes(paths.wtDir);
   if (stashes.length === 0) {
@@ -122,45 +124,51 @@ export async function runStashApply(
   if (!paths) {
     throw new Error("Not inside a wt-managed container.");
   }
+  await validateContainer(paths);
 
-  let state = await readState(paths.wtDir);
-  state = await reconcile(paths.wtDir, paths.container, state);
-  await writeState(paths.wtDir, state);
+  const release = await acquireLock(paths.wtDir);
+  try {
+    let state = await readState(paths.wtDir);
+    state = await reconcile(paths.wtDir, paths.container, state);
+    await writeState(paths.wtDir, state);
 
-  const resolvedBranch = await resolveBranch(branch, cwd, paths, state);
+    const resolvedBranch = await resolveBranch(branch, cwd, paths, state);
 
-  const stash = await getStash(paths.wtDir, resolvedBranch);
-  if (!stash) {
-    throw new Error(`No stash found for branch '${resolvedBranch}'.`);
-  }
-  if (stash.status === "archived") {
-    throw new Error(
-      `Stash for '${resolvedBranch}' is archived. Use 'wt clean' to manage archived stashes.`
-    );
-  }
-
-  const slot = findSlotForBranch(state, resolvedBranch);
-  if (!slot) {
-    throw new Error(
-      `Branch '${resolvedBranch}' is not checked out in any slot. Run 'wt checkout ${resolvedBranch}' first.`
-    );
-  }
-
-  const worktreeDir = path.join(paths.container, slot);
-  const result = await restoreStash(paths.wtDir, paths.repoDir, resolvedBranch, worktreeDir);
-
-  switch (result) {
-    case "restored":
-      process.stdout.write(`Stash applied and cleaned up for '${resolvedBranch}'.\n`);
-      break;
-    case "conflict":
-      process.stdout.write(
-        `Stash applied with conflicts. Resolve manually, then run 'wt stash drop ${resolvedBranch}'.\n`
+    const stash = await getStash(paths.wtDir, resolvedBranch);
+    if (!stash) {
+      throw new Error(`No stash found for branch '${resolvedBranch}'.`);
+    }
+    if (stash.status === "archived") {
+      throw new Error(
+        `Stash for '${resolvedBranch}' is archived. Use 'wt clean' to manage archived stashes.`
       );
-      break;
-    case "none":
-      process.stdout.write(`No stash found for '${resolvedBranch}'.\n`);
-      break;
+    }
+
+    const slot = findSlotForBranch(state, resolvedBranch);
+    if (!slot) {
+      throw new Error(
+        `Branch '${resolvedBranch}' is not checked out in any slot. Run 'wt checkout ${resolvedBranch}' first.`
+      );
+    }
+
+    const worktreeDir = path.join(paths.container, slot);
+    const result = await restoreStash(paths.wtDir, paths.repoDir, resolvedBranch, worktreeDir);
+
+    switch (result) {
+      case "restored":
+        process.stdout.write(`Stash applied and cleaned up for '${resolvedBranch}'.\n`);
+        break;
+      case "conflict":
+        process.stdout.write(
+          `Stash applied with conflicts. Resolve manually, then run 'wt stash drop ${resolvedBranch}'.\n`
+        );
+        break;
+      case "none":
+        process.stdout.write(`No stash found for '${resolvedBranch}'.\n`);
+        break;
+    }
+  } finally {
+    await release();
   }
 }
 
@@ -178,27 +186,33 @@ export async function runStashDrop(
   if (!paths) {
     throw new Error("Not inside a wt-managed container.");
   }
+  await validateContainer(paths);
 
-  const state = await readState(paths.wtDir);
-  const resolvedBranch = await resolveBranch(branch, cwd, paths, state);
+  const release = await acquireLock(paths.wtDir);
+  try {
+    const state = await readState(paths.wtDir);
+    const resolvedBranch = await resolveBranch(branch, cwd, paths, state);
 
-  const stash = await getStash(paths.wtDir, resolvedBranch);
-  if (!stash) {
-    throw new Error(`No stash found for branch '${resolvedBranch}'.`);
-  }
-
-  if (!options.confirmYes) {
-    const confirmed = await promptConfirm(
-      `Drop stash for '${resolvedBranch}'? This cannot be undone. [y/N] `
-    );
-    if (!confirmed) {
-      process.stdout.write("Aborted.\n");
-      return;
+    const stash = await getStash(paths.wtDir, resolvedBranch);
+    if (!stash) {
+      throw new Error(`No stash found for branch '${resolvedBranch}'.`);
     }
-  }
 
-  await dropStash(paths.wtDir, paths.repoDir, resolvedBranch);
-  process.stdout.write(`Stash dropped for '${resolvedBranch}'.\n`);
+    if (!options.confirmYes) {
+      const confirmed = await promptConfirm(
+        `Drop stash for '${resolvedBranch}'? This cannot be undone. [y/N] `
+      );
+      if (!confirmed) {
+        process.stdout.write("Aborted.\n");
+        return;
+      }
+    }
+
+    await dropStash(paths.wtDir, paths.repoDir, resolvedBranch);
+    process.stdout.write(`Stash dropped for '${resolvedBranch}'.\n`);
+  } finally {
+    await release();
+  }
 }
 
 /**
@@ -214,6 +228,7 @@ export async function runStashShow(
   if (!paths) {
     throw new Error("Not inside a wt-managed container.");
   }
+  await validateContainer(paths);
 
   const state = await readState(paths.wtDir);
   const resolvedBranch = await resolveBranch(branch, cwd, paths, state);

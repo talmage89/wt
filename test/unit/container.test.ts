@@ -5,6 +5,7 @@ import { tmpdir } from "os";
 import {
   findContainer,
   createContainerStructure,
+  validateContainer,
   currentSlotName,
 } from "../../src/core/container.js";
 
@@ -83,6 +84,31 @@ describe("createContainerStructure", () => {
   it("is idempotent — does not throw if directories already exist", async () => {
     await createContainerStructure(tmpDir);
     await expect(createContainerStructure(tmpDir)).resolves.not.toThrow();
+  });
+});
+
+describe("validateContainer", () => {
+  it("resolves when .wt/repo/ exists", async () => {
+    await mkdir(join(tmpDir, ".wt", "repo"), { recursive: true });
+    const paths = {
+      container: tmpDir,
+      wtDir: join(tmpDir, ".wt"),
+      repoDir: join(tmpDir, ".wt", "repo"),
+    };
+    await expect(validateContainer(paths)).resolves.toBeUndefined();
+  });
+
+  it("throws when .wt/repo/ is missing", async () => {
+    await mkdir(join(tmpDir, ".wt"), { recursive: true });
+    // .wt/repo/ intentionally absent
+    const paths = {
+      container: tmpDir,
+      wtDir: join(tmpDir, ".wt"),
+      repoDir: join(tmpDir, ".wt", "repo"),
+    };
+    await expect(validateContainer(paths)).rejects.toThrow(
+      "Container is corrupted: .wt/repo/ is missing."
+    );
   });
 });
 
