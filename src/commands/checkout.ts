@@ -11,7 +11,7 @@ import {
   markSlotUsed,
   markSlotVacant,
 } from "../core/slots.js";
-import { saveStash, restoreStash, touchStash } from "../core/stash.js";
+import { saveStash, restoreStash, touchStash, archiveScan } from "../core/stash.js";
 import { generateTemplates } from "../core/templates.js";
 import { establishSymlinks } from "../core/symlinks.js";
 import { writeNavFile } from "../core/nav.js";
@@ -49,7 +49,21 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
     // Fetch errors are not fatal — continue with local state
   }
 
-  // 5. ARCHIVE SCAN — skipped in Phase 3 (implemented in Phase 6)
+  // 5. ARCHIVE SCAN
+  try {
+    const { archived } = await archiveScan(
+      paths.wtDir,
+      paths.repoDir,
+      config.archive_after_days
+    );
+    if (archived.length > 0) {
+      process.stderr.write(
+        `Archived ${archived.length} stash(es): ${archived.join(", ")}\n`
+      );
+    }
+  } catch {
+    // Archive scan errors are not fatal — continue checkout
+  }
 
   // 6. BRANCH ALREADY IN A SLOT?
   const existingSlot = findSlotForBranch(state, options.branch);
@@ -79,8 +93,16 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
   if (!isVacant(state.slots[targetSlot])) {
     const evictedBranch = state.slots[targetSlot].branch!;
 
-    // Save stash if dirty
-    await saveStash(paths.wtDir, paths.repoDir, evictedBranch, worktreeDir);
+    // Save stash if dirty.
+    // Note: git stash create does NOT clean the working tree — it only records
+    // the dirty state as a commit object. We must reset + clean manually so that
+    // the subsequent branch checkout does not fail with "local changes would be
+    // overwritten".
+    const stashed = await saveStash(paths.wtDir, paths.repoDir, evictedBranch, worktreeDir);
+    if (stashed) {
+      await git.hardReset(worktreeDir);
+      await git.cleanUntracked(worktreeDir);
+    }
 
     // Detach HEAD
     await git.checkoutDetach(worktreeDir);

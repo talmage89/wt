@@ -394,6 +394,26 @@ export async function checkoutTrack(
   );
 }
 
+/**
+ * Run `git reset --hard HEAD` to discard all tracked file changes.
+ */
+export async function hardReset(worktreeDir: string): Promise<void> {
+  await execa("git", ["reset", "--hard", "HEAD"], {
+    cwd: worktreeDir,
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+}
+
+/**
+ * Run `git clean -fd` to remove untracked files and directories.
+ */
+export async function cleanUntracked(worktreeDir: string): Promise<void> {
+  await execa("git", ["clean", "-fd"], {
+    cwd: worktreeDir,
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+}
+
 /** Add a named remote to the repo. */
 export async function addRemote(
   repoDir: string,

@@ -2,8 +2,9 @@ import * as fs from "node:fs/promises";
 import * as readline from "node:readline";
 import { findContainer } from "../core/container.js";
 import { readState, writeState } from "../core/state.js";
+import { readConfig } from "../core/config.js";
 import { reconcile } from "../core/reconcile.js";
-import { listStashes, dropStash, StashMetadata } from "../core/stash.js";
+import { listStashes, dropStash, archiveScan, StashMetadata } from "../core/stash.js";
 
 export interface CleanOptions {
   cwd?: string;
@@ -73,8 +74,8 @@ export async function runClean(options: CleanOptions = {}): Promise<void> {
   state = await reconcile(paths.wtDir, paths.container, state);
   await writeState(paths.wtDir, state);
 
-  // Archive scan stub (full implementation in Phase 6)
-  // Phase 5: no-op here; Phase 6 will call archiveScan(paths.wtDir, paths.repoDir)
+  const config = await readConfig(paths.wtDir);
+  await archiveScan(paths.wtDir, paths.repoDir, config.archive_after_days);
 
   const allStashes = await listStashes(paths.wtDir);
   const archived = allStashes.filter((s) => s.status === "archived");

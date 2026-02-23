@@ -1,6 +1,7 @@
 import { parse, stringify } from "smol-toml";
-import { readFile, writeFile, unlink, readdir } from "fs/promises";
+import { readFile, writeFile, unlink, readdir, mkdir } from "fs/promises";
 import { join } from "path";
+import { execa } from "execa";
 import { encodeBranch } from "./branch-encode.js";
 import * as git from "./git.js";
 
@@ -241,4 +242,125 @@ export async function touchStash(wtDir: string, branch: string): Promise<void> {
     stringify(serializeMetadata(meta)),
     "utf8"
   );
+}
+
+/**
+ * Check if the zstd binary is available on this system.
+ */
+export async function isZstdAvailable(): Promise<boolean> {
+  try {
+    await execa("zstd", ["--version"], { stdio: "pipe" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Archive a single active stash:
+ * 1. Export patch via `git stash show -p`
+ * 2. Compress with zstd (or store uncompressed if zstd unavailable)
+ * 3. Delete git ref
+ * 4. Update metadata: status="archived", archived_at, archive_path
+ */
+export async function archiveStash(
+  wtDir: string,
+  repoDir: string,
+  branch: string
+): Promise<void> {
+  const meta = await getStash(wtDir, branch);
+  if (!meta || meta.status !== "active") return;
+
+  const encoded = encodeBranch(branch);
+  const archiveDir = join(wtDir, "stashes", "archive");
+  await mkdir(archiveDir, { recursive: true });
+
+  // Export patch — use git diff to reliably capture all changes
+  let patch: string;
+  try {
+    patch = await git.stashShow(repoDir, meta.stash_ref);
+  } catch {
+    // Fallback: use git diff between base commit and stash ref
+    const result = await execa(
+      "git",
+      ["diff", "--binary", meta.commit, meta.stash_ref],
+      { cwd: repoDir, stdio: ["ignore", "pipe", "inherit"] }
+    );
+    patch = result.stdout;
+  }
+
+  let archivePath: string;
+  if (await isZstdAvailable()) {
+    archivePath = join(archiveDir, `${encoded}.patch.zst`);
+    await execa("zstd", ["-f", "-o", archivePath], {
+      input: patch,
+      stdio: ["pipe", "pipe", "inherit"],
+    });
+  } else {
+    archivePath = join(archiveDir, `${encoded}.patch`);
+    await writeFile(archivePath, patch, "utf8");
+    process.stderr.write(
+      "Warning: zstd not found. Archived stash stored uncompressed.\n"
+    );
+  }
+
+  // Delete git ref (ignore if already gone)
+  try {
+    await git.deleteRef(repoDir, `refs/wt/stashes/${encoded}`);
+  } catch {
+    // Ref may already be deleted
+  }
+
+  // Update metadata
+  meta.status = "archived";
+  meta.archived_at = new Date().toISOString();
+  meta.archive_path = archivePath;
+  await writeFile(
+    stashFilePath(wtDir, branch),
+    stringify(serializeMetadata(meta)),
+    "utf8"
+  );
+}
+
+/**
+ * Scan all active stashes and archive those that qualify:
+ * - Branch does NOT exist on the remote, AND
+ * - last_used_at is older than archiveAfterDays days ago
+ *
+ * Returns lists of archived and skipped branch names.
+ */
+export async function archiveScan(
+  wtDir: string,
+  repoDir: string,
+  archiveAfterDays: number
+): Promise<{ archived: string[]; skipped: string[] }> {
+  const stashes = await listStashes(wtDir);
+  const activeStashes = stashes.filter((s) => s.status === "active");
+
+  const archived: string[] = [];
+  const skipped: string[] = [];
+
+  for (const stash of activeStashes) {
+    // Check age: governed by last_used_at (not created_at)
+    const lastUsed = new Date(stash.last_used_at);
+    const daysSinceUse =
+      (Date.now() - lastUsed.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSinceUse < archiveAfterDays) {
+      skipped.push(stash.branch);
+      continue;
+    }
+
+    // Check remote: branch must NOT exist on remote
+    const existsOnRemote = await git.remoteBranchExists(repoDir, stash.branch);
+    if (existsOnRemote) {
+      skipped.push(stash.branch);
+      continue;
+    }
+
+    // Both conditions met — archive
+    await archiveStash(wtDir, repoDir, stash.branch);
+    archived.push(stash.branch);
+  }
+
+  return { archived, skipped };
 }

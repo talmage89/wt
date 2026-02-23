@@ -1,7 +1,9 @@
 import { findContainer } from "../core/container.js";
 import { readState, writeState } from "../core/state.js";
+import { readConfig } from "../core/config.js";
 import { reconcile } from "../core/reconcile.js";
 import * as git from "../core/git.js";
+import { archiveScan } from "../core/stash.js";
 
 export interface FetchOptions {
   cwd?: string;
@@ -29,4 +31,16 @@ export async function runFetch(options: FetchOptions = {}): Promise<void> {
 
   await git.fetch(paths.repoDir);
   process.stdout.write("Fetched latest from remote.\n");
+
+  const config = await readConfig(paths.wtDir);
+  const { archived } = await archiveScan(
+    paths.wtDir,
+    paths.repoDir,
+    config.archive_after_days
+  );
+  if (archived.length > 0) {
+    process.stderr.write(
+      `Archived ${archived.length} stash(es): ${archived.join(", ")}\n`
+    );
+  }
 }
