@@ -6,6 +6,8 @@ import { runInit } from "../../src/commands/init.js";
 import { runCheckout } from "../../src/commands/checkout.js";
 import { readState, writeState } from "../../src/core/state.js";
 import { getStash } from "../../src/core/stash.js";
+import { readConfig, writeConfig } from "../../src/core/config.js";
+import { syncAllSymlinks } from "../../src/core/symlinks.js";
 import { createTempDir, createTestRepo, cleanup, exists } from "./helpers.js";
 
 const temps: string[] = [];
@@ -511,5 +513,68 @@ describe("wt checkout — error handling", () => {
     await expect(
       runCheckout({ branch: "nonexistent-branch-xyz", cwd: containerDir })
     ).rejects.toBeDefined();
+  });
+});
+
+describe("wt checkout — BUG-009: symlinks removed before git checkout", () => {
+  it("should succeed when target slot has a shared symlink for a git-tracked file", async () => {
+    const dir = await mktemp();
+
+    // Build repo with a branch that git-tracks .config/app.json
+    await createTestRepo(dir);
+    await execa("git", ["checkout", "-b", "feature/tracked-config"], { cwd: dir });
+    await fs.mkdir(path.join(dir, ".config"), { recursive: true });
+    await fs.writeFile(path.join(dir, ".config", "app.json"), '{"tracked":true}\n');
+    await execa("git", ["add", "."], { cwd: dir });
+    await execa("git", ["commit", "-m", "Add .config/app.json"], { cwd: dir });
+    await execa("git", ["checkout", "main"], { cwd: dir });
+
+    // Init wt container
+    await runInit({ cwd: dir });
+
+    const wtDir = path.join(dir, ".wt");
+    const state = await readState(wtDir);
+
+    // Update config to include .config as a shared directory
+    const config = await readConfig(wtDir);
+    config.shared.directories = [".config"];
+    await writeConfig(wtDir, config);
+
+    // Create canonical shared file and install symlinks in all slots (simulates wt sync)
+    const canonicalDir = path.join(wtDir, "shared", ".config");
+    await fs.mkdir(canonicalDir, { recursive: true });
+    await fs.writeFile(path.join(canonicalDir, "app.json"), '{"shared":true}\n');
+    await syncAllSymlinks(wtDir, dir, state.slots, [".config"]);
+
+    // Sanity check: at least one slot has the symlink installed
+    const hasSymlink = (
+      await Promise.all(
+        Object.keys(state.slots).map(async (slotName) => {
+          const p = path.join(dir, slotName, ".config", "app.json");
+          const st = await fs.lstat(p).catch(() => null);
+          return st?.isSymbolicLink() ?? false;
+        })
+      )
+    ).some(Boolean);
+    expect(hasSymlink).toBe(true);
+
+    // Checkout the branch that tracks .config/app.json — must not throw
+    // (without the fix, git fails with "untracked working tree files would be overwritten")
+    await expect(
+      runCheckout({ branch: "feature/tracked-config", cwd: dir })
+    ).resolves.toBeDefined();
+
+    // The slot should have the branch checked out
+    const newState = await readState(wtDir);
+    const trackedSlot = Object.entries(newState.slots).find(
+      ([, s]) => s.branch === "feature/tracked-config"
+    )?.[0];
+    expect(trackedSlot).toBeDefined();
+
+    // The file in the slot should be the real git-tracked file, not a symlink
+    const configPath = path.join(dir, trackedSlot!, ".config", "app.json");
+    const st = await fs.lstat(configPath);
+    expect(st.isSymbolicLink()).toBe(false);
+    expect(st.isFile()).toBe(true);
   });
 });

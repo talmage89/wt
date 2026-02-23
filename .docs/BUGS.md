@@ -1,7 +1,8 @@
 ## BUG-009: `wt checkout` fails when target slot has a shared symlink the target branch git-tracks
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-24T12:00:00Z
+**Fixed**: 2026-02-24T13:00:00Z
 **Test run**: ~/wt-usage-tests/2026-02-24T12-00-00Z/
 
 ### Description

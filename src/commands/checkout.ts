@@ -15,7 +15,7 @@ import {
 } from "../core/slots.js";
 import { saveStash, restoreStash, touchStash, archiveScan } from "../core/stash.js";
 import { generateTemplates } from "../core/templates.js";
-import { establishSymlinks } from "../core/symlinks.js";
+import { establishSymlinks, removeSymlinks } from "../core/symlinks.js";
 import { writeNavFile } from "../core/nav.js";
 
 export interface CheckoutOptions {
@@ -120,6 +120,10 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
   }
 
   // 9. CHECKOUT BRANCH
+  // Remove managed symlinks from target slot before git checkout.
+  // git refuses to checkout if a symlink exists for a file the target branch tracks.
+  await removeSymlinks(paths.wtDir, worktreeDir, config.shared.directories);
+
   let checkoutError: unknown = null;
   try {
     await git.checkout(worktreeDir, options.branch);
