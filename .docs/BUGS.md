@@ -1,3 +1,76 @@
+## BUG-013: Generated config.toml prevents adding templates via documented `[[templates]]` syntax
+
+**Status**: open
+**Found**: 2026-02-23T13:30:00Z
+**Test run**: ~/wt-usage-tests/2026-02-23T13-27-42Z/
+
+### Description
+
+`wt init` generates a `config.toml` containing `templates = []` (a TOML inline array assignment). When a user later edits the file to add templates using the `[[templates]]` array-of-tables syntax shown in VISION §10, the TOML parser rejects the file:
+
+```
+wt: Invalid TOML document: trying to redefine an already defined table or value
+
+8:  [[templates]]
+      ^
+9:  source = "templates/env.test"
+```
+
+**What happened**: After `wt init`, the generated config.toml contains `templates = []`. User appended:
+```toml
+[[templates]]
+source = "templates/env.test"
+target = ".env.test"
+```
+Running `wt sync` failed with "Invalid TOML document: trying to redefine an already defined table or value" (exit 1).
+
+**What should have happened**: Users should be able to add templates using the `[[templates]]` syntax documented in VISION §10 without needing to first manually remove the `templates = []` line.
+
+### Root cause
+
+In `src/core/config.ts`, `writeConfig()` serializes the config with `smol-toml`'s `stringify()`. When `templates` is an empty array, `stringify` outputs `templates = []`. In TOML, once a key is defined as a simple value (`templates = []`), it cannot be redefined using array-of-tables syntax (`[[templates]]`). The two syntaxes are mutually exclusive for the same key.
+
+### Reproduction
+
+```bash
+mkdir test-proj && cd test-proj
+wt init <url>
+cat .wt/config.toml
+# → contains: templates = []
+
+# Append templates per VISION §10 syntax:
+cat >> .wt/config.toml <<'EOF'
+
+[[templates]]
+source = "templates/env.test"
+target = ".env.test"
+EOF
+
+wt sync
+# → wt: Invalid TOML document: trying to redefine an already defined table or value (exit 1)
+```
+
+### Fix
+
+In `writeConfig()`, when `templates` is empty, omit the `templates` key entirely instead of writing `templates = []`. When `templates` has entries, `smol-toml`'s `stringify` should produce the correct `[[templates]]` array-of-tables format. Alternatively, construct the TOML data object such that empty arrays of tables are not serialized. Example fix:
+
+```typescript
+const data: Record<string, unknown> = {
+  slot_count: config.slot_count,
+  archive_after_days: config.archive_after_days,
+  shared: { directories: config.shared.directories },
+};
+if (config.templates.length > 0) {
+  data.templates = config.templates;
+}
+```
+
+### Vision reference
+
+VISION.md §10 (Configuration): Shows the documented way to configure templates using `[[templates]]` array-of-tables syntax. The generated config.toml must be compatible with this syntax.
+
+---
+
 ## BUG-012: `wt init <url>` fails when remote default branch is not "main" or "master"
 
 **Status**: fixed

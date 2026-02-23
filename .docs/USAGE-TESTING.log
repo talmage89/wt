@@ -1,3 +1,15 @@
+## 2026-02-23T13-27-42Z
+
+Location: ~/wt-usage-tests/2026-02-23T13-27-42Z/
+Tests performed:
+- wt init from repo in detached HEAD state: cloned remote, ran `git checkout --detach HEAD`, then `wt init`; init succeeded (exit 0), 5 slots created, all vacant — no starting branch recorded because HEAD was detached; `wt list` showed 5 vacant slots; no slot checked out to any branch; user would need `wt checkout main` to start working — not a crash, but vision §2.1 step 5 ("Check out the starting branch in one slot") was silently skipped; arguable edge case, not filed as bug since vision doesn't explicitly address detached HEAD init — PASS (marginal)
+- wt checkout of a tag name (v1.0.0): `wt checkout v1.0.0` on initialized container; exit 0; a vacant slot (ruby-rind-grim) was selected, git detached at tag commit; `wt list` showed slot as "(vacant)" because detached HEAD ≠ branch; state.toml recorded "v1.0.0" in branch_history but slot has no branch field; nav file pointed to correct slot; behavior is reasonable for branch-centric tool — PASS (edge case noted)
+- Template with unknown `{{UNKNOWN_VAR}}` variable: configured `[[templates]]` with source containing `{{UNKNOWN_VAR}}` alongside `{{WORKTREE_DIR}}` and `{{BRANCH_NAME}}`; COULD NOT TEST — adding `[[templates]]` to config.toml failed because init generated `templates = []` which conflicts with TOML array-of-tables syntax — BUG FOUND
+Result: BUG FOUND
+Bug: BUG-013 — Generated config.toml contains `templates = []` which prevents adding templates via documented `[[templates]]` syntax (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-23T13-21-46Z
 
 Location: ~/wt-usage-tests/2026-02-23T13-21-46Z/
