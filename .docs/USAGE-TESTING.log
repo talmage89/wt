@@ -1,3 +1,16 @@
+## 2026-02-23T15-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-23T15-00-00Z/
+Tests performed:
+- Self-eviction (checkout when current slot IS the LRU candidate): filled all 5 slots; from garnet-smooth-bur (main, the LRU), created dirty state (wip.txt + modified file1.txt), then ran `wt checkout feature/epsilon`; garnet-smooth-bur correctly evicted itself — stash created for main with both files, feature/epsilon checked out in same slot; `wt stash show main` confirmed both modified and untracked files preserved — correct per VISION §3.1 step 4b (LRU selection) and §5.1 (stash save)
+- Nav file lifecycle via shell function: ran `bash -c 'eval "$(wt shell-init bash)"; wt checkout feature/beta'` with PATH including /workspace/bin; no nav file existed before checkout; after checkout, nav file consumed and deleted by shell function; cwd correctly changed to nettle-cairn-light (feature/beta slot) — correct per VISION §4.2 (nav file mechanism)
+- Deeply nested shared directories: configured [shared] directories=[".config/deep/nested"]; created 2 canonical files (settings.json, env.local) at .wt/shared/.config/deep/nested/; ran wt sync; all 5 slots received correct symlinks at .config/deep/nested/{settings.json,env.local} with proper relative path depth (../../../../.wt/shared/...); symlink content resolved correctly — correct per VISION §6.2
+- Drop archived stash (verify full cleanup): created stash for feature/epsilon, faked timestamp to 8 days ago, deleted remote branch, ran `wt fetch` — archival triggered; patch file at .wt/stashes/archive/feature--epsilon.patch + metadata at .wt/stashes/feature--epsilon.toml both present with status=archived; ran `printf 'y\n' | wt stash drop feature/epsilon`; both patch file AND metadata TOML deleted; stash list empty; archive dir empty — correct per VISION §5.5
+- Multiple stash accumulation + sequential restore: evicted 3 branches (beta, zeta, main) with unique dirty state; each got independent stash with correct content per `wt stash show`; re-checked out all 3 in sequence; beta restored beta-unique.txt + modified file2.txt ✓; zeta restored zeta-work.txt + modified file2.txt ✓; main restored wip.txt + modified file1.txt ✓; all 3 stashes cleaned up after successful restore; 2 new stashes created for alpha and gamma (evicted during restoration) — correct per VISION §5.2 (restore) and §5.1 (save on eviction)
+Result: PASS
+
+---
+
 ## 2026-02-24T14-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-24T14-00-00Z/
