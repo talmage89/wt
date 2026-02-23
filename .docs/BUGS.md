@@ -1,7 +1,8 @@
 ## BUG-003: Shell function causes infinite recursion → segfault due to `command -v wt` returning function name
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-23T09:00:00Z
+**Fixed**: 2026-02-23T10:00:00Z
 **Test run**: ~/wt-usage-tests/2026-02-23T09-00-00/
 
 ### Description

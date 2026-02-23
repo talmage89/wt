@@ -3,11 +3,11 @@ export type ShellType = "bash" | "zsh" | "fish";
 // Shell function for bash — wraps the wt binary to handle directory navigation.
 // After commands that produce a nav file (/tmp/wt-nav-$$), cd to the target dir
 // and run the post-checkout hook if present.
+//
+// `command wt` bypasses the shell function and invokes the external wt binary
+// directly, preventing infinite recursion when the function shadows the binary.
 const BASH_SCRIPT = `wt() {
-  local wt_bin
-  wt_bin="$(command -v wt)" || { echo "wt: binary not found" >&2; return 1; }
-
-  "$wt_bin" "$@"
+  command wt "$@"
   local exit_code=$?
 
   local nav_file="/tmp/wt-nav-$$"
@@ -32,11 +32,10 @@ const BASH_SCRIPT = `wt() {
 // zsh is compatible with the bash version for this use case
 const ZSH_SCRIPT = BASH_SCRIPT;
 
+// `command wt` in fish bypasses the function and calls the external binary,
+// preventing infinite recursion.
 const FISH_SCRIPT = `function wt
-    set -l wt_bin (command -v wt)
-    or begin; echo "wt: binary not found" >&2; return 1; end
-
-    $wt_bin $argv
+    command wt $argv
     set -l exit_code $status
 
     set -l nav_file "/tmp/wt-nav-$fish_pid"
