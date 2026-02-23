@@ -15,6 +15,25 @@ import {
 import { runList } from "./commands/list.js";
 import { runPin, runUnpin } from "./commands/pin.js";
 import { runClean } from "./commands/clean.js";
+import { findContainer } from "./core/container.js";
+
+// When invoked with no arguments, launch the TUI (if inside a container)
+// or show help (if outside).
+if (process.argv.length <= 2) {
+  const paths = await findContainer(process.cwd());
+  if (paths) {
+    const { render } = await import("ink");
+    const React = await import("react");
+    const { App } = await import("./tui/App.js");
+    const { waitUntilExit } = render(
+      React.createElement(App, { containerPaths: paths })
+    );
+    await waitUntilExit();
+    process.exit(0);
+  } else {
+    // Print help below after building the cli object
+  }
+}
 
 const cli = yargs(hideBin(process.argv))
   .scriptName("wt")
@@ -201,5 +220,10 @@ const cli = yargs(hideBin(process.argv))
   .strict()
   .help()
   .version("0.1.0");
+
+if (process.argv.length <= 2) {
+  cli.showHelp();
+  process.exit(0);
+}
 
 await cli.parseAsync();

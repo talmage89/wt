@@ -6,4 +6,8 @@ export default defineConfig({
   sourcemap: true,
   dts: true,
   clean: true,
+  esbuildOptions(options) {
+    options.jsx = "automatic";
+    options.jsxImportSource = "react";
+  },
 });
