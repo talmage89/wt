@@ -3,6 +3,7 @@ import { findContainer } from "../core/container.js";
 import { readState, writeState } from "../core/state.js";
 import { readConfig } from "../core/config.js";
 import { reconcile } from "../core/reconcile.js";
+import { adjustSlotCount } from "../core/slots.js";
 import * as git from "../core/git.js";
 
 export interface ListOptions {
@@ -36,8 +37,14 @@ export async function runList(options: ListOptions = {}): Promise<void> {
   }
 
   let state = await readState(paths.wtDir);
-  await readConfig(paths.wtDir); // validate config exists
+  const config = await readConfig(paths.wtDir);
   state = await reconcile(paths.wtDir, paths.container, state);
+
+  // Adjust slot count if config changed
+  if (Object.keys(state.slots).length !== config.slot_count) {
+    state = await adjustSlotCount(paths.repoDir, paths.container, paths.wtDir, state, config);
+  }
+
   await writeState(paths.wtDir, state);
 
   // Collect info for each slot

@@ -1,7 +1,12 @@
 import { join } from "path";
 import { generateSlotName } from "./words.js";
-import { worktreeAdd } from "./git.js";
+import { worktreeAdd, worktreeRemove, defaultBranch, hardReset, cleanUntracked, refExists } from "./git.js";
 import type { State, SlotState } from "./state.js";
+import { writeState } from "./state.js";
+import type { Config } from "./config.js";
+import { saveStash } from "./stash.js";
+import { generateTemplates } from "./templates.js";
+import { establishSymlinks } from "./symlinks.js";
 
 /**
  * Create N worktree slots in the container directory.
@@ -106,4 +111,94 @@ export function markSlotVacant(state: State, slotName: string): void {
     throw new Error(`Slot not found: ${slotName}`);
   }
   slot.branch = null;
+}
+
+/**
+ * Adjust slot count to match the configured value.
+ * - Increasing: create new vacant slots with templates + symlinks.
+ * - Decreasing: evict excess slots (LRU order), error if pinned > new count.
+ */
+export async function adjustSlotCount(
+  repoDir: string,
+  containerDir: string,
+  wtDir: string,
+  state: State,
+  config: Config
+): Promise<State> {
+  const currentCount = Object.keys(state.slots).length;
+  const targetCount = config.slot_count;
+
+  if (currentCount === targetCount) return state;
+
+  if (targetCount > currentCount) {
+    // Increasing: create new vacant slots
+    const newCount = targetCount - currentCount;
+    const existingNames = new Set(Object.keys(state.slots));
+
+    // Resolve commit ref for new slots (prefer origin/<default> if it exists, fallback to HEAD)
+    let slotCommit: string;
+    try {
+      const branch = await defaultBranch(repoDir);
+      const remoteRef = `refs/remotes/origin/${branch}`;
+      slotCommit = (await refExists(repoDir, remoteRef)) ? `origin/${branch}` : "HEAD";
+    } catch {
+      slotCommit = "HEAD";
+    }
+
+    const newNames = await createSlots(repoDir, containerDir, newCount, slotCommit, existingNames);
+    const now = new Date().toISOString();
+
+    for (const name of newNames) {
+      state.slots[name] = { branch: null, last_used_at: now, pinned: false };
+    }
+
+    // Generate templates and symlinks for each new slot (vacant)
+    for (const name of newNames) {
+      const slotDir = join(containerDir, name);
+      await generateTemplates(wtDir, slotDir, name, "", config.templates);
+      await establishSymlinks(wtDir, slotDir, config.shared.directories, "");
+    }
+
+    await writeState(wtDir, state);
+  } else {
+    // Decreasing: remove excess slots
+    const excessCount = currentCount - targetCount;
+    const pinnedCount = Object.values(state.slots).filter((s) => s.pinned).length;
+
+    if (pinnedCount > targetCount) {
+      throw new Error(
+        `Cannot reduce slot count to ${targetCount}: ${pinnedCount} worktrees are pinned. Unpin worktrees first or choose a higher count.`
+      );
+    }
+
+    // Sort non-pinned slots by last_used_at ascending (LRU first = oldest first)
+    const evictionCandidates = Object.entries(state.slots)
+      .filter(([, slot]) => !slot.pinned)
+      .sort(
+        ([, a], [, b]) =>
+          new Date(a.last_used_at).getTime() - new Date(b.last_used_at).getTime()
+      );
+
+    const toEvict = evictionCandidates.slice(0, excessCount);
+
+    for (const [slotName, slot] of toEvict) {
+      const slotPath = join(containerDir, slotName);
+
+      if (slot.branch !== null) {
+        // Save stash if dirty, then clean so worktree remove succeeds
+        const stashed = await saveStash(wtDir, repoDir, slot.branch, slotPath);
+        if (stashed) {
+          await hardReset(slotPath);
+          await cleanUntracked(slotPath);
+        }
+      }
+
+      await worktreeRemove(repoDir, slotPath);
+      delete state.slots[slotName];
+    }
+
+    await writeState(wtDir, state);
+  }
+
+  return state;
 }

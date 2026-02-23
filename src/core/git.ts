@@ -425,3 +425,43 @@ export async function addRemote(
     stdio: ["ignore", "pipe", "inherit"],
   });
 }
+
+/**
+ * Run `git worktree remove --force <path>`.
+ * Removes the worktree directory and its git metadata.
+ * Uses --force to handle any remaining state after stash+clean.
+ */
+export async function worktreeRemove(
+  repoDir: string,
+  worktreePath: string
+): Promise<void> {
+  await execa("git", ["worktree", "remove", "--force", worktreePath], {
+    cwd: repoDir,
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+}
+
+/**
+ * Run `git worktree prune` to clean up stale worktree registrations.
+ */
+export async function worktreePrune(repoDir: string): Promise<void> {
+  await execa("git", ["worktree", "prune"], {
+    cwd: repoDir,
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+}
+
+/**
+ * Check if a git ref exists (e.g., refs/remotes/origin/main).
+ */
+export async function refExists(repoDir: string, ref: string): Promise<boolean> {
+  try {
+    await execa("git", ["rev-parse", "--verify", ref], {
+      cwd: repoDir,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}

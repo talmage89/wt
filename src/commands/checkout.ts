@@ -10,6 +10,7 @@ import {
   isVacant,
   markSlotUsed,
   markSlotVacant,
+  adjustSlotCount,
 } from "../core/slots.js";
 import { saveStash, restoreStash, touchStash, archiveScan } from "../core/stash.js";
 import { generateTemplates } from "../core/templates.js";
@@ -41,6 +42,11 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
 
   // 3. RECONCILE
   state = await reconcile(paths.wtDir, paths.container, state);
+
+  // 3b. ADJUST SLOT COUNT if config changed
+  if (Object.keys(state.slots).length !== config.slot_count) {
+    state = await adjustSlotCount(paths.repoDir, paths.container, paths.wtDir, state, config);
+  }
 
   // 4. FETCH (errors pass through verbatim)
   try {
