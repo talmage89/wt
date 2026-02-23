@@ -1,3 +1,21 @@
+## 2026-02-23T14:00:00Z
+
+Location: ~/wt-usage-tests/2026-02-23T14-00-00/
+Tests performed:
+- Discovered: BUG-004 source fix was committed but dist/ was never rebuilt (pnpm build not run). Binary still had old `.option("no-restore")` code. Fixed by running `pnpm build` at start of session.
+- --no-restore flag (BUG-004 fix verified post-rebuild): `wt checkout --no-restore feature/auth` succeeded (exit 0), worktree clean, stash preserved in `wt stash list` — correct
+- wt stash apply (manual): `wt stash apply feature/auth` restored staged, unstaged, and untracked files; stash cleaned up on success; "Stash applied and cleaned up for 'feature/auth'." — correct (staged state becomes unstaged after apply, expected behavior of `git stash apply` without --index per VISION §5.2)
+- wt stash apply on branch not in any slot: `wt stash apply feature/evict-trigger` (stash exists, branch evicted) → "wt: Branch 'feature/evict-trigger' is not checked out in any slot. Run 'wt checkout feature/evict-trigger' first." (exit 1) — correct
+- wt stash apply with no stash: `wt stash apply feature/api` → "wt: No stash found for branch 'feature/api'." (exit 1) — correct
+- wt fetch: ran wt fetch after adding upstream commit to feature/api; output showed "Fetched latest from remote." and remote tracking ref in bare repo updated to new commit — correct
+- Template files via wt sync: configured [[templates]] in config.toml with source "templates/.env.development" (uses {{WORKTREE_DIR}} and {{BRANCH_NAME}}), ran `wt sync`; all 5 slots got correct .env.development with slot-specific WORKTREE_DIR and branch-specific BRANCH_NAME values — correct
+- Template regeneration on wt checkout: checked out feature/evict-trigger into spit-lupine-cool; .env.development regenerated with BRANCH=feature/evict-trigger — correct
+- Observation: generated template files (.env.development) are untracked, causing all slots to show as "dirty" in wt list — expected behavior per VISION §7.3 (user must gitignore generated files)
+- LRU eviction correctness spot-checked: verified via state.toml timestamps that LRU selection correctly chose oldest slot
+Result: PASS
+
+---
+
 ## 2026-02-23T12:00:00Z
 
 Location: ~/wt-usage-tests/2026-02-23T12-00-00/
