@@ -1,7 +1,8 @@
 ## BUG-028: `wt checkout <nonexistent-branch>` silently evicts an occupied slot even though the checkout ultimately fails
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-25T62:00:00Z
+**Fixed**: 2026-02-25
 **Test run**: ~/wt-usage-tests/2026-02-25T62-00-00Z/
 
 ### Description

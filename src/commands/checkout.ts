@@ -123,6 +123,29 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
   const targetSlot = selectSlotForCheckout(state);
   const worktreeDir = path.join(paths.container, targetSlot);
 
+  // 7.5. PRE-CHECK: Verify the branch exists before evicting any slot (BUG-028).
+  // Eviction is irreversible — if the subsequent checkout fails, the evicted
+  // slot is left vacant with its original branch assignment lost. Fail early
+  // with a clear error if the branch doesn't exist locally or on the remote.
+  // Only applies to the non-create path; -b creates a new branch at startPoint.
+  if (!options.create) {
+    const localExists = await git.refExists(
+      paths.repoDir,
+      `refs/heads/${options.branch}`
+    );
+    if (!localExists) {
+      const remoteExists = await git.remoteBranchExists(
+        paths.repoDir,
+        options.branch
+      );
+      if (!remoteExists) {
+        throw new Error(
+          `Branch '${options.branch}' not found locally or on remote.`
+        );
+      }
+    }
+  }
+
   // Feedback tracking
   let evictedBranch: string | null = null;
   let wasStashed = false;
