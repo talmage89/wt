@@ -333,7 +333,7 @@ export async function listRemoteBranches(repoDir: string): Promise<string[]> {
   return result.stdout
     .split("\n")
     .map((l) => l.trim())
-    .filter((l) => l.length > 0 && !l.includes("HEAD"));
+    .filter((l) => l.length > 0 && !l.includes("HEAD") && l.includes("/"));
 }
 
 /**

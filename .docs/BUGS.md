@@ -1,6 +1,6 @@
 ## BUG-024: TUI branch search shows `origin` as a checkout option — `git branch -r --format=%(refname:short)` formats `origin/HEAD` as just `origin`
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-25T40:00:00Z
 **Test run**: ~/wt-usage-tests/2026-02-25T40-00-00Z/
 
