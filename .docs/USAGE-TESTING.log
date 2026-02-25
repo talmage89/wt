@@ -1,3 +1,18 @@
+## 2026-02-25T23-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T23-00-00Z/
+Tests performed:
+- BUG-020 regression — `printf "none\n" | wt clean` (single-prompt abort): ran with 2 archived stashes present; output showed stash list, selection prompt, then "Aborted." (exit 0); single-prompt path unchanged and working — PASS
+- BUG-020 regression — `printf "1\nn\n" | wt clean` (two-prompt path, decline at confirmation): queued line reader correctly delivered "1" to first prompt and "n" to second prompt; output: selection prompt read "1", confirmation prompt read "n", "Aborted." (exit 0); the critical two-prompt piped stdin flow now works — PASS
+- BUG-020 regression — `printf "all\ny\n" | wt clean` (PRIMARY BUG-020 CASE): previously crashed with exit 13 "Warning: Detected unsettled top-level await"; with queued line reader fix, "all" delivered to first prompt and "y" delivered to second prompt without race; "Deleted 2 archived stashes." (exit 0); BUG-020 fix confirmed — PASS
+- `printf "1,2\ny\n" | wt clean` (comma-separated stash selection): selected stashes 1 and 2 by number; confirmation showed "Delete 2 stashes?"; "y" read correctly; "Deleted 2 archived stashes." (exit 0) — PASS
+- `wt stash drop` with piped stdin: `printf "y\n" | wt stash drop feature/epsilon` → "Stash dropped for 'feature/epsilon'." (exit 0); `printf "n\n" | wt stash drop feature/zeta` → "Aborted." (exit 0); `promptConfirm` function uses `process.stdin.once("data", ...)` which works correctly for single-prompt piped stdin — PASS
+- `wt checkout -b` with invalid start point: `wt checkout -b feature/invalid-test origin/nonexistent-branch` → "HEAD is now at ..." (detach for slot prep) + "fatal: 'origin/nonexistent-branch' is not a commit..." (verbatim from git, exit 128); slot correctly reverted to vacant/detached state after failed checkout; `wt list` confirmed slot shown as "(vacant)" — PASS
+- BUG-019 regression — no double-printed git errors: `wt checkout -b feature/alpha` (with origin/main deleted from remote) → only "fatal: 'origin/main' is not a commit and a branch 'feature/alpha' cannot be created from it" (exit 128); NO "wt: Command failed with exit code 128: ..." appended; BUG-019 fix confirmed — PASS
+Result: PASS
+
+---
+
 ## 2026-02-25T20-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T20-00-00Z/
