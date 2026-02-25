@@ -1,3 +1,15 @@
+## 2026-02-25T42-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T42-00-00Z/
+Tests performed:
+- BUG-024 fix verification — `origin` excluded from TUI branch search: initialized fresh container from remote with `origin/HEAD` symbolic ref (points to `main`); `git branch -r --format=%(refname:short)` in the bare repo produces `origin` (for `origin/HEAD`), `origin/feature/alpha`, `origin/feature/beta`, `origin/feature/gamma`, `origin/main`; confirmed raw git output includes the bare `origin` entry; opened TUI via PTY, navigated to Manage Worktrees, pressed `/` for branch search; branch list showed: `feature/alpha`, `feature/beta`, `feature/gamma`, `main` — `origin` was NOT present; fix (`l.includes("/")` filter in `listRemoteBranches`) correctly excludes the bare remote name; BUG-024 fix confirmed — PASS
+- Gitignored files not shown as dirty in `wt list`: created `.gitignore` with `*.log` pattern as untracked file in main slot — `wt list` correctly showed "dirty" (`.gitignore` itself is untracked); committed `.gitignore`, leaving only `ignored-file.log` and `another.log` (both gitignored) in the slot; `git status --porcelain` showed empty output (gitignored files invisible to git); `wt list` showed trail-slope-ford as "clean"; gitignored files confirmed still present on disk (`ls -la`); `wt list` dirty detection uses `git status --porcelain` which does not include gitignored files — correct per git semantics — PASS
+- Binary file stash lifecycle (evict + restore): created `binary-wip.bin` (4116 bytes, /dev/urandom content) and `text-wip.txt` as untracked files in main slot; evicted main via checkout of new branch; `wt stash list` showed active stash for main; `wt stash show main` correctly displayed binary diff (`Binary files /dev/null and b/binary-wip.bin differ`) and text file diff; re-checked out main into a new slot — `binary-wip.bin` restored at exact original size (4116 bytes), `text-wip.txt` restored with correct content; stash list empty after restore; binary file integrity confirmed — git stash create with `--include-untracked` handles binary files correctly end-to-end — PASS
+- Local branch ahead of remote — stash lifecycle: checked out `feature/alpha` (remote has 2 commits); made 2 local-only commits (not pushed); added dirty state (modified tracked file `local-only-file.txt` + untracked `dirty-local.txt`); evicted by checking out new branch; `wt stash list` showed stash for `feature/alpha` anchored at local commit `7e372e5` (local HEAD, NOT remote tip); `wt stash show` correctly showed dirty delta (modification to `local-only-file.txt` adding "pending-work", new `dirty-local.txt`); re-checked out `feature/alpha` into new slot; `git log` confirmed all 4 commits preserved (2 remote + 2 local); dirty state fully restored (modified `local-only-file.txt` with "pending-work", untracked `dirty-local.txt`); stash list empty after restore; stash anchor correctly uses actual local HEAD, not remote tracking ref — PASS
+Result: PASS
+
+---
+
 ## 2026-02-25T40-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T40-00-00Z/
