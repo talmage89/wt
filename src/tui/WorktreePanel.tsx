@@ -19,7 +19,7 @@ interface BranchEntry {
   hasStash?: boolean;
 }
 
-type Mode = "list" | "search" | "status" | "diff" | "checking_out";
+type Mode = "list" | "search" | "status" | "diff" | "checking_out" | "new_branch";
 
 interface Props {
   paths: ContainerPaths;
@@ -129,6 +129,9 @@ export function WorktreePanel({ paths, onBack }: Props) {
   const [outputContent, setOutputContent] = useState("");
   const [outputTitle, setOutputTitle] = useState("");
 
+  // New branch creation state
+  const [newBranchName, setNewBranchName] = useState("");
+
   // Misc
   const [error, setError] = useState<string | null>(null);
   const [checkoutBranch, setCheckoutBranch] = useState<string | null>(null);
@@ -181,8 +184,38 @@ export function WorktreePanel({ paths, onBack }: Props) {
       });
   };
 
+  const doCreateBranch = (branchName: string) => {
+    setCheckoutBranch(branchName);
+    setMode("checking_out");
+    runCheckout({ branch: branchName, create: true, cwd: paths.container })
+      .then(() => {
+        process.exit(0);
+      })
+      .catch((err: unknown) => {
+        setError(`Branch creation failed: ${String(err)}`);
+        setMode("list");
+        setCheckoutBranch(null);
+      });
+  };
+
   useInput((input, key) => {
     if (mode === "checking_out") return;
+
+    // New branch creation mode
+    if (mode === "new_branch") {
+      if (key.escape) {
+        setMode("list");
+        setNewBranchName("");
+      } else if (key.return) {
+        const name = newBranchName.trim();
+        if (name) doCreateBranch(name);
+      } else if (key.backspace || key.delete) {
+        setNewBranchName((n) => n.slice(0, -1));
+      } else if (input && !key.ctrl && !key.meta && input.length === 1) {
+        setNewBranchName((n) => n + input);
+      }
+      return;
+    }
 
     // Error overlay: any key clears (q quits)
     if (error !== null) {
@@ -249,6 +282,9 @@ export function WorktreePanel({ paths, onBack }: Props) {
           .catch(() => setAllBranches([]))
           .finally(() => setLoadingBranches(false));
       }
+    } else if (input === "n") {
+      setMode("new_branch");
+      setNewBranchName("");
     } else if (key.upArrow || input === "k") {
       setSelectedIdx((i) => Math.max(0, i - 1));
     } else if (key.downArrow || input === "j") {
@@ -407,6 +443,25 @@ export function WorktreePanel({ paths, onBack }: Props) {
     );
   }
 
+  if (mode === "new_branch") {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Text bold>New Branch</Text>
+        <Box marginTop={1}>
+          <Text bold color="green">name: </Text>
+          <Text>{newBranchName}</Text>
+          <Text color="cyan">█</Text>
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>Creates from origin/&lt;default-branch&gt;</Text>
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>Enter: create  Esc: cancel</Text>
+        </Box>
+      </Box>
+    );
+  }
+
   // List mode
   const currentEntry = entries[selectedIdx];
 
@@ -463,16 +518,16 @@ export function WorktreePanel({ paths, onBack }: Props) {
       </Box>
       <Box marginTop={1}>
         {!currentEntry ? (
-          <Text dimColor>/: search  Esc: back  q: quit</Text>
+          <Text dimColor>n: new branch  /: search  Esc: back  q: quit</Text>
         ) : currentEntry.tier === "inactive" ? (
           <Text dimColor>
             Enter: checkout
             {currentEntry.hasStash ? "  d: stash diff" : ""}
-            {"  /: search  Esc: back  q: quit"}
+            {"  n: new branch  /: search  Esc: back  q: quit"}
           </Text>
         ) : (
           <Text dimColor>
-            Enter: checkout  p: pin/unpin  s: git status  /: search  Esc: back  q: quit
+            Enter: checkout  p: pin/unpin  s: git status  n: new branch  /: search  Esc: back  q: quit
           </Text>
         )}
       </Box>
