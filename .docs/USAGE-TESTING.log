@@ -1,3 +1,15 @@
+## 2026-02-25T16-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T16-00-00Z/
+Tests performed:
+- Shell integration — `wt shell-init bash` output is valid bash (bash -n passes), defines `wt()` function and exports `WT_SHELL_INTEGRATION=1`; nav file written to `/tmp/wt-nav-<pid>` during checkout with correct target path; shell function reads nav file, `cd`s to slot, removes nav file; after checkout via shell function cwd changed to correct slot (`stout-cape-steel`); nav file cleaned up (PASS) — all shell integration behaviors correct per VISION §13
+- Corrupt state.toml (invalid TOML, not just missing fields): wrote `this is not valid TOML !!!` + broken TOML into state.toml; ran `wt list` → warning "Warning: .wt/state.toml is corrupted. Regenerating from git state." printed, state regenerated from actual git worktree state, valid state.toml written back, table displayed correctly (exit 0); subsequent `wt checkout develop` worked correctly — graceful recovery from fully-corrupt state file — PASS
+- Modify template source, run sync — all slots regenerated: configured `[[templates]]` with `source = "templates/info.txt"` / `target = "INFO.txt"`; first sync wrote per-slot files with `{{BRANCH_NAME}}` and `{{WORKTREE_DIR}}` expansion (main→"main", develop→"develop", vacant→""); modified template source to add "Updated: YES" line + "Version: 2.0"; re-ran `wt sync`; all 5 slots (2 occupied, 3 vacant) had updated INFO.txt with new content — PASS (always-overwrite on sync is correct per VISION §7.2)
+- Delete canonical shared file, run sync — broken symlinks cleaned: configured `[shared] directories = [".config"]`; synced (symlinks created for `app.json` and `settings.json` in all slots); deleted canonical `.wt/shared/.config/settings.json`; confirmed broken symlink in slots; ran `wt sync`; broken `settings.json` symlink removed from all 5 slots (correct per VISION §6.4: "If a symlink is broken (target deleted), remove it"); valid `app.json` symlink preserved in all slots — PASS
+Result: PASS
+
+---
+
 ## 2026-02-25T06-34-58Z
 
 Location: ~/wt-usage-tests/2026-02-25T06-34-58Z/
