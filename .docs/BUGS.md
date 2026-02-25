@@ -1,7 +1,8 @@
 ## BUG-019: Git errors double-printed — ExecaError message appended after git stderr
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-25T07:00:00Z
+**Fixed**: 2026-02-25T06:20:00Z
 **Test run**: ~/wt-usage-tests/2026-02-25T07-00-00Z/
 
 ### Description

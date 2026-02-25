@@ -48,6 +48,20 @@ if (process.argv.length <= 2) {
   }
 }
 
+/**
+ * Handle errors from CLI command handlers.
+ * ExecaErrors (git failures): stderr has already been printed via stdio inherit.
+ * Just exit with the same exit code — no extra message.
+ * Other errors: print `wt: <message>` and exit 1.
+ */
+function handleCliError(err: unknown): never {
+  if (typeof (err as { exitCode?: unknown }).exitCode === "number") {
+    process.exit((err as { exitCode: number }).exitCode);
+  }
+  process.stderr.write(`wt: ${(err as Error).message}\n`);
+  process.exit(1);
+}
+
 const cli = yargs(hideBin(process.argv))
   .scriptName("wt")
   .usage("$0 <command> [options]")
@@ -64,8 +78,7 @@ const cli = yargs(hideBin(process.argv))
         await runInit({ url: argv.url });
         // nav file written by runInit; shell function handles the cd
       } catch (err: unknown) {
-        process.stderr.write(`wt: ${(err as Error).message}\n`);
-        process.exit(1);
+        handleCliError(err);
       }
     }
   )
@@ -111,8 +124,7 @@ const cli = yargs(hideBin(process.argv))
           startPoint: argv["start-point"] as string | undefined,
         });
       } catch (err: unknown) {
-        process.stderr.write(`wt: ${(err as Error).message}\n`);
-        process.exit(1);
+        handleCliError(err);
       }
     }
   )
@@ -124,8 +136,7 @@ const cli = yargs(hideBin(process.argv))
       try {
         await runFetch();
       } catch (err: unknown) {
-        process.stderr.write(`wt: ${(err as Error).message}\n`);
-        process.exit(1);
+        handleCliError(err);
       }
     }
   )
@@ -161,8 +172,7 @@ const cli = yargs(hideBin(process.argv))
             break;
         }
       } catch (err: unknown) {
-        process.stderr.write(`wt: ${(err as Error).message}\n`);
-        process.exit(1);
+        handleCliError(err);
       }
     }
   )
@@ -174,8 +184,7 @@ const cli = yargs(hideBin(process.argv))
       try {
         await runSync();
       } catch (err: unknown) {
-        process.stderr.write(`wt: ${(err as Error).message}\n`);
-        process.exit(1);
+        handleCliError(err);
       }
     }
   )
@@ -187,8 +196,7 @@ const cli = yargs(hideBin(process.argv))
       try {
         await runClean();
       } catch (err: unknown) {
-        process.stderr.write(`wt: ${(err as Error).message}\n`);
-        process.exit(1);
+        handleCliError(err);
       }
     }
   )
@@ -200,8 +208,7 @@ const cli = yargs(hideBin(process.argv))
       try {
         await runList();
       } catch (err: unknown) {
-        process.stderr.write(`wt: ${(err as Error).message}\n`);
-        process.exit(1);
+        handleCliError(err);
       }
     }
   )
@@ -217,8 +224,7 @@ const cli = yargs(hideBin(process.argv))
       try {
         await runPin(argv.slot as string | undefined);
       } catch (err: unknown) {
-        process.stderr.write(`wt: ${(err as Error).message}\n`);
-        process.exit(1);
+        handleCliError(err);
       }
     }
   )
@@ -234,8 +240,7 @@ const cli = yargs(hideBin(process.argv))
       try {
         await runUnpin(argv.slot as string | undefined);
       } catch (err: unknown) {
-        process.stderr.write(`wt: ${(err as Error).message}\n`);
-        process.exit(1);
+        handleCliError(err);
       }
     }
   )
