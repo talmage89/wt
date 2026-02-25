@@ -1,3 +1,86 @@
+## BUG-021: Archive scan fires before `last_used_at` reset during `wt checkout` — stash archived even though user is actively checking out the branch
+
+**Status**: open
+**Found**: 2026-02-28T14:00:00Z
+**Test run**: ~/wt-usage-tests/2026-02-28T14-00-00Z/
+
+### Description
+
+When `wt checkout <branch>` runs, the checkout flow is:
+1. Fetch (updates remote refs)
+2. Archive scan (archives stashes where `last_used_at > 7 days` AND remote branch deleted)
+3. Slot selection and checkout
+4. Stash restore (where `last_used_at` would be updated)
+
+The archive scan (step 2) fires BEFORE `last_used_at` is reset to the current time. If the target branch's stash is 7+ days old AND the remote branch doesn't exist (either was deleted or was never pushed), the stash gets **archived during the user's own checkout attempt**, preventing auto-restore.
+
+After checkout completes, `last_used_at` in the stash metadata is still set to the old timestamp — the update was never performed. This means the stash remains permanently archived with an outdated timestamp.
+
+**What happened**:
+```
+$ wt checkout feature/beta   # stash is 10 days old, branch is local-only (no remote)
+Warning: zstd not found. Archived stash stored uncompressed.
+Archived 1 stash(es): feature/beta          # ← stash archived DURING checkout
+Switched to branch 'feature/beta'
+wt: Checked out feature/beta in opal-rapids-glow
+wt: Evicted feature/gamma from opal-rapids-glow (dirty state stashed)
+# NO "Restored stash" line — stash was archived before restore could happen
+# Slot is clean: beta-wip.txt is MISSING (stash was not restored)
+# stash metadata: last_used_at is STILL "2026-02-15T..." (not updated to now)
+```
+
+**What should have happened**:
+```
+$ wt checkout feature/beta
+wt: Checked out feature/beta in opal-rapids-glow
+wt: Evicted feature/gamma from opal-rapids-glow (dirty state stashed)
+wt: Restored stash from 10d ago
+# beta-wip.txt present in slot
+```
+
+The VISION states: "The `last_used_at` timestamp is reset whenever the branch is checked out via wt. This means actively used branches never age into archival." Running `wt checkout feature/beta` IS a wt use of the branch, yet archival still fired.
+
+### Reproduction
+
+```bash
+# Set up a wt container with a branch that has a stash
+wt checkout feature/beta        # creates local branch
+echo "wip" > slot/beta-wip.txt  # dirty state
+wt checkout -b feature/zeta     # evicts feature/beta (stash created)
+
+# Fake the stash timestamp to 10 days ago
+python3 -c "
+import re, pathlib
+f = pathlib.Path('.wt/stashes/feature--beta.toml')
+content = re.sub(r'last_used_at = \"[^\"]+\"', 'last_used_at = \"2026-02-15T00:00:00.000Z\"', f.read_text())
+f.write_text(content)
+"
+
+# NOTE: feature/beta is local-only (never pushed to remote) OR delete remote branch
+# Remote branch deletion OR non-existence triggers the archive condition
+
+# Now checkout feature/beta — stash gets archived during the checkout
+wt checkout feature/beta
+# Expected: "Restored stash from 10d ago" + beta-wip.txt present
+# Actual:   "Archived 1 stash(es): feature/beta" + no stash restore + beta-wip.txt MISSING
+```
+
+### Root Cause
+
+In `src/commands/checkout.ts`, the archive scan runs at the beginning of the checkout flow (after fetch, before slot selection). At that point, the stash's `last_used_at` has not yet been updated to reflect the current checkout. The archive scan sees an old `last_used_at`, finds the remote branch is absent, and archives the stash.
+
+The fix should be one of:
+1. **Skip archiving the target branch's stash** in the archive scan during checkout (the user is actively using it).
+2. **Update `last_used_at` for the target branch's stash** to the current time before the archive scan runs.
+3. **Both**: update first to prevent archival, then let the normal restore logic proceed.
+
+### Vision Reference
+
+VISION.md §5.3: "Archive stashes after 7 days (configurable) since last `wt` use of the branch AND remote branch deleted."
+"The `last_used_at` timestamp is reset whenever the branch is checked out via `wt`. This means actively used branches never age into archival, even if the stash itself was created long ago."
+
+---
+
 ## BUG-020: `wt clean` crashes (exit 13) when stdin is piped — readline 'line' event race condition with multiple sequential prompts
 
 **Status**: fixed

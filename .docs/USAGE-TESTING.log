@@ -1,3 +1,14 @@
+## 2026-02-28T14-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-28T14-00-00Z/
+Tests performed:
+- `wt stash list` output format with mixed active + archived stashes: initialized fresh container from test-remote.git (main + feature/alpha); checked out feature/alpha, created several branches (beta, gamma, delta, epsilon, zeta, eta) to fill slots; forced evictions with dirty state to create stashes for feature/alpha and feature/beta; faked timestamps to 10 days ago; ran `wt fetch` (deleted origin/feature/alpha) → archived feature/alpha stash; `wt stash list` correctly displayed 3-row table with columns "Branch / Age / Status / Base Commit": feature/alpha (2m ago, archived, b5e45d4), feature/beta (10d ago, archived, c6ceb7c), feature/gamma (1m ago, active, c6ceb7c); column separators (────) rendered correctly; all status values (archived/active) shown; age display correct (relative time for both old and new stashes) — PASS
+- Archive scan fires before `last_used_at` reset during checkout — BUG FOUND: created stash for feature/beta with dirty state (beta-wip.txt); faked stash last_used_at to 10 days ago; feature/beta was local-only (never pushed to remote); ran `wt checkout feature/beta`; during checkout flow (step 2: archive scan), feature/beta stash was archived ("Archived 1 stash(es): feature/beta") BEFORE the checkout completed; no "Restored stash" line appeared; beta-wip.txt absent from slot (stash not restored); stash metadata confirmed last_used_at was NEVER updated (still "2026-02-15T..."); the user was actively checking out the branch (a wt use) yet the stash was archived — violates VISION §5.3 "actively used branches never age into archival" — BUG FOUND
+Result: BUG FOUND
+Bug: BUG-021 — Archive scan fires during `wt checkout <branch>` before `last_used_at` is reset, archiving target branch's stash even though user is actively using it; stash not restored, `last_used_at` never updated (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-25T07-48-23Z
 
 Location: ~/wt-usage-tests/2026-02-25T07-48-23Z/
