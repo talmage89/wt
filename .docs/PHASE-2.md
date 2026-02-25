@@ -172,7 +172,7 @@ At minimum, document the hook. Optionally implement `wt hooks show <integration>
 ## Completion Checklist
 
 - [x] Cursor always visible after TUI exit and CLI commands.
-- [ ] `wt init` prints slot summary and shell integration hint.
+- [x] `wt init` prints slot summary and shell integration hint.
 - [ ] `wt checkout` prints action summary (eviction, stash, branch creation).
 - [ ] `wt checkout -b <branch>` creates new branches.
 - [ ] TUI Worktree Panel shows all local branches.
