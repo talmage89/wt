@@ -1,3 +1,15 @@
+## 2026-02-26T14-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-26T14-00-00Z/
+Tests performed:
+- Real concurrent access (lock contention): ran 3 simultaneous `wt` processes (`wt list`, `wt list`, `wt checkout develop`) in the background; the first process to acquire the lock succeeded (exit 0), the other two got "wt: Another wt operation is in progress. If this is stale, remove .wt/lock." (exit 1); no data corruption or stale lock left behind; verified exit codes separately (winner=0, loser=1); lock correctly serializes real concurrent access — PASS
+- Templates + symlinks configured simultaneously: added `[shared] directories = [".config"]` and `[[templates]] source=templates/env.txt target=.env.local` to config.toml in the same container; ran `wt sync`; all 5 slots received BOTH a `.config/app.json` symlink (pointing to `../../.wt/shared/.config/app.json`) AND a `.env.local` template file (with correct `WORKTREE=<slot>` and `BRANCH=<branch>` expansion); vacant slots got empty `BRANCH=`; both features coexist correctly without interference — PASS
+- `wt list` dirty-status column with template/symlink files: after `wt sync` created untracked `.env.local` and `.config/` in all occupied slots, `wt list` correctly showed "dirty" for all occupied slots; vacant slots still showed blank status; the status column correctly detects untracked template-generated files and shared symlinks as dirty state (note: users should gitignore these files to see "clean" status, per VISION §7.2) — PASS
+- Template regeneration on checkout and on eviction: (a) `wt checkout -b feature/newbranch` into vacant slot `shale-lucid-marten` — template immediately generated with correct `WORKTREE=shale-lucid-marten` and `BRANCH=feature/newbranch`; symlink also present; (b) eviction of `main` from `foam-torrent-fresh` (dirty: modified file1.txt + untracked wip.txt + untracked .env.local) via checkout of `feature/template-regen` — stash captured all three files including `.env.local` with `BRANCH=main`; after eviction, template in `foam-torrent-fresh` correctly updated to `BRANCH=feature/template-regen`; template "always overwrite" (VISION §7.1) correctly fires on checkout in addition to `wt sync` — PASS
+Result: PASS
+
+---
+
 ## 2026-02-25T26-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T25-00-00Z/
