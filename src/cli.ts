@@ -1,4 +1,10 @@
 #!/usr/bin/env node
+// Restore cursor visibility on exit — Ink (and some CLI tools) hide the cursor
+// and may not restore it if the process is killed or crashes.
+process.on("exit", () => {
+  if (process.stdout.isTTY) process.stdout.write("\x1B[?25h");
+});
+
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { runInit } from "./commands/init.js";
