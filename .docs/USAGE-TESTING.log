@@ -1,3 +1,16 @@
+## 2026-02-28T10-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-28T10-00-00Z/
+Tests performed:
+- Slot count increase (5 → 7): edited config.toml `slot_count = 7`; ran `wt list`; two new slots (`frost-lumpy-deep`, `log-ember-briar`) created automatically as vacant (git worktree add ran for each); `wt list` showed all 7 slots including 2 new vacant ones; slot state.toml updated correctly — PASS
+- Slot count decrease (7 → 3) with LRU eviction of excess: manipulated state.toml timestamps to make 4 slots clearly LRU (two occupied: `wane-lean-subtle`/feature/beta, `vent-nutmeg-silt`/feature/gamma; two vacant: `frost-lumpy-deep`, `wild-linen-deep`/main — where main was the oldest of the "recent" ones); set `slot_count = 3`; `wt list` evicted the 4 LRU slots; remaining: `knoll-oriole-cedar`/develop, `polar-aspen-spruce`/feature/alpha, `log-ember-briar`/vacant; worktree directories for evicted slots removed from filesystem; all clean slots evicted without stash creation (correct — no dirty state) — PASS
+- Slot count decrease below pinned count: pinned all 3 remaining slots; set `slot_count = 2`; `wt list` returned "wt: Cannot reduce slot count to 2: 3 worktrees are pinned. Unpin worktrees first or choose a higher count." (exit 1); no eviction attempted; slots unchanged — PASS
+- Corrupt state.toml — recovery: manually wrote invalid TOML to state.toml (`=== CORRUPT ===`, `this is [not valid = TOML {{{`, `slot-name = { broken`); `wt list` printed "Warning: .wt/state.toml is corrupted. Regenerating from git state." then displayed all 3 slots correctly regenerated from git worktree state (pinned flags lost, LRU timestamps reset to epoch); `wt checkout develop` (exit 0) worked immediately after without any additional intervention — graceful auto-recovery confirmed — PASS
+- `wt checkout --no-restore` + manual `wt stash apply`: added dirty state (staged wip.txt + unstaged modification to main.txt) to develop slot; all 3 slots filled (no vacancies); checked out `feature/alpha` → LRU develop evicted (dirty state stashed, stash list shows 1 active stash for "develop"); re-checked out `develop` with `--no-restore` flag → "wt: Checked out develop in log-ember-briar" with no "Restored stash" line (stash preserved, NOT auto-applied); git status in slot showed clean; wip.txt absent; then `wt stash apply develop` → "Stash applied and cleaned up for 'develop'." (exit 0); wip.txt appeared, git status showed `A  wip.txt` (staged) and ` M main.txt` (unstaged) — exact dirty state fully restored; stash list empty — PASS
+Result: PASS
+
+---
+
 ## 2026-02-27T10-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-27T10-00-00Z/
