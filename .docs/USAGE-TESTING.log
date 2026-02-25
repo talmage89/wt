@@ -457,3 +457,18 @@ Tests performed:
 Result: BUG FOUND
 Bug: BUG-017 — `wt init` from inside a worktree slot corrupts the slot because the .git file (worktree link) is not distinguished from a .git/ directory (see .docs/BUGS.md)
 
+---
+
+## 2026-02-25T05-57-32Z
+
+Location: ~/wt-usage-tests/2026-02-25T05-57-32Z/
+Tests performed:
+- Phase 2.2 init feedback: `wt init file://<url>` printed full slot summary (all 5 slot names with active/vacant status, which slot has the active branch) and shell integration hint (eval lines for bash/zsh/fish); exit 0 — correct per Phase 2.2 spec
+- Phase 2.3 checkout feedback: (a) simple checkout into vacant slot → "Checked out <branch> in <slot>" message confirmed; (b) eviction with dirty state → "Checked out <branch> in <slot>" + "Evicted <old-branch> from <slot> (dirty state stashed)" both printed; (c) re-checkout of evicted branch → "Checked out <branch> in <slot>" + "Evicted <old-branch> from <slot>" + "Restored stash from just now" all printed; stash list empty after restore; wip.txt confirmed present in new slot — correct per Phase 2.3 spec
+- BUG-009 fix verification: configured [shared] directories=[".config"] with canonical .wt/shared/.config/app.json; ran wt sync — vacant slots got symlinks .config/app.json (main branch has no .config tracked, so symlink created correctly); then `wt checkout feature/tracked-config` (which git-tracks .config/app.json) targeted slot chill-root-violet (which had the symlink); message "Skipping symlink for .config/app.json: file is tracked by git in branch feature/tracked-config." printed; checkout succeeded; chill-root-violet now has regular file (git-tracked content `{"feature":"tracked"}`) not a symlink — BUG-009 fix confirmed correct
+- BUG-010 fix regression: `wt stash drop feature/e </dev/null` still crashes with exit 13 and "Warning: Detected unsettled top-level await"; stash NOT dropped (safe); root cause: `promptConfirm()` in stash.ts listens for "close" event on process.stdin, but Node.js stdin connected to /dev/null emits "end" (not "close") — confirmed via `node -e "stdin.on('end',()=>log('end'));stdin.on('close',()=>log('close'))" </dev/null` which only prints "end"; fix needs "end" event listener — BUG FOUND
+Result: BUG FOUND
+Bug: BUG-018 — `wt stash drop` with stdin=/dev/null still crashes (exit 13): `promptConfirm` fix incomplete, listens for "close" but stdin emits "end" (see .docs/BUGS.md)
+
+---
+

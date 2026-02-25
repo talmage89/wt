@@ -1,3 +1,55 @@
+## BUG-018: `wt stash drop` with stdin=/dev/null still crashes (exit 13) — `promptConfirm` fix incomplete
+
+**Status**: open
+**Found**: 2026-02-25T05:57:32Z
+**Fixed**:
+**Test run**: ~/wt-usage-tests/2026-02-25T05-57-32Z/
+
+### Description
+
+`wt stash drop <branch> </dev/null` still crashes with exit 13 and Node.js warning "Detected unsettled top-level await". This was previously reported as BUG-010 and marked "fixed", but the fix was incomplete.
+
+The fix in `src/commands/stash.ts` added `process.stdin.once("close", onClose)` to `promptConfirm()`. However, when stdin is connected to `/dev/null`, Node.js stdin emits the `"end"` event (no more data) but **not** the `"close"` event — confirmed by direct Node.js test:
+
+```
+node -e "process.stdin.resume(); process.stdin.on('end',()=>console.log('end')); process.stdin.on('close',()=>console.log('close'));" </dev/null
+# Output: end    (only "end" fires, "close" never fires)
+```
+
+Since `promptConfirm()` only registers a `"close"` listener (not `"end"`), the promise never resolves. The top-level `await cli.parseAsync()` remains pending, and Node.js exits with the unsettled-await warning (exit code 13).
+
+**What happened**: `wt stash drop feature/e </dev/null` printed prompt, then crashed: `Warning: Detected unsettled top-level await ... exit 13`. Stash NOT dropped (safe), but exit code and warning are wrong.
+
+**What should have happened**: When stdin reaches EOF with no data, `promptConfirm` should default to "N" and print "Aborted.", exiting cleanly (exit 0).
+
+### Reproduction
+
+```bash
+# Set up a stash
+wt checkout feature/g  # evicts dirty branch to create stash
+wt stash list          # confirm stash exists
+# Try to drop with non-interactive stdin
+wt stash drop feature/e </dev/null
+# Expected: "Drop stash for 'feature/e'? [y/N] Aborted." exit 0
+# Actual:   "Drop stash for 'feature/e'? [y/N] Warning: Detected unsettled top-level await..." exit 13
+```
+
+### Fix
+
+In `promptConfirm()` in `src/commands/stash.ts`, change the `"close"` listener to `"end"`:
+
+```typescript
+process.stdin.once("end", onClose);  // was: "close"
+```
+
+Or listen for both `"end"` and `"close"` to handle all non-interactive stdin cases.
+
+### Vision reference
+
+VISION.md §15.3 (error handling): commands should exit cleanly with appropriate codes. Exit 13 is non-standard.
+
+---
+
 ## BUG-017: `wt init` from inside a worktree slot corrupts the slot
 
 **Status**: fixed
