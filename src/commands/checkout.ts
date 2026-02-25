@@ -76,12 +76,14 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
     // Fetch errors are not fatal — continue with local state
   }
 
-  // 5. ARCHIVE SCAN
+  // 5. ARCHIVE SCAN — exclude the target branch so its stash is not archived
+  // before the restore step below (BUG-021).
   try {
     const { archived } = await archiveScan(
       paths.wtDir,
       paths.repoDir,
-      config.archive_after_days
+      config.archive_after_days,
+      options.branch
     );
     if (archived.length > 0) {
       process.stderr.write(

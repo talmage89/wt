@@ -225,6 +225,26 @@ describe("archiveScan", () => {
     expect(meta!.status).toBe("active");
   });
 
+  it("does NOT archive the excluded branch even when both conditions are met (BUG-021)", async () => {
+    const containerDir = await mktemp();
+    const { remoteDir, wtDir, repoDir } = await setupRemoteContainer(containerDir);
+
+    await createStashForFeatureBranch(containerDir, wtDir, repoDir);
+
+    // Delete remote branch and age stash — both conditions for archiving are met
+    await deleteRemoteBranch(remoteDir, repoDir, "feature-branch");
+    await ageStash(wtDir, "feature-branch", 8);
+
+    // Call archiveScan with feature-branch as the excluded branch
+    const { archived, skipped } = await archiveScan(wtDir, repoDir, 7, "feature-branch");
+
+    expect(archived).not.toContain("feature-branch");
+    expect(skipped).toContain("feature-branch");
+
+    const meta = await getStash(wtDir, "feature-branch");
+    expect(meta!.status).toBe("active");
+  });
+
   it("uses last_used_at for age, not created_at", async () => {
     const containerDir = await mktemp();
     const { remoteDir, wtDir, repoDir } = await setupRemoteContainer(containerDir);
@@ -441,6 +461,67 @@ describe("checkout triggers archive scan", () => {
     const meta = await getStash(wtDir, "feature-branch");
     expect(meta).not.toBeNull();
     expect(meta!.status).toBe("archived");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// BUG-021: checkout must not archive the target branch's stash
+// ---------------------------------------------------------------------------
+
+describe("checkout does not archive the target branch stash (BUG-021)", () => {
+  it("restores stash even when last_used_at is old and remote branch is gone", async () => {
+    const containerDir = await mktemp();
+    const { remoteDir, wtDir, repoDir } = await setupRemoteContainer(containerDir);
+
+    // Checkout feature-branch and create dirty state
+    await runCheckout({ branch: "feature-branch", cwd: containerDir, noRestore: true });
+
+    const state = await readState(wtDir);
+    const featureSlot = Object.entries(state.slots).find(
+      ([, s]) => s.branch === "feature-branch"
+    )?.[0];
+    expect(featureSlot).toBeDefined();
+
+    // Create an untracked sentinel file — the stash must restore it
+    const sentinelPath = path.join(containerDir, featureSlot!, "beta-wip.txt");
+    await fs.writeFile(sentinelPath, "wip\n");
+
+    // Force feature-branch to be LRU so it gets evicted
+    state.slots[featureSlot!].last_used_at = new Date(0).toISOString();
+    await writeState(wtDir, state);
+
+    // Evict feature-branch by filling all slots
+    const slotCount = Object.keys(state.slots).length;
+    for (let i = 0; i < slotCount - 1; i++) {
+      await execa("git", ["branch", `bugtest-fill-${i}`], { cwd: repoDir });
+      await runCheckout({ branch: `bugtest-fill-${i}`, cwd: containerDir });
+    }
+    await execa("git", ["branch", "bugtest-evict"], { cwd: repoDir });
+    await runCheckout({ branch: "bugtest-evict", cwd: containerDir, noRestore: true });
+
+    // Verify feature-branch stash was created
+    const stash = await getStash(wtDir, "feature-branch");
+    expect(stash).not.toBeNull();
+    expect(stash!.status).toBe("active");
+
+    // Now set up conditions for BUG-021: age the stash and delete the remote branch
+    await deleteRemoteBranch(remoteDir, repoDir, "feature-branch");
+    await ageStash(wtDir, "feature-branch", 10);
+
+    // Checkout feature-branch — archive scan must NOT archive its stash
+    await runCheckout({ branch: "feature-branch", cwd: containerDir });
+
+    // The sentinel file must be present (stash was restored, not archived)
+    const state2 = await readState(wtDir);
+    const newSlot = Object.entries(state2.slots).find(
+      ([, s]) => s.branch === "feature-branch"
+    )?.[0];
+    expect(newSlot).toBeDefined();
+    const restoredSentinel = path.join(containerDir, newSlot!, "beta-wip.txt");
+    expect(await exists(restoredSentinel)).toBe(true);
+
+    // Stash metadata must be gone (consumed by restore)
+    expect(await getStash(wtDir, "feature-branch")).toBeNull();
   });
 });
 

@@ -1,6 +1,6 @@
 ## BUG-021: Archive scan fires before `last_used_at` reset during `wt checkout` — stash archived even though user is actively checking out the branch
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-28T14:00:00Z
 **Test run**: ~/wt-usage-tests/2026-02-28T14-00-00Z/
 

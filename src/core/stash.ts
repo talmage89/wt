@@ -358,11 +358,15 @@ export async function archiveStash(
  * - last_used_at is older than archiveAfterDays days ago
  *
  * Returns lists of archived and skipped branch names.
+ *
+ * @param excludeBranch - Branch to unconditionally skip (e.g. the branch being
+ *   checked out, whose stash must not be archived before it can be restored).
  */
 export async function archiveScan(
   wtDir: string,
   repoDir: string,
-  archiveAfterDays: number
+  archiveAfterDays: number,
+  excludeBranch?: string
 ): Promise<{ archived: string[]; skipped: string[] }> {
   const stashes = await listStashes(wtDir);
   const activeStashes = stashes.filter((s) => s.status === "active");
@@ -371,6 +375,13 @@ export async function archiveScan(
   const skipped: string[] = [];
 
   for (const stash of activeStashes) {
+    // Never archive the branch being checked out — its stash must survive until
+    // the restore step that follows the archive scan (BUG-021).
+    if (excludeBranch !== undefined && stash.branch === excludeBranch) {
+      skipped.push(stash.branch);
+      continue;
+    }
+
     // Check age: governed by last_used_at (not created_at)
     const lastUsed = new Date(stash.last_used_at);
     const daysSinceUse =
