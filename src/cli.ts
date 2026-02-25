@@ -21,6 +21,7 @@ import {
 import { runList } from "./commands/list.js";
 import { runPin, runUnpin } from "./commands/pin.js";
 import { runClean } from "./commands/clean.js";
+import { runHooksShow } from "./commands/hooks.js";
 import { findContainer } from "./core/container.js";
 
 // When invoked with no arguments, launch the TUI (if inside a container)
@@ -235,6 +236,33 @@ const cli = yargs(hideBin(process.argv))
       } catch (err: unknown) {
         process.stderr.write(`wt: ${(err as Error).message}\n`);
         process.exit(1);
+      }
+    }
+  )
+  .command(
+    "hooks <action> [integration]",
+    "Show integration hook configurations",
+    (yargs) =>
+      yargs
+        .positional("action", {
+          type: "string",
+          choices: ["show"] as const,
+          demandOption: true,
+          describe: "Hooks subcommand",
+        })
+        .positional("integration", {
+          type: "string",
+          describe: "Integration name (e.g., claude-code)",
+        }),
+    (argv) => {
+      if (argv.action === "show") {
+        if (!argv.integration) {
+          process.stderr.write(
+            "wt: 'hooks show' requires an integration name (e.g., claude-code)\n"
+          );
+          process.exit(1);
+        }
+        runHooksShow(argv.integration as string);
       }
     }
   )

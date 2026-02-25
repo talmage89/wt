@@ -180,7 +180,7 @@ At minimum, document the hook. Optionally implement `wt hooks show <integration>
 - [x] TUI polls for state changes every 2 seconds.
 - [x] Config Panel shows change guidance after editing.
 - [x] Hooks Panel exists in TUI with create/edit/chmod flow.
-- [ ] Claude Code pin hook documented or implemented.
-- [ ] All existing tests still pass (`pnpm test`).
-- [ ] No type errors (`pnpm tsc --noEmit`).
-- [ ] `pnpm build` succeeds and binary reflects all changes.
+- [x] Claude Code pin hook documented or implemented.
+- [x] All existing tests still pass (`pnpm test`).
+- [x] No type errors (`pnpm tsc --noEmit`).
+- [x] `pnpm build` succeeds and binary reflects all changes.
