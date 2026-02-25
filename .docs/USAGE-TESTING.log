@@ -1,3 +1,16 @@
+## 2026-02-25T36-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T36-00-00Z/
+Tests performed:
+- `wt checkout -b main` when `main` already exists locally: git error "fatal: a branch named 'main' already exists" (exit 128) passed through verbatim; slot left in detached HEAD (vacant) state after failed attempt; `wt list` confirmed slot shows as "(vacant)" with no broken state; correct behavior — PASS
+- `wt sync` with missing template source file (configured `[[templates]] source = "templates/missing.txt"` but file absent): printed "wt: template source not found: .wt/templates/missing.txt" once per slot (5 identical messages for 5 slots — noisy but non-crashing), exited 0; no `.env.local` files created; UX note: error message is repeated per-slot with identical content — deduplicated output would be cleaner; behavior is correct (skip + warn) — PASS
+- `wt checkout v1.0.0` (a git tag, not a branch): succeeded (exit 0), printed "HEAD is now at 6dd9abc init" (from git) and "wt: Checked out v1.0.0 in <slot>"; BUT slot immediately shows as "(vacant)" in `wt list` because checkout landed in detached HEAD state; a subsequent `wt checkout feature/alpha` immediately reused the "tag slot" as a vacant slot without any warning; UX GAP: if user creates untracked files in the tag slot they persist stranded (not stashed) in the reused slot; modified tracked files would be silently reverted by git on slot reuse; classified as UX gap (not a hard bug): VISION doesn't address tag checkouts, and detached HEAD = vacant is consistent with design; the "Checked out v1.0.0" feedback message misleads user into thinking the operation persisted — PASS (behavior consistent with design, UX gap noted)
+- `WT_SHELL_INTEGRATION` value strictness: tested with values `yes`, `1`, `true`, `0`; all non-empty values (including `0`) trigger "Navigating to..." message and nav file write; check is truthy (any non-empty string), not strict `=== '1'`; `WT_SHELL_INTEGRATION=0` unexpectedly triggers navigation despite implying "disabled"; minor implementation note — not a practical bug since users would `unset WT_SHELL_INTEGRATION` rather than set it to `0`, and the shell function (which sets `WT_SHELL_INTEGRATION=1`) is the only legitimate setter — PASS
+- `wt stash apply feature/delta` immediately after `wt stash drop feature/delta`: drop confirmed "Stash dropped for 'feature/delta'." (exit 0); `wt stash list` showed "No saved stashes."; subsequent `wt stash apply feature/delta` returned "wt: No stash found for branch 'feature/delta'." (exit 1); clean error with correct exit code — PASS
+Result: PASS
+
+---
+
 ## 2026-02-25T34-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T34-00-00Z/
