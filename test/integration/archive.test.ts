@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
+import { PassThrough } from "node:stream";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { execa } from "execa";
@@ -498,6 +499,61 @@ describe("wt clean with archive scan", () => {
     expect(output).toContain("Deleted");
 
     // Stash should be gone
+    expect(await getStash(wtDir, "feature-branch")).toBeNull();
+  });
+
+  it("handles piped stdin with two sequential answers without hanging (BUG-020)", async () => {
+    const containerDir = await mktemp();
+    const { remoteDir, wtDir, repoDir } = await setupRemoteContainer(containerDir);
+
+    await createStashForFeatureBranch(containerDir, wtDir, repoDir);
+    await deleteRemoteBranch(remoteDir, repoDir, "feature-branch");
+    await ageStash(wtDir, "feature-branch", 8);
+
+    // Archive the stash so clean can find it
+    await archiveStash(wtDir, repoDir, "feature-branch");
+
+    const meta = await getStash(wtDir, "feature-branch");
+    expect(meta!.status).toBe("archived");
+
+    // Simulate `printf "all\ny\n" | wt clean` by replacing process.stdin with a
+    // PassThrough that already has both lines buffered before runClean is called.
+    // The old rl.question()-based makePrompter lost the second line because
+    // readline emitted "y" as a 'line' event before the second rl.question()
+    // registered its one-time listener (async gap after first await ask()).
+    const origStdin = process.stdin;
+    const fakeStdin = new PassThrough();
+    Object.defineProperty(process, "stdin", {
+      value: fakeStdin,
+      writable: true,
+      configurable: true,
+    });
+
+    const lines: string[] = [];
+    const origWrite = process.stdout.write.bind(process.stdout);
+    process.stdout.write = (chunk: string | Uint8Array): boolean => {
+      if (typeof chunk === "string") lines.push(chunk);
+      return true;
+    };
+
+    try {
+      // Write both answers upfront and close — this is the piped-stdin scenario
+      fakeStdin.write("all\ny\n");
+      fakeStdin.end();
+
+      await runClean({ cwd: containerDir });
+    } finally {
+      process.stdout.write = origWrite;
+      Object.defineProperty(process, "stdin", {
+        value: origStdin,
+        writable: true,
+        configurable: true,
+      });
+    }
+
+    const output = lines.join("");
+    expect(output).toContain("Deleted");
+    // Stash must be gone — not just "Aborted" due to missed second prompt
     expect(await getStash(wtDir, "feature-branch")).toBeNull();
   });
 

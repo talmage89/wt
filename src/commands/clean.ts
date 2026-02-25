@@ -45,19 +45,39 @@ async function archiveSize(archivePath: string): Promise<string> {
 
 /**
  * Create a shared readline interface and return an `ask` function that
- * uses it for all prompts.  A single interface must be shared across
- * multiple sequential questions — closing and re-opening causes Node to
- * discard the remaining buffered stdin data, which breaks piped input.
+ * uses it for all prompts.  Uses a persistent 'line' listener with a
+ * queue to avoid the race condition where piped stdin emits buffered
+ * lines before the next rl.question() registers its one-time listener.
  */
 function makePrompter(): { ask: (q: string) => Promise<string>; close: () => void } {
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
   });
-  const ask = (question: string): Promise<string> =>
-    new Promise((resolve) => {
-      rl.question(question, (answer) => resolve(answer.trim()));
+  const lineQueue: string[] = [];
+  const pendingResolvers: ((s: string) => void)[] = [];
+
+  rl.on("line", (line) => {
+    if (pendingResolvers.length > 0) {
+      pendingResolvers.shift()!(line.trim());
+    } else {
+      lineQueue.push(line.trim());
+    }
+  });
+
+  rl.on("close", () => {
+    for (const resolve of pendingResolvers) resolve("");
+    pendingResolvers.length = 0;
+  });
+
+  const ask = (question: string): Promise<string> => {
+    process.stdout.write(question);
+    if (lineQueue.length > 0) return Promise.resolve(lineQueue.shift()!);
+    return new Promise<string>((resolve) => {
+      pendingResolvers.push(resolve);
     });
+  };
+
   return { ask, close: () => rl.close() };
 }
 

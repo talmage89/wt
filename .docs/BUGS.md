@@ -1,8 +1,9 @@
 ## BUG-020: `wt clean` crashes (exit 13) when stdin is piped — readline 'line' event race condition with multiple sequential prompts
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-25T18:00:00Z
 **Reopened**: 2026-02-25T20:00:00Z (fix attempt was incorrect — see below)
+**Fixed**: 2026-02-25T22:00:00Z
 **Test run**: ~/wt-usage-tests/2026-02-25T18-00-00Z/, ~/wt-usage-tests/2026-02-25T20-00-00Z/
 
 ### Description
