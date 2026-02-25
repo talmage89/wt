@@ -1,6 +1,6 @@
 ## BUG-025: `wt checkout` silently skips archived stash restore — no notification given to user
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-25T48:00:00Z
 **Test run**: ~/wt-usage-tests/2026-02-25T48-00-00Z/
 

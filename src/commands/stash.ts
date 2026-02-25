@@ -140,7 +140,7 @@ export async function runStashApply(
     }
     if (stash.status === "archived") {
       throw new Error(
-        `Stash for '${resolvedBranch}' is archived. Use 'wt clean' to manage archived stashes.`
+        `Stash for '${resolvedBranch}' is archived and cannot be restored. View diff with 'wt stash show ${resolvedBranch}'.`
       );
     }
 

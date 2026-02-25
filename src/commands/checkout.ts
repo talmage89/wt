@@ -194,10 +194,17 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
   if (!options.noRestore) {
     // Read stash metadata before restoring (metadata is deleted on success)
     const stashMeta = await getStash(paths.wtDir, options.branch);
-    const stashCreatedAt = stashMeta?.created_at ?? null;
-    const stashResult = await restoreStash(paths.wtDir, paths.repoDir, options.branch, worktreeDir);
-    if (stashResult === "restored" && stashCreatedAt) {
-      stashRestoredAt = stashCreatedAt;
+    if (stashMeta?.status === "archived") {
+      // Archived stash exists but cannot be auto-restored — notify the user
+      process.stderr.write(
+        `wt: Archived stash for ${options.branch} was not auto-restored. View with 'wt stash show ${options.branch}'.\n`
+      );
+    } else {
+      const stashCreatedAt = stashMeta?.created_at ?? null;
+      const stashResult = await restoreStash(paths.wtDir, paths.repoDir, options.branch, worktreeDir);
+      if (stashResult === "restored" && stashCreatedAt) {
+        stashRestoredAt = stashCreatedAt;
+      }
     }
   }
 

@@ -705,6 +705,61 @@ describe("wt stash show for archived stash", () => {
 });
 
 // ---------------------------------------------------------------------------
+// BUG-025: checkout must notify user when archived stash exists
+// ---------------------------------------------------------------------------
+
+describe("checkout notifies user about archived stash (BUG-025)", () => {
+  it("prints archived stash notification and does not restore the stash", async () => {
+    const containerDir = await mktemp();
+    const { remoteDir, wtDir, repoDir } = await setupRemoteContainer(containerDir);
+
+    // Create a stash for feature-branch
+    await createStashForFeatureBranch(containerDir, wtDir, repoDir);
+
+    // Archive the stash (delete remote branch + age stash)
+    await deleteRemoteBranch(remoteDir, repoDir, "feature-branch");
+    await ageStash(wtDir, "feature-branch", 8);
+    await archiveStash(wtDir, repoDir, "feature-branch");
+
+    const meta = await getStash(wtDir, "feature-branch");
+    expect(meta!.status).toBe("archived");
+
+    // Capture stderr output during checkout
+    const stderrLines: string[] = [];
+    const origStderr = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk: string | Uint8Array): boolean => {
+      if (typeof chunk === "string") stderrLines.push(chunk);
+      return true;
+    };
+
+    try {
+      // Checkout the branch whose stash is archived — should NOT throw
+      await runCheckout({ branch: "feature-branch", cwd: containerDir });
+    } finally {
+      process.stderr.write = origStderr;
+    }
+
+    const stderr = stderrLines.join("");
+
+    // Must print notification about the archived stash
+    expect(stderr).toContain("Archived stash for feature-branch was not auto-restored");
+    expect(stderr).toContain("wt stash show feature-branch");
+
+    // Checkout must have succeeded
+    const state2 = await readState(wtDir);
+    const newSlot = Object.entries(state2.slots).find(
+      ([, s]) => s.branch === "feature-branch"
+    )?.[0];
+    expect(newSlot).toBeDefined();
+
+    // Archived stash metadata must still be present (not consumed)
+    const metaAfter = await getStash(wtDir, "feature-branch");
+    expect(metaAfter).not.toBeNull();
+    expect(metaAfter!.status).toBe("archived");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // isZstdAvailable
 // ---------------------------------------------------------------------------
 
