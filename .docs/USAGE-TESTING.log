@@ -1,3 +1,14 @@
+## 2026-02-25T32-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T32-00-00Z/
+Tests performed:
+- `wt stash drop` on an archived stash (not via `wt clean`): created stash for `develop`, faked timestamps to 10 days ago, deleted remote `develop` branch, ran `wt fetch` (archived the stash); then `printf "y\n" | wt stash drop develop` — stash dropped correctly (exit 0, "Stash dropped for 'develop'."); `wt stash list` showed "No saved stashes."; archive directory empty (patch file deleted); `wt stash drop` works on both active AND archived stashes — PASS
+- `wt init` on a git repo with NO commits (unborn branch): `git init` followed immediately by `wt init` (no URL); git emitted `fatal: invalid reference: HEAD` (exit 128); BUT the `.git/` directory was already moved to `.wt/repo/` before the error occurred; user is left in unrecoverable state: no `wt` commands work (all emit same `fatal: invalid reference: HEAD`), re-running `wt init` says "already a wt-managed container" (wrong — init failed); user cannot recover without manually moving `.wt/repo/` back to `.git/` and deleting `.wt/`; the init should pre-flight check for commits before moving `.git/`, and should roll back on failure — BUG FOUND
+Result: BUG FOUND
+Bug: BUG-023 — `wt init` on repo with no commits moves .git/ to .wt/repo/ before failing, leaving user in unrecoverable broken state (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-25T30-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T30-00-00Z/

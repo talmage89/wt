@@ -1,3 +1,75 @@
+## BUG-023: `wt init` on a repo with no commits leaves user in unrecoverable broken state
+
+**Status**: open
+**Found**: 2026-02-25T32:00:00Z
+**Test run**: ~/wt-usage-tests/2026-02-25T32-00-00Z/
+
+### Description
+
+When `wt init` (no URL) is run from inside a git repository that has no commits yet (i.e., right after `git init` with no commits), the command:
+
+1. Creates the `.wt/` directory structure — OK
+2. Moves `.git/` to `.wt/repo/` — OK
+3. Calls `createSlots()` with `"HEAD"` as the commit reference — FAILS
+
+Step 3 fails because `git worktree add --detach HEAD` requires a valid commit, and `HEAD` is an unborn ref in a no-commits repo. Git emits: `fatal: invalid reference: HEAD` (exit 128).
+
+No cleanup is performed. The user is left in a broken state:
+- `.wt/` directory exists (partial init)
+- `.wt/repo/` contains the repo (`.git/` was moved away)
+- No `config.toml`, no `state.toml`, no worktree slots
+- Running any `wt` command (e.g. `wt list`) also fails with `fatal: invalid reference: HEAD`
+- Running `wt init` again says "wt: This directory is already a wt-managed container." (misleading — it's broken, not initialized)
+- The user cannot recover without manually moving `.wt/repo/` back to `.git/` and deleting `.wt/`
+
+**What happened**:
+```
+$ mkdir empty-repo && cd empty-repo && git init
+$ wt init
+fatal: invalid reference: HEAD
+# EXIT: 128
+$ ls
+.wt/                          # .git/ is GONE, moved to .wt/repo/
+$ wt list
+fatal: invalid reference: HEAD
+# EXIT: 128 — no wt commands work
+$ wt init
+wt: This directory is already a wt-managed container.
+# EXIT: 1 — wrong error, not managed at all
+```
+
+**What should have happened**:
+`wt init` should detect that the repo has no commits before moving `.git/`, and emit a clear error:
+```
+wt: Repository has no commits. Create at least one commit before running 'wt init'.
+# EXIT: 1 — no files moved, user can create a commit and try again
+```
+
+### Reproduction
+
+```sh
+mkdir empty-repo && cd empty-repo
+git init
+wt init
+# Expected: clear error about no commits (no state changed)
+# Got: fatal: invalid reference: HEAD (exit 128) + .git/ is moved to .wt/repo/ + unrecoverable state
+```
+
+### Root Cause
+
+In `src/commands/init.ts`, the `initFromExistingRepo()` function:
+1. Creates `.wt/` structure (line 72)
+2. Moves `.git/` → `.wt/repo/` (line 78)
+3. Calls `createSlots()` with `"HEAD"` as the slot commit (line 110)
+
+Step 3 fails for repos with no commits. There is no pre-flight check for commits before the destructive move in step 2. There is also no rollback (move `.wt/repo/` back to `.git/`, remove `.wt/`) on failure.
+
+### Vision Reference
+
+VISION.md §2.1: "If `wt init` is run from inside an existing repository, the repository is moved into `.wt/repo/`." The vision doesn't address the no-commits case, but the principle of "git errors pass through verbatim" cannot excuse leaving the user's repository in an unrecoverable state.
+
+---
+
 ## BUG-022: `wt init` from subdirectory of git repo gives self-contradictory error message
 
 **Status**: fixed
