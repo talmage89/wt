@@ -1,3 +1,15 @@
+## 2026-02-25T62-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T62-00-00Z/
+Tests performed:
+- BUG-025 fix verification — `wt checkout <branch>` when branch has archived stash now prints notification: set up container (5 slots, all occupied); created dirty state in feature/alpha slot (alpha-wip.txt untracked); evicted feature/alpha (stash created at 34ec638); faked stash `last_used_at` to 10 days ago; deleted remote feature/alpha; ran `wt fetch` → archived stash ("Archived 1 stash(es): feature/alpha"); ran `wt checkout feature/alpha` → output now includes "wt: Archived stash for feature/alpha was not auto-restored. View with 'wt stash show feature/alpha'." before "wt: Checked out feature/alpha in wind-stoat-gray"; alpha-wip.txt correctly absent (archived stash not restored); stash still listed as archived; BUG-025 fix confirmed working — PASS
+- `wt pin`/`wt unpin` with invalid (nonexistent) slot name: `wt pin totally-nonexistent-slot` → "wt: Slot 'totally-nonexistent-slot' not found." (exit 1); `wt unpin also-nonexistent-slot` → "wt: Slot 'also-nonexistent-slot' not found." (exit 1); both give clear errors with correct exit code and make no state changes — PASS
+- `wt checkout <nonexistent-branch>` — git error passthrough + BUG-028 found: ran `wt checkout feature/does-not-exist-anywhere` with all 5 slots occupied (epsilon, zeta, alpha, gamma, delta); git correctly reported "error: pathspec 'feature/does-not-exist-anywhere' did not match any file(s) known to git" (exit 1) — error passthrough PASS; HOWEVER: elk-vale-pitch (previously holding feature/gamma) was silently evicted (detached HEAD) before the checkout failed, leaving it vacant — feature/gamma lost its slot assignment despite the command failing; no rollback of the LRU eviction occurred; subsequent `wt list` confirmed elk-vale-pitch is now (vacant) — BUG FOUND
+Result: BUG FOUND
+Bug: BUG-028 — `wt checkout <nonexistent-branch>` silently evicts an LRU slot even when the checkout fails; the eviction is not rolled back, leaving the slot vacant and the evicted branch's slot assignment lost (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-25T60-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T60-00-00Z/

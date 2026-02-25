@@ -1,3 +1,86 @@
+## BUG-028: `wt checkout <nonexistent-branch>` silently evicts an occupied slot even though the checkout ultimately fails
+
+**Status**: open
+**Found**: 2026-02-25T62:00:00Z
+**Test run**: ~/wt-usage-tests/2026-02-25T62-00-00Z/
+
+### Description
+
+When `wt checkout <branch>` is called with a branch name that doesn't exist locally or on the remote, the command:
+
+1. Selects an LRU slot for checkout (correct).
+2. Evicts the existing branch from that slot — `git checkout --detach` runs, detaching the slot from its branch.
+3. Attempts `git checkout <nonexistent-branch>` in the now-detached slot — **fails** with `error: pathspec '...' did not match any file(s) known to git` (exit 1).
+4. The git error is passed through verbatim (correct).
+
+However, **step 2 is irreversible** — the slot is left in detached HEAD (vacant) state even though the checkout command ultimately failed. The original branch's slot assignment is lost silently. No rollback occurs.
+
+**What happened**:
+```
+# All 5 slots occupied: epsilon, zeta, alpha, gamma, delta
+$ wt checkout feature/does-not-exist-anywhere
+HEAD is now at 557746b gamma commit       ← LRU slot (gamma) evicted
+error: pathspec 'feature/does-not-exist-anywhere' did not match any file(s) known to git
+# EXIT: 1
+
+$ wt list
+# elk-vale-pitch now shows (vacant)  — feature/gamma lost its slot assignment!
+# feature/gamma is still a branch but is no longer in any slot
+```
+
+**What should have happened**:
+The slot eviction should not have occurred, or should have been rolled back on failure. One of:
+```
+# Option A — pre-check (preferred): verify branch exists before evicting
+wt: Branch 'feature/does-not-exist-anywhere' not found locally or on remote.
+[exit 1 — no eviction, no slot change]
+
+# Option B — rollback: re-assign the slot back to its original branch after checkout failure
+wt checkout feature/gamma  # restore evicted branch to its slot
+[exit 1 — slot state restored]
+```
+
+**Impact**:
+- Lost slot assignment for the evicted branch (minor — branch still accessible, just unassigned).
+- If the evicted slot had **dirty state**, the dirty state IS stashed correctly (stash keyed by branch name, retrievable later). However, the user sees the checkout fail but doesn't realize their dirty state was captured in a stash — confusing.
+- With `--no-restore`, user intentionally avoids restore but still shouldn't lose slot assignments on failed checkouts.
+
+### Reproduction
+
+```sh
+wt init <url>
+# Fill all 5 slots with branches
+wt checkout feature/alpha
+wt checkout feature/beta
+wt checkout feature/gamma
+wt checkout -b feature/delta
+wt checkout -b feature/epsilon
+# All 5 slots occupied. Now checkout nonexistent branch:
+wt checkout feature/does-not-exist-anywhere
+# Expected: error message, no slot changes
+# Actual: git error printed, one slot now vacant (LRU branch evicted)
+wt list  # verify one slot is now (vacant)
+```
+
+### Root Cause
+
+In `src/commands/checkout.ts`, the checkout flow is:
+1. `selectSlotForCheckout()` — select LRU slot
+2. `evictSlot()` — detach HEAD from the LRU slot (irreversible — no rollback)
+3. `git checkout <branch>` (or `git checkout -b <branch> <start>`) — may fail
+
+If step 3 fails, the code propagates the git error (correct), but the eviction in step 2 is already done and leaves the slot vacant. There is no rollback mechanism.
+
+**Fix options**:
+1. **Pre-check**: Before evicting, check if the branch exists (locally via `git branch --list`, remotely via `git branch -r --list`) and fail early if not found. This handles the simple case but not all DWIM scenarios.
+2. **Post-failure re-checkout**: On git checkout failure, attempt to restore the slot's original branch (`git checkout <original-branch>`). This is more robust but complex and may itself fail (e.g., if the original branch was deleted).
+
+### Vision Reference
+
+VISION §3.1: "Select a slot (vacant → LRU unpinned → error if all pinned). If the LRU slot has dirty state, stash it." The vision describes the flow assuming the checkout succeeds. It does not address rollback on checkout failure. The principle of "git errors pass through verbatim" (VISION §1) is satisfied (the error IS passed through), but the resulting state violates user expectations: a failed command should not cause persistent state changes.
+
+---
+
 ## BUG-027: `slot_count = 0` in config silently destroys all worktree slots — no guard for zero or sub-minimum slot count
 
 **Status**: fixed
