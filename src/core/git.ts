@@ -554,6 +554,21 @@ export async function addAll(worktreeDir: string): Promise<void> {
 }
 
 /**
+ * Run `git checkout -b <branch> <startPoint>` in a worktree.
+ * Creates a new local branch at the given start point.
+ */
+export async function checkoutCreate(
+  worktreeDir: string,
+  branch: string,
+  startPoint: string
+): Promise<void> {
+  await execa("git", ["checkout", "-b", branch, startPoint], {
+    cwd: worktreeDir,
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+}
+
+/**
  * Check if a git ref exists (e.g., refs/remotes/origin/main).
  */
 export async function refExists(repoDir: string, ref: string): Promise<boolean> {

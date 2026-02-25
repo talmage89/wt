@@ -627,6 +627,145 @@ describe("wt checkout — BUG-016: eviction of slot with unresolved merge confli
   });
 });
 
+describe("wt checkout — -b flag: branch creation", () => {
+  /**
+   * Helper: set up a container initialized from a URL so that
+   * origin/* refs exist in the bare repo.
+   */
+  async function setupContainerFromUrl(): Promise<{
+    containerDir: string;
+    wtDir: string;
+    repoDir: string;
+    remoteDir: string;
+  }> {
+    const remoteWork = await mktemp();
+    await execa("git", ["init", "-b", "main"], { cwd: remoteWork });
+    await execa("git", ["config", "user.email", "test@wt.test"], { cwd: remoteWork });
+    await execa("git", ["config", "user.name", "WT Test"], { cwd: remoteWork });
+    await fs.writeFile(path.join(remoteWork, "README.md"), "# Remote\n");
+    await execa("git", ["add", "."], { cwd: remoteWork });
+    await execa("git", ["commit", "-m", "Initial commit"], { cwd: remoteWork });
+
+    // Also create a 'develop' branch on the remote
+    await execa("git", ["checkout", "-b", "develop"], { cwd: remoteWork });
+    await fs.writeFile(path.join(remoteWork, "develop.txt"), "dev\n");
+    await execa("git", ["add", "."], { cwd: remoteWork });
+    await execa("git", ["commit", "-m", "Develop commit"], { cwd: remoteWork });
+    await execa("git", ["checkout", "main"], { cwd: remoteWork });
+
+    const remoteBase = await mktemp();
+    const remoteDir = path.join(remoteBase, "remote.git");
+    await execa("git", ["clone", "--bare", remoteWork, remoteDir]);
+
+    const containerDir = await mktemp();
+    await runInit({ url: remoteDir, cwd: containerDir });
+
+    return {
+      containerDir,
+      wtDir: path.join(containerDir, ".wt"),
+      repoDir: path.join(containerDir, ".wt", "repo"),
+      remoteDir,
+    };
+  }
+
+  it("should create a new branch from origin/<default-branch> when no start-point given", async () => {
+    const { containerDir, wtDir } = await setupContainerFromUrl();
+
+    const targetDir = await runCheckout({
+      branch: "feature/new",
+      create: true,
+      cwd: containerDir,
+    });
+
+    expect(targetDir).toBeTruthy();
+
+    // Branch should appear in state
+    const state = await readState(wtDir);
+    const slot = Object.entries(state.slots).find(
+      ([, s]) => s.branch === "feature/new"
+    )?.[0];
+    expect(slot).toBeDefined();
+
+    // Verify git agrees
+    const actual = (
+      await execa("git", ["symbolic-ref", "--short", "HEAD"], {
+        cwd: path.join(containerDir, slot!),
+      })
+    ).stdout.trim();
+    expect(actual).toBe("feature/new");
+  });
+
+  it("should create a new branch from an explicit start-point", async () => {
+    const { containerDir, wtDir } = await setupContainerFromUrl();
+
+    await runCheckout({
+      branch: "feature/from-develop",
+      create: true,
+      startPoint: "origin/develop",
+      cwd: containerDir,
+    });
+
+    const state = await readState(wtDir);
+    const slot = Object.entries(state.slots).find(
+      ([, s]) => s.branch === "feature/from-develop"
+    )?.[0];
+    expect(slot).toBeDefined();
+
+    // Verify git has the branch checked out
+    const actual = (
+      await execa("git", ["symbolic-ref", "--short", "HEAD"], {
+        cwd: path.join(containerDir, slot!),
+      })
+    ).stdout.trim();
+    expect(actual).toBe("feature/from-develop");
+
+    // Verify the branch was based on develop (develop.txt should exist)
+    const devFile = path.join(containerDir, slot!, "develop.txt");
+    await expect(fs.access(devFile)).resolves.toBeUndefined();
+  });
+
+  it("should evict a slot if needed when creating a new branch", async () => {
+    const { containerDir, wtDir, repoDir } = await setupContainerFromUrl();
+
+    // Fill all vacant slots
+    await fillVacantSlots(containerDir, repoDir, ["b1", "b2", "b3", "b4"]);
+
+    // Force main's slot to be LRU
+    let state = await readState(wtDir);
+    const mainSlot = Object.keys(state.slots).find(
+      (n) => state.slots[n].branch === "main"
+    )!;
+    state.slots[mainSlot].last_used_at = new Date(0).toISOString();
+    await writeState(wtDir, state);
+
+    // Create a new branch — should evict main's slot
+    await runCheckout({
+      branch: "feature/evict-test",
+      create: true,
+      cwd: containerDir,
+    });
+
+    state = await readState(wtDir);
+    // main should no longer be in any slot
+    const mainStillInSlot = Object.values(state.slots).some(
+      (s) => s.branch === "main"
+    );
+    expect(mainStillInSlot).toBe(false);
+
+    // feature/evict-test should be in the evicted slot
+    expect(state.slots[mainSlot].branch).toBe("feature/evict-test");
+  });
+
+  it("should error when trying to create a branch that already exists locally", async () => {
+    const { containerDir } = await setupContainerFromUrl();
+
+    // 'main' already exists as a local branch
+    await expect(
+      runCheckout({ branch: "main", create: true, cwd: containerDir })
+    ).rejects.toBeDefined();
+  });
+});
+
 describe("wt checkout — BUG-009: symlinks removed before git checkout", () => {
   it("should succeed when target slot has a shared symlink for a git-tracked file", async () => {
     const dir = await mktemp();

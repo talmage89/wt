@@ -83,11 +83,19 @@ const cli = yargs(hideBin(process.argv))
     }
   )
   .command(
-    ["checkout <branch>", "co <branch>"],
+    ["checkout <branch> [start-point]", "co <branch> [start-point]"],
     "Check out a branch (evicts LRU slot if needed)",
     (yargs) =>
       yargs
         .positional("branch", { type: "string", demandOption: true })
+        .positional("start-point", {
+          type: "string",
+          describe: "Start point for branch creation (only used with -b)",
+        })
+        .option("b", {
+          type: "boolean",
+          describe: "Create a new branch at start-point (default: origin/<default-branch>)",
+        })
         .option("restore", {
           type: "boolean",
           default: true,
@@ -98,6 +106,8 @@ const cli = yargs(hideBin(process.argv))
         await runCheckout({
           branch: argv.branch as string,
           noRestore: !argv.restore,
+          create: argv.b ?? false,
+          startPoint: argv["start-point"] as string | undefined,
         });
       } catch (err: unknown) {
         process.stderr.write(`wt: ${(err as Error).message}\n`);

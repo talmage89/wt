@@ -35,8 +35,10 @@ function relativeTime(isoDate: string): string {
 
 export interface CheckoutOptions {
   branch: string;
-  noRestore?: boolean;  // --no-restore flag
-  cwd?: string;         // override cwd for testing
+  noRestore?: boolean;   // --no-restore flag
+  create?: boolean;      // -b flag: create a new branch
+  startPoint?: string;   // start point for branch creation (default: origin/<default-branch>)
+  cwd?: string;          // override cwd for testing
 }
 
 /**
@@ -90,8 +92,8 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
     // Archive scan errors are not fatal — continue checkout
   }
 
-  // 6. BRANCH ALREADY IN A SLOT?
-  const existingSlot = findSlotForBranch(state, options.branch);
+  // 6. BRANCH ALREADY IN A SLOT? (skipped when creating a new branch)
+  const existingSlot = !options.create ? findSlotForBranch(state, options.branch) : null;
   if (existingSlot) {
     // Just navigate to it
     await touchStash(paths.wtDir, options.branch);
@@ -123,6 +125,8 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
   let evictedBranch: string | null = null;
   let wasStashed = false;
   let branchCreatedFromRemote = false;
+  let branchCreatedExplicitly = false;
+  let explicitStartPoint: string | null = null;
   let stashRestoredAt: string | null = null;
 
   // 8. EVICT (if slot is not vacant)
@@ -150,25 +154,37 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
   // git refuses to checkout if a symlink exists for a file the target branch tracks.
   await removeSymlinks(paths.wtDir, worktreeDir, config.shared.directories);
 
-  let checkoutError: unknown = null;
-  try {
-    await git.checkout(worktreeDir, options.branch);
-  } catch (err) {
-    checkoutError = err;
-  }
+  if (options.create) {
+    // -b flag: create a new local branch at the given start point
+    let resolvedStartPoint = options.startPoint;
+    if (!resolvedStartPoint) {
+      const defBranch = await git.defaultBranch(paths.repoDir);
+      resolvedStartPoint = `origin/${defBranch}`;
+    }
+    await git.checkoutCreate(worktreeDir, options.branch, resolvedStartPoint);
+    branchCreatedExplicitly = true;
+    explicitStartPoint = resolvedStartPoint;
+  } else {
+    let checkoutError: unknown = null;
+    try {
+      await git.checkout(worktreeDir, options.branch);
+    } catch (err) {
+      checkoutError = err;
+    }
 
-  if (checkoutError !== null) {
-    // Branch doesn't exist locally — try creating from origin/<branch>
-    const remoteExists = await git.remoteBranchExists(
-      paths.repoDir,
-      options.branch
-    );
-    if (remoteExists) {
-      await git.checkoutTrack(worktreeDir, options.branch);
-      branchCreatedFromRemote = true;
-    } else {
-      // No remote branch — let git error pass through
-      throw checkoutError;
+    if (checkoutError !== null) {
+      // Branch doesn't exist locally — try creating from origin/<branch>
+      const remoteExists = await git.remoteBranchExists(
+        paths.repoDir,
+        options.branch
+      );
+      if (remoteExists) {
+        await git.checkoutTrack(worktreeDir, options.branch);
+        branchCreatedFromRemote = true;
+      } else {
+        // No remote branch — let git error pass through
+        throw checkoutError;
+      }
     }
   }
 
@@ -223,6 +239,9 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
   if (evictedBranch !== null) {
     const dirtyNote = wasStashed ? " (dirty state stashed)" : "";
     process.stderr.write(`wt: Evicted ${evictedBranch} from ${targetSlot}${dirtyNote}\n`);
+  }
+  if (branchCreatedExplicitly) {
+    process.stderr.write(`wt: Created branch ${options.branch} from ${explicitStartPoint}\n`);
   }
   if (branchCreatedFromRemote) {
     process.stderr.write(`wt: Created local branch ${options.branch} from origin/${options.branch}\n`);
