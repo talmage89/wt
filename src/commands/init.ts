@@ -62,6 +62,15 @@ async function initFromExistingRepo(containerDir: string): Promise<string> {
     );
   }
 
+  // Pre-flight check: repo must have at least one commit before we make any
+  // destructive changes. git worktree add requires a valid commit ref, and
+  // moving .git/ without being able to create slots leaves the repo unrecoverable.
+  if (!(await git.hasCommits(containerDir))) {
+    throw new Error(
+      "Repository has no commits. Create at least one commit before running 'wt init'."
+    );
+  }
+
   // Get current branch (may be null if detached HEAD)
   const startingBranch = await git.currentBranch(containerDir);
 

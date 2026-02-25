@@ -569,6 +569,19 @@ export async function checkoutCreate(
 }
 
 /**
+ * Check if the repository has at least one commit (HEAD points to a valid commit).
+ * Returns false for repos that have been git-inited but have no commits yet.
+ */
+export async function hasCommits(dir: string): Promise<boolean> {
+  const result = await execa("git", ["rev-parse", "--verify", "HEAD"], {
+    cwd: dir,
+    stdio: ["ignore", "pipe", "pipe"],
+    reject: false,
+  });
+  return result.exitCode === 0;
+}
+
+/**
  * Check if a git ref exists (e.g., refs/remotes/origin/main).
  */
 export async function refExists(repoDir: string, ref: string): Promise<boolean> {

@@ -1,7 +1,8 @@
 ## BUG-023: `wt init` on a repo with no commits leaves user in unrecoverable broken state
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-25T32:00:00Z
+**Fixed**: 2026-02-25T33:00:00Z
 **Test run**: ~/wt-usage-tests/2026-02-25T32-00-00Z/
 
 ### Description

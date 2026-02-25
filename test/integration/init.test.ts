@@ -162,6 +162,27 @@ describe("wt init (from existing repo)", () => {
     );
   });
 
+  it("should reject a repo with no commits without corrupting it (BUG-023)", async () => {
+    const dir = await mktemp();
+    // git init but NO commits — unborn HEAD
+    await execa("git", ["init"], { cwd: dir });
+    await execa("git", ["config", "user.email", "test@wt.test"], { cwd: dir });
+    await execa("git", ["config", "user.name", "WT Test"], { cwd: dir });
+
+    // Must throw a clear error
+    await expect(runInit({ cwd: dir })).rejects.toThrow(
+      "Repository has no commits"
+    );
+
+    // .wt/ must NOT have been created — no state changes
+    expect(await exists(path.join(dir, ".wt"))).toBe(false);
+
+    // .git/ must still be present (repo not corrupted)
+    expect(await exists(path.join(dir, ".git"))).toBe(true);
+    const gitStat = await fs.stat(path.join(dir, ".git"));
+    expect(gitStat.isDirectory()).toBe(true);
+  });
+
   it("should give a clear error when run from a subdirectory of a git repo (BUG-022)", async () => {
     const dir = await mktemp();
     await createTestRepo(dir);
