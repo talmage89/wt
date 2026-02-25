@@ -1,3 +1,16 @@
+## 2026-02-25T08-02-20Z
+
+Location: ~/wt-usage-tests/2026-02-25T08-02-20Z/
+Tests performed:
+- BUG-021 regression — archive scan skips target branch during checkout: created stash for feature/alpha (alpha-wip.txt dirty); faked stash last_used_at and created_at to 10 days ago; deleted remote feature/alpha branch; ran `wt checkout feature/alpha` with all slots full (triggered LRU eviction of feature/beta); archive scan ran but correctly EXCLUDED feature/alpha from archival (excludeBranch parameter); checkout completed: "wt: Restored stash from 10 days ago" printed; alpha-wip.txt present in new slot; stash list empty (cleaned up after restore); no "Archived 1 stash(es)" message — BUG-021 fix confirmed, regression test PASS
+- Reconcile after direct `git checkout` inside slot: with flint-nub-creek on feature/zeta, ran `git checkout feature/beta` directly inside that slot (bypassing wt); immediately ran `wt list` — reconcile silently detected the branch change and updated state; list showed flint-nub-creek on feature/beta (not feature/zeta); no error, no warning; next `wt checkout` would correctly treat it as feature/beta's slot — PASS
+- `wt checkout -b <new-branch> <explicit-start-point>` with commit SHA: ran `wt checkout -b feature/from-sha <de3c120 SHA>` (full 40-char SHA of origin/main HEAD); feedback: "wt: Created branch feature/from-sha from de3c120ec..." (full SHA); `git log --oneline -1` in slot confirmed HEAD = de3c120 "Add config file"; feature/from-sha correctly points to specified commit — PASS; also tested `wt checkout -b feature/from-remote-branch origin/feature/beta` — feedback: "Created branch feature/from-remote-branch from origin/feature/beta"; `git log` confirmed HEAD = ec878da "beta commit" (origin/feature/beta's HEAD) — PASS
+- Symlink: git-tracked file on shared directory path — `isGitTracked` detection: committed `.config/app.json` exists on main, feature/epsilon, feature/from-sha (branches created from origin/main after that commit); feature/alpha and feature/beta branches do NOT have it; configured `[shared] directories = [".config"]` with canonical `.wt/shared/.config/app.json`; ran `wt sync`; slots with tracked file (shrill-sol-close/feature/epsilon, open-fox-alder/feature/from-sha) got "Skipping symlink for .config/app.json: file is tracked by git in branch <branch>" message and NO symlink; slots without tracked file (moor-early-spit/feature/alpha, flint-nub-creek/feature/beta, sandy-fine-balmy/feature/from-remote-branch) DID get symlink → ../../.wt/shared/.config/app.json; `isGitTracked` works correctly per-branch — PASS
+- `wt sync` from inside a worktree slot: added `.wt/shared/.config/settings.json` (not git-tracked in any branch); ran `wt sync` from CWD = moor-early-spit (a worktree slot, not container root); container detection walked up correctly; symlinks created in ALL 5 slots (including moor-early-spit itself); symlink targets correct (../../.wt/shared/.config/settings.json); exit 0 — PASS
+Result: PASS
+
+---
+
 ## 2026-02-28T14-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-28T14-00-00Z/
