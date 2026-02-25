@@ -1,3 +1,19 @@
+## 2026-02-25T50-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T50-00-00Z/
+Tests performed:
+- Remote-only branch checkout via git DWIM — `wt checkout feature/alpha` where `feature/alpha` only exists on remote (never checked out locally): git DWIM created local tracking branch transparently; "wt: Checked out feature/alpha in ledge-wood-eagle" printed (exit 0); NO "Created local branch from origin/..." message; this is a pre-existing spec/implementation gap: the "Created local branch" message is emitted in the `checkoutTrack` code path (which runs when `git checkout` fails), but git DWIM causes `git checkout` to SUCCEED even for remote-only branches, so the explicit tracking path is never triggered; locally created tracking branch confirmed via `git branch --list`; checkout is functionally correct, informational message just not emitted — PASS (gap noted, not new)
+- Deep-slash branch name checkout — `wt checkout feature/backend/auth/oauth` (remote-only, 28-char name with 3 slashes): checkout succeeded (exit 0); `wt list` shows branch truncated to `feature/backend/a...` in 20-char column; branch correctly checked out in slot; git DWIM created local tracking branch — PASS
+- `wt stash drop` piped `n` (abort path): created stash for `main` via eviction; `printf "n\n" | wt stash drop main` → "Drop stash for 'main'? This cannot be undone. [y/N] Aborted." (exit 0); stash preserved in list; BUG-018 fix confirmed for 'n' response — PASS
+- `wt stash drop` piped `y` (confirm path): `printf "y\n" | wt stash drop main` → "Drop stash for 'main'? This cannot be undone. [y/N] Stash dropped for 'main'." (exit 0); stash list empty afterward — PASS
+- `wt clean` piped stdin BUG-020 regression: created stash for `feature/fill2`, faked timestamps to 10 days ago, deleted remote branch (never existed), ran `wt fetch` → archived stash; `printf "all\ny\n" | wt clean` → "Archived stashes: [1] feature/fill2 (10d ago, 319 B) Select stashes to delete... Delete 1 stash? [y/N] Deleted 1 archived stash." (exit 0); archive file and stash metadata cleaned up; no "Detected unsettled top-level await" error; BUG-020 fix confirmed for piped stdin with sequential prompts — PASS
+- Detached HEAD slot with dirty state reuse: checked out tag `v1.0.0` → slot `bulb-inlet-dun` set to detached HEAD "(vacant)"; created untracked `stranded.txt` and `stranded2.txt` in slot; ran `wt checkout -b feature/use-vacant-slot` (used `bulb-inlet-dun` as target vacant slot); NO stash created (vacant slot has no branch key); stranded files persisted alongside new branch's files; slot shows as "dirty" in `wt list` (untracked stranded files visible to git status); if user later evicts this slot, stranded files WILL be captured in stash for `feature/use-vacant-slot`; consistent with previous finding in 2026-02-25T36-00-00Z; VISION doesn't address tag/detached-HEAD checkouts — PASS (known UX gap, behavior consistent with design)
+- `wt stash drop` / `wt stash apply` with no branch arg from container root: both returned "wt: Not inside a worktree slot. Specify a branch name." (exit 1) — PASS
+- `wt` (no args) from outside container (both plain subprocess and via PTY): shows yargs help text listing all commands — does NOT show "Not inside a wt-managed container." (unlike all other subcommands); TUI is only launched when invoked from inside a container; outside a container, yargs default-command handler shows help; consistent with CLI design (help text is appropriate when there's no context) — PASS
+Result: PASS
+
+---
+
 ## 2026-02-25T48-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T48-00-00Z/
