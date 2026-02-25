@@ -1,3 +1,16 @@
+## 2026-02-25T56-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T56-00-00Z/
+Tests performed:
+- Increase `slot_count` from 5 to 7 in config, run `wt list`: edited `slot_count = 5` → `slot_count = 7` in `.wt/config.toml`; ran `wt list` from container → two "Preparing worktree (detached HEAD fe616ab)" messages emitted (new slots being created); list showed 7 slots total (5 original + 2 new vacant: `fast-linen-ford`, `aspen-brine-gull`); both new slot directories appeared on disk; `wt list` correctly creates new slots to satisfy the higher slot_count — PASS
+- Corrupt `state.toml` (invalid TOML), run `wt list`: backed up valid state.toml; wrote "TOTALLY INVALID !@#$ NOT TOML\n[broken section\nthis = = broken" to state.toml; ran `wt list` → "Warning: .wt/state.toml is corrupted. Regenerating from git state." (exit 0); list displayed all 7 slots correctly; branch assignments preserved (knoll-forest-vapor→main correctly detected from git worktree state); LRU timestamps reset to epoch (all showed "20509d ago") — state regenerated from git but timestamps are lost; graceful recovery with no crash — PASS (timestamps loss expected: git state cannot recover them)
+- `wt init` from existing repo with dirty state + untracked files: created git repo with staged change + unstaged change to README.md + untracked `untracked-secret.txt`; ran `wt init` (no URL); init succeeded (exit 0); `git stash create -u` captures dirty state before restructuring (line 78 of init.ts); stash applied to active slot after checkout (`git stash apply` in slot0Dir); verified in active slot: README.md content includes both staged ("staged content") and unstaged ("unstaged content") changes; `untracked-secret.txt` present with correct content; `git status` in slot shows ` M README.md` and `?? untracked-secret.txt`; NOTE: staging status (MM → M) was lost — `git stash apply` restores staged changes as unstaged modifications, which is standard git behavior — PASS (staging state loss is expected git stash behavior)
+- `wt shell-init bash` produces valid function + cd works: `node /workspace/bin/wt.mjs shell-init bash` → valid bash function with `wt()` wrapper; function sets `WT_SHELL_INTEGRATION=1`; wraps `command wt "$@"`, reads nav file at `/tmp/wt-nav-$$`, runs `cd "$target_dir"`; simulated the shell function in a bash script, ran `wt checkout feature/alpha` from container root; nav file written correctly; `cd` happened to `aspen-brine-gull` slot; post-checkout script confirmed `pwd` = absolute path to `aspen-brine-gull`; exit 0; function also conditionally runs `.wt/hooks/post-checkout` after cd — PASS
+- `wt checkout --no-restore feature/alpha` then manual `wt stash apply`: set up stash for feature/alpha (dirty `alpha-wip.txt`); ran `wt checkout --no-restore feature/alpha` → "wt: Checked out feature/alpha in lynx-lune-thrush" + "wt: Evicted feature/b4 from lynx-lune-thrush" (exit 0); NO "Restored stash" message; `alpha-wip.txt` NOT present in slot (stash not restored — correct); stash still listed in `wt stash list` (not consumed); ran `wt stash apply feature/alpha` manually → "Stash applied and cleaned up for 'feature/alpha'." (exit 0); `alpha-wip.txt` present with correct content "alpha-wip"; stash list empty after apply — PASS
+Result: PASS
+
+---
+
 ## 2026-02-25T54-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T54-00-00Z/
