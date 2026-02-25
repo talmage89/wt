@@ -1,8 +1,8 @@
 ## BUG-018: `wt stash drop` with stdin=/dev/null still crashes (exit 13) — `promptConfirm` fix incomplete
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-25T05:57:32Z
-**Fixed**:
+**Fixed**: 2026-02-25T06:04:00Z
 **Test run**: ~/wt-usage-tests/2026-02-25T05-57-32Z/
 
 ### Description

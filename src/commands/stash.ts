@@ -271,6 +271,8 @@ export async function runStashShow(
 /**
  * Prompt the user for a yes/no confirmation on stdin.
  * Resolves false (defaulting to "N") if stdin closes without data.
+ * Listens to both "end" and "close" so it handles /dev/null (which only
+ * emits "end", not "close") and normal stream close (which emits "close").
  */
 async function promptConfirm(question: string): Promise<boolean> {
   process.stdout.write(question);
@@ -278,16 +280,20 @@ async function promptConfirm(question: string): Promise<boolean> {
     process.stdin.setEncoding("utf8");
     process.stdin.resume();
     const onData = (chunk: string) => {
-      process.stdin.removeListener("close", onClose);
+      process.stdin.removeListener("end", onEnd);
+      process.stdin.removeListener("close", onEnd);
       process.stdin.pause();
       const answer = chunk.trim().toLowerCase();
       resolve(answer === "y" || answer === "yes");
     };
-    const onClose = () => {
+    const onEnd = () => {
       process.stdin.removeListener("data", onData);
+      process.stdin.removeListener("end", onEnd);
+      process.stdin.removeListener("close", onEnd);
       resolve(false);
     };
     process.stdin.once("data", onData);
-    process.stdin.once("close", onClose);
+    process.stdin.once("end", onEnd);
+    process.stdin.once("close", onEnd);
   });
 }

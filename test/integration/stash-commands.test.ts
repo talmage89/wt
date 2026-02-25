@@ -335,6 +335,53 @@ describe("wt stash drop", () => {
     const output = lines.join("");
     expect(output).toContain("Aborted");
   });
+
+  it("aborts cleanly when stdin emits only 'end' (not 'close'), like /dev/null (BUG-018)", async () => {
+    const dir = await mktemp();
+    const { wtDir, repoDir } = await setupContainer(dir);
+
+    await createStashViaEviction(dir, wtDir, repoDir);
+    expect(await getStash(wtDir, "main")).not.toBeNull();
+
+    // Simulate /dev/null: emits "end" but never "close"
+    const origStdin = process.stdin;
+    const fakeStdin = new PassThrough();
+    // Suppress the "close" event to replicate /dev/null behaviour
+    fakeStdin.emit = function (event: string | symbol, ...args: unknown[]) {
+      if (event === "close") return true; // swallow close
+      return PassThrough.prototype.emit.call(this, event, ...args);
+    };
+    Object.defineProperty(process, "stdin", {
+      value: fakeStdin,
+      writable: true,
+      configurable: true,
+    });
+
+    const lines: string[] = [];
+    const origWrite = process.stdout.write.bind(process.stdout);
+    process.stdout.write = (chunk: string | Uint8Array): boolean => {
+      if (typeof chunk === "string") lines.push(chunk);
+      return true;
+    };
+
+    try {
+      // Trigger "end" only — no "close"
+      setTimeout(() => fakeStdin.end(), 10);
+      await runStashDrop("main", { cwd: dir });
+    } finally {
+      process.stdout.write = origWrite;
+      Object.defineProperty(process, "stdin", {
+        value: origStdin,
+        writable: true,
+        configurable: true,
+      });
+    }
+
+    // Stash should NOT be dropped — promptConfirm defaulted to "N"
+    expect(await getStash(wtDir, "main")).not.toBeNull();
+    const output = lines.join("");
+    expect(output).toContain("Aborted");
+  });
 });
 
 describe("wt stash show", () => {
