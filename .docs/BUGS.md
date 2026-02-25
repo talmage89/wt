@@ -1,7 +1,8 @@
 ## BUG-027: `slot_count = 0` in config silently destroys all worktree slots — no guard for zero or sub-minimum slot count
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-25T54:00:00Z
+**Fixed**: 2026-02-25T55:00:00Z
 **Test run**: ~/wt-usage-tests/2026-02-25T54-00-00Z/
 
 ### Description

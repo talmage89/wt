@@ -128,6 +128,10 @@ export async function adjustSlotCount(
   const currentCount = Object.keys(state.slots).length;
   const targetCount = config.slot_count;
 
+  if (targetCount < 1) {
+    throw new Error(`slot_count must be at least 1.`);
+  }
+
   if (currentCount === targetCount) return state;
 
   if (targetCount > currentCount) {
