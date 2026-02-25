@@ -1,7 +1,8 @@
 ## BUG-017: `wt init` from inside a worktree slot corrupts the slot
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-25T12:00:00Z
+**Fixed**: 2026-02-25T05:58:00Z
 **Test run**: ~/wt-usage-tests/2026-02-25T12-00-00Z/
 
 ### Description

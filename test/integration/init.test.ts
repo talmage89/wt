@@ -161,6 +161,31 @@ describe("wt init (from existing repo)", () => {
       "Not a git repository"
     );
   });
+
+  it("should error (not corrupt) when run from inside a worktree slot (BUG-017)", async () => {
+    const dir = await mktemp();
+    await createTestRepo(dir);
+    await runInit({ cwd: dir });
+
+    // Find a slot directory (any entry that is not .wt)
+    const entries = await fs.readdir(dir);
+    const slotName = entries.find((e) => e !== ".wt")!;
+    const slotDir = path.join(dir, slotName);
+
+    // A slot has a .git FILE (worktree link), not a .git/ directory
+    const gitFile = path.join(slotDir, ".git");
+    const gitStat = await fs.stat(gitFile);
+    expect(gitStat.isFile()).toBe(true);
+
+    // Running wt init from inside a slot must throw a clear error
+    await expect(runInit({ cwd: slotDir })).rejects.toThrow(
+      "not inside a worktree slot"
+    );
+
+    // The slot must not be corrupted: .git file still present and is a file
+    const gitStatAfter = await fs.stat(gitFile);
+    expect(gitStatAfter.isFile()).toBe(true);
+  });
 });
 
 describe("wt init <url> (from URL)", () => {

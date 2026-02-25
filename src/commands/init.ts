@@ -1,4 +1,4 @@
-import { access, readdir, rename, rm } from "fs/promises";
+import { access, readdir, rename, rm, stat } from "fs/promises";
 import { join } from "path";
 import { execa } from "execa";
 import { createContainerStructure } from "../core/container.js";
@@ -41,12 +41,24 @@ async function initFromExistingRepo(containerDir: string): Promise<string> {
     throw new Error("This directory is already a wt-managed container.");
   }
 
-  // Validate: must be a git repository (.git/ must exist)
+  // Validate: must be a git repository (.git/ must be a directory, not a file)
+  // A worktree slot has a .git FILE (worktree link) rather than a .git/ directory.
+  // We must check for a directory specifically to avoid corrupting a slot.
   const gitDir = join(containerDir, ".git");
-  const isGitRepo = await exists(gitDir);
-  if (!isGitRepo) {
+  let gitStat: import("fs").Stats | null = null;
+  try {
+    gitStat = await stat(gitDir);
+  } catch {
+    // .git doesn't exist at all
+  }
+  if (!gitStat) {
     throw new Error(
       "Not a git repository. Use 'wt init <url>' to clone, or run from inside a git repository."
+    );
+  }
+  if (!gitStat.isDirectory()) {
+    throw new Error(
+      "Not a git repository root. Run 'wt init' from a regular git repository, not inside a worktree slot."
     );
   }
 
