@@ -78,11 +78,47 @@ After initialization:
 - All other worktree slots are in a **vacant state** (detached HEAD at the default branch tip).
 - The user's shell is inside the active worktree.
 
+### 2.4 Post-Init Output
+
+After `wt init` completes, the following summary is printed to stderr:
+
+```
+wt: Initialized with 5 worktree slots.
+wt:   crimson-maple-river  (active, branch: main)
+wt:   gentle-autumn-spark  (vacant)
+wt:   bright-coral-dawn    (vacant)
+wt:   silver-frost-meadow  (vacant)
+wt:   hollow-pine-creek    (vacant)
+wt:
+wt: To enable shell navigation (cd on checkout), add to your shell config:
+wt:   eval "$(wt shell-init bash)"    # bash
+wt:   eval "$(wt shell-init zsh)"     # zsh
+wt:   wt shell-init fish | source     # fish
+wt:
+wt: Then restart your shell or run the eval command now.
+```
+
+The shell integration hint is omitted if `WT_SHELL_INTEGRATION=1` is set in the environment (i.e., the shell wrapper has already been sourced).
+
 ---
 
 ## 3. Branch Checkout
 
 The primary user-facing operation is `wt checkout <branch>` (alias: `wt co <branch>`).
+
+### 3.0 Branch Creation
+
+To create a new branch and check it out:
+
+```
+wt checkout -b <new-branch> [<start-point>]
+```
+
+- If `<start-point>` is omitted, the new branch is created from `origin/<default-branch>`.
+- If `<start-point>` is specified, the new branch is created from that ref.
+- After creation, the checkout flow (Section 3.1) proceeds normally: slot selection, eviction if needed, stash restore if applicable.
+
+This mirrors `git checkout -b` semantics.
 
 ### 3.1 Checkout Flow
 
@@ -103,7 +139,26 @@ The primary user-facing operation is `wt checkout <branch>` (alias: `wt co <bran
 10. **Execute post-checkout hook**: If `.wt/hooks/post-checkout` exists, execute it with the worktree path and branch name as arguments.
 11. **Navigate**: Change the user's shell working directory to the target worktree slot.
 
-### 3.2 Reconciliation
+### 3.2 Checkout Feedback
+
+After checkout completes, `wt` prints a brief summary to stderr. Only lines that apply are shown:
+
+```
+wt: Checked out feature/my-branch in crimson-maple-river
+wt: Evicted main from crimson-maple-river (dirty state stashed)
+wt: Restored stash from 2d ago
+wt: Created local branch feature/new from origin/main
+wt: Navigating to /path/to/crimson-maple-river
+```
+
+- The "Checked out" line always appears.
+- The "Evicted" line appears only when LRU eviction occurred.
+- "(dirty state stashed)" is appended to the eviction line only if a stash was created.
+- The "Restored stash" line appears only when a saved stash was applied.
+- The "Created local branch" line appears only when a new branch was created from remote.
+- The "Navigating" line appears only when shell integration is active (`WT_SHELL_INTEGRATION=1`).
+
+### 3.3 Reconciliation
 
 On every `wt` command, `wt` scans all worktree slots and updates its internal state:
 
@@ -112,6 +167,8 @@ On every `wt` command, `wt` scans all worktree slots and updates its internal st
 - Pin status.
 
 If a branch has changed due to direct `git checkout` usage (bypassing `wt`), `wt` silently updates its internal mapping to reflect reality. No warning is emitted; the tool adapts.
+
+---
 
 ---
 
@@ -127,7 +184,7 @@ The user adds one of the following to their shell configuration:
 - **zsh**: `eval "$(wt shell-init zsh)"`
 - **fish**: `wt shell-init fish | source`
 
-This defines a shell function `wt()` that wraps the `wt` binary.
+This defines a shell function `wt()` that wraps the `wt` binary. Shell scripts must export `WT_SHELL_INTEGRATION=1` so the CLI can detect that shell integration is active.
 
 ### 4.2 Mechanism
 
@@ -366,6 +423,7 @@ The TUI main screen is a list of top-level actions:
 2. **Manage Stashes** — View and delete archived stashes.
 3. **Edit Configuration** — Modify `.wt/config.toml` in-terminal.
 4. **Edit Templates** — Edit template source files, regenerate across worktrees.
+5. **Edit Hooks** — Create and edit hook scripts in `.wt/hooks/`.
 
 ### 8.2 Manage Worktrees Panel
 
@@ -379,7 +437,10 @@ Each entry in the list represents a branch. Branches fall into three visual tier
 
 2. **Active branches** (in a worktree slot, not pinned) — Displayed in **bright white** with a colored status dot indicating worktree state. Sorted by recency below pinned entries.
 
-3. **Inactive branches** (not in any worktree slot) — Displayed in **dim/faded text** below active branches. Limited to branches the user has previously checked out via `wt` (tracked in `wt` history). Sorted by recency of last `wt` checkout.
+3. **Inactive branches** (not in any worktree slot) — Displayed in **dim/faded text** below active branches. Includes:
+   - Branches previously checked out via `wt` (tracked in `wt` history), sorted by recency of last `wt` checkout.
+   - All other local branches (from `git branch`) not already listed above, shown at the bottom of the inactive tier.
+   Deduplication: each branch appears exactly once regardless of how many sources it appears in.
 
 #### 8.2.2 Status Indicators
 
@@ -407,7 +468,22 @@ On an **inactive branch** (not in a worktree slot):
 - **Checkout** — Check out this branch (triggers slot selection / LRU eviction) and navigate to it.
 - **View Stash** — If a stash exists, display the diff contents.
 
-#### 8.2.4 Branch Search
+From anywhere in the Worktree Panel:
+
+- **`n` key — Create New Branch** — Opens a text input prompt for the new branch name. The branch is created from `origin/<default-branch>` and immediately checked out (triggering the full checkout flow). The user may optionally specify a start point.
+
+#### 8.2.4 Live Polling
+
+The TUI polls for state changes every 2 seconds while the Worktree Panel is visible and `$EDITOR` is not open. On each tick:
+
+- Re-read `.wt/state.toml`.
+- Run `git status --porcelain` per active slot (lightweight).
+- If any slot's branch or dirty status changed, update the display.
+- Re-run reconciliation to detect direct `git checkout` changes.
+
+Polling pauses when an editor is open (to avoid interfering with editor I/O) and resumes when the editor exits.
+
+#### 8.2.5 Branch Search
 
 A search action is available from the worktree panel (e.g., `/` or a dedicated keybinding) that allows the user to fuzzy-search across **all** local and remote branches — not just those in `wt` history. Selecting a branch from search results triggers a checkout.
 
@@ -429,13 +505,50 @@ Available actions:
 - **Delete** — Remove the stash (with confirmation).
 - **Bulk Delete** — Select multiple archived stashes for deletion.
 
+The Stash Panel also polls for changes every 2 seconds (same mechanism as the Worktree Panel).
+
 ### 8.4 Edit Configuration Panel
 
-Opens `.wt/config.toml` in an in-terminal editor for modification.
+Opens `.wt/config.toml` in `$EDITOR` for modification.
+
+After the editor closes, `wt` compares the new config with the snapshot taken before the editor opened and displays a diff summary:
+
+```
+Config updated.
+  slot_count: 5 → 7 (run any wt command to create new slots)
+  shared.directories: added ".env.local.d" (run 'wt sync' to propagate)
+  templates: added 1 template (run 'wt sync' to generate)
+```
+
+If no changes were made: `No changes.`
+
+This summary appears immediately after returning to the TUI and guides the user on any follow-up actions required.
 
 ### 8.5 Edit Templates Panel
 
-Lists all configured template source files. Selecting one opens it in an in-terminal editor. After saving, prompts to regenerate the template across all worktrees.
+Lists all configured template source files. Selecting one opens it in `$EDITOR`. After saving, prompts to regenerate the template across all worktrees.
+
+### 8.6 Edit Hooks Panel
+
+Lists all files in `.wt/hooks/` and their descriptions.
+
+If no hooks exist, offers to create the `post-checkout` hook with a commented template:
+
+```bash
+#!/usr/bin/env bash
+# post-checkout hook — runs after wt navigates to a new worktree
+# $1 = absolute path to the worktree
+# $2 = branch name checked out
+WORKTREE_PATH="$1"
+BRANCH="$2"
+```
+
+Selecting an existing hook opens it in `$EDITOR`. After editing, the panel checks whether the file is executable. If not, it offers to run `chmod +x` on the file.
+
+Available actions per hook entry:
+- **Edit** — Open in `$EDITOR`.
+- **Make Executable / Already Executable** — Toggle based on current mode.
+- **Delete** — Remove the hook file (with confirmation).
 
 ---
 
@@ -445,6 +558,7 @@ Lists all configured template source files. Selecting one opens it in an in-term
 |---|---|
 | `wt init [url]` | Initialize a `wt`-managed container. If `url` is provided, clone from it. Otherwise, restructure the current repository. |
 | `wt checkout <branch>` | Check out a branch, evicting the LRU slot if necessary. Alias: `wt co`. Supports `--no-restore` to skip automatic stash restoration. |
+| `wt checkout -b <branch> [start]` | Create a new branch from `<start>` (default: `origin/<default-branch>`) and check it out. |
 | `wt fetch` | Run a centralized `git fetch` and trigger archive scanning. |
 | `wt stash list` | List all saved stashes with branch, age, status, and base commit. |
 | `wt stash apply [branch]` | Apply a saved stash for the given branch (defaults to current). Deletes stash on clean apply; retains on conflict. |
@@ -570,3 +684,56 @@ The user can avoid this entirely by using `wt checkout --no-restore <branch>` an
 ### 15.3 Git Error Pass-Through
 
 All git errors are passed through to the user verbatim. `wt` does not wrap, reinterpret, or suppress git error messages. If `git checkout`, `git fetch`, `git stash apply`, or any other git operation fails, the user sees git's native error output.
+
+---
+
+## 16. Claude Code Integration
+
+### 16.1 Worktree Pinning Hook
+
+When Claude Code runs a prompt inside a `wt`-managed worktree, that worktree could be evicted by a concurrent `wt checkout` in another terminal. To prevent this, users can configure a Claude Code hook that pins the worktree for the duration of the Claude Code session.
+
+Add the following to Claude Code's hook configuration (`.claude/settings.json` or the equivalent hooks file):
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "wt pin 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "wt unpin 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+The `|| true` ensures that if `wt` is not available or the current directory is not inside a managed worktree, the hook silently does nothing.
+
+This hook can be placed in `.wt/shared/.claude/settings.json` so it is automatically symlinked into all worktrees, requiring no per-worktree configuration.
+
+### 16.2 `wt hooks show` (Optional)
+
+`wt hooks show claude-code` outputs the above JSON to stdout, allowing the user to inspect or redirect it:
+
+```
+wt hooks show claude-code >> .claude/settings.json
+```
+
+This subcommand is optional; the hook definition above is the primary deliverable.

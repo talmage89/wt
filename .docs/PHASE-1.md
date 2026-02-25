@@ -175,10 +175,10 @@ Once all improvements are designed, write the implementation checklist for Phase
 
 ## Completion Checklist
 
-- [ ] Every CLI command audited for UX gaps.
-- [ ] Every TUI panel audited for UX gaps.
-- [ ] Shell integration audited.
-- [ ] Concrete spec written for each improvement (A through I, plus any additional).
-- [ ] VISION.md amendments drafted.
-- [ ] Phase 2 implementation checklist written.
-- [ ] All specs reviewed for consistency with existing VISION.md.
+- [x] Every CLI command audited for UX gaps.
+- [x] Every TUI panel audited for UX gaps.
+- [x] Shell integration audited.
+- [x] Concrete spec written for each improvement (A through I, plus any additional).
+- [x] VISION.md amendments drafted and applied.
+- [x] Phase 2 implementation checklist written.
+- [x] All specs reviewed for consistency with existing VISION.md.
