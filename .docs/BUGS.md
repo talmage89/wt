@@ -1,3 +1,79 @@
+## BUG-025: `wt checkout` silently skips archived stash restore — no notification given to user
+
+**Status**: open
+**Found**: 2026-02-25T48:00:00Z
+**Test run**: ~/wt-usage-tests/2026-02-25T48-00-00Z/
+
+### Description
+
+When a stash is archived (branch deleted on remote AND stash older than `archive_after_days`), running `wt checkout <branch>` silently skips the stash restore with no user notification. The checkout succeeds, the slot is assigned the branch, but the user's dirty state is NOT restored and NO message is printed.
+
+**What happened**:
+```
+# Setup: feature/alpha has an archived stash (alpha-wip.txt + modified main.txt)
+$ wt checkout feature/alpha
+wt: Checked out feature/alpha in spit-algae-berry
+wt: Evicted main from spit-algae-berry
+# EXIT: 0 — no mention of archived stash at all
+
+$ ls spit-algae-berry/
+main.txt   # alpha-wip.txt is absent — dirty state NOT restored
+```
+
+The stash is still listed as archived afterward:
+```
+$ wt stash list
+feature/alpha  20509d ago  archived  b33dc91
+```
+
+**What should have happened**:
+The checkout command should notify the user that an archived stash exists but cannot be auto-restored:
+```
+wt: Checked out feature/alpha in spit-algae-berry
+wt: Archived stash for feature/alpha was not auto-restored. View with 'wt stash show feature/alpha'.
+```
+
+### Root cause
+
+In `src/core/stash.ts`, `restoreStash()` line 127:
+```typescript
+if (!meta || meta.status === "archived") return "none";
+```
+When the stash is archived, the function returns `"none"` — treating it identically to "no stash ever existed". The checkout command in `src/commands/checkout.ts` reads the stash metadata BEFORE calling `restoreStash()` (line 197: `getStash()`), so it knows a stash exists. But it only reads `created_at` for the "Restored stash from X" message — it does not distinguish between "archived stash" and "no stash at all".
+
+The fix: before calling `restoreStash()`, check if the stash status is `"archived"`. If so, print a notification and skip (rather than silently skipping). Alternatively, `restoreStash()` could return a new `"archived"` status instead of `"none"`, and the caller can handle it.
+
+Also related: `wt stash apply <branch>` on an archived stash emits:
+```
+wt: Stash for 'feature/alpha' is archived. Use 'wt clean' to manage archived stashes.
+```
+This is misleading: `wt clean` only DELETES archived stashes — it does not restore them. There is currently no mechanism to restore dirty state from an archived stash. The error message should say "Archived stashes cannot be restored. View diff with 'wt stash show feature/alpha'."
+
+### Reproduction
+
+```sh
+wt init <url>
+wt checkout feature/alpha
+echo "wip" > alpha-wip.txt
+# Force eviction of feature/alpha by filling all slots
+# ... (fill all 5 slots, fake LRU for feature/alpha slot)
+wt checkout feature/epsilon  # evicts feature/alpha, creates stash
+# Archive the stash:
+python3 -c "import re, sys; ... # fake last_used_at to 10+ days ago"
+git push origin --delete feature/alpha  # delete remote branch
+wt fetch  # triggers archive scan — archives stash
+# Now checkout feature/alpha (which has archived stash)
+wt checkout feature/alpha
+# Expected: "Archived stash ... not auto-restored. View with wt stash show ..."
+# Got: checkout succeeds silently, alpha-wip.txt absent, no message
+```
+
+### Vision reference
+
+VISION §5.2 defines stash restoration: "When the user checks out a branch that has a saved stash (and `--no-restore` is not set): 1. Look up the stash ref from `.wt/stashes/<encoded-branch-name>.toml`." The vision does not explicitly address archived stashes, but the general principle of transparency and user notification applies. The user's dirty state was captured and archived — they should be informed it exists but cannot be auto-restored.
+
+---
+
 ## BUG-024: TUI branch search shows `origin` as a checkout option — `git branch -r --format=%(refname:short)` formats `origin/HEAD` as just `origin`
 
 **Status**: fixed

@@ -1,3 +1,18 @@
+## 2026-02-25T48-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T48-00-00Z/
+Tests performed:
+- `wt pin`/`wt unpin` feedback messages — from inside slot (no arg): "Pinned '<slot>' (branch: <branch>). It will not be evicted." and "Unpinned '<slot>' (branch: <branch>). It can now be evicted via LRU." (exit 0); by slot name from container root: same messages; `wt list` shows "pinned" in Pinned column while pinned, blank when unpinned; correct behavior for both invocation forms — PASS
+- Archived stash auto-restore on checkout — `wt checkout <branch>` when branch has archived stash: created stash for feature/alpha (alpha-wip.txt + modified main.txt); archived by faking timestamps to 10 days ago, deleting remote feature/alpha, running `wt fetch`; `wt stash list` showed "archived" status; ran `wt checkout feature/alpha` → "wt: Checked out feature/alpha in spit-algae-berry" + "wt: Evicted main from spit-algae-berry" (exit 0); NO message about archived stash; alpha-wip.txt absent from slot; stash still listed as archived in `wt stash list`; root cause: `restoreStash()` returns `"none"` when status is "archived", same as "no stash at all" — checkout silently skips restore with no user notification — BUG FOUND
+- `wt stash apply` on archived stash: ran `wt stash apply feature/alpha` with archived stash → "wt: Stash for 'feature/alpha' is archived. Use 'wt clean' to manage archived stashes." (exit 1); stash NOT restored; message is misleading ("wt clean" only deletes, doesn't restore) — not a functional data-loss bug (data viewable via `wt stash show`) but confusing UX guidance; this is a secondary aspect of BUG-025 — PASS (with misleading message)
+- `wt stash show` on archived stash: showed correct diff from patch file (modified main.txt + alpha-wip.txt new file); exit 0; archived stash data is readable even though not restorable — PASS
+- `wt clean` command: (a) no archived stashes → "No archived stashes to clean." (exit 0) — PASS; (b) with archived feature/alpha stash → lists "[1] feature/alpha  (20509d ago, 327 B)" with selection prompt "comma-separated numbers, 'all', or 'none'"; `none` input → "Aborted." (exit 0); `all` + `y` confirmation → "Deleted 1 archived stash." (exit 0); stash list empty afterward; archive file removed from filesystem; stash metadata TOML deleted — PASS
+- Post-checkout hook execution via shell function: created `.wt/hooks/post-checkout` (executable, logs args to /tmp/wt-hook-test.log); simulated shell function using `node /workspace/bin/wt.mjs` as the backend; ran `wt checkout feature/beta` → hook logged "HOOK CALLED: worktree=<absolute-path-to-slot> branch=feature/beta"; `cd` to slot occurred before hook ran; hook NOT called for `wt list` (no nav file written) — correct; hook IS called for idempotent re-checkout (nav file still written, navigation still occurs) — PASS
+Result: BUG FOUND
+Bug: BUG-025 — `wt checkout` silently skips archived stash restore with no user notification; user has no indication their dirty state was not restored (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-25T46-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T46-00-00Z/
