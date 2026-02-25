@@ -428,3 +428,17 @@ Tests performed:
 - git stash push --include-untracked confirmed to include untracked files (3-parent)
 Result: BUG FOUND
 Bug: BUG-001 — untracked files silently lost during slot eviction due to git stash create not supporting --include-untracked (see .docs/BUGS.md)
+## 2026-02-25T10-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T10-00-00Z/
+Tests performed:
+- `wt checkout -b <new-branch>` (no start point): ran `wt checkout -b feature/new-cli` from container root; created branch from origin/main (default); exit 0; message "Created branch feature/new-cli from origin/main"; `wt list` confirmed trunk-pure-deer now holds feature/new-cli; git log in slot showed 1 commit (Initial commit, same as main tip) — correct per VISION §3.1 / Phase 2.4
+- `wt checkout -b <new-branch> <start-point>`: ran `wt checkout -b feature/from-alpha origin/feature/alpha`; created branch from origin/feature/alpha; exit 0; message "Created branch feature/from-alpha from origin/feature/alpha"; slot contained alpha.txt (from feature/alpha tip) — correct
+- `wt checkout -b` with existing branch name: ran `wt checkout -b feature/new-cli` again; git error "fatal: a branch named 'feature/new-cli' already exists" passed through verbatim; exit 1 — correct per VISION §15.3 (git errors pass through)
+- Nav file written and cleaned up by shell function: set WT_SHELL_INTEGRATION=1; ran checkout; verified nav file written to /tmp/wt-nav-<ppid> with correct slot path and "Navigating to <slot>" message; simulated shell function (wt() wrapper with nav_file logic) in a bash script: confirmed cwd changed to correct slot after checkout AND nav file removed after read — correct per VISION §13
+- `wt hooks show claude-code`: output valid Claude Code hooks JSON with PreToolUse (wt pin) and PostToolUse (wt unpin) events; exit 0 — correct per Phase 2.10 spec; `wt hooks show` (no arg) → exit 1 "requires an integration name"; `wt hooks show unknown-xyz` → exit 1 "Unknown integration 'unknown-xyz'. Supported: claude-code" — both correct
+- Template creation and sync: created .wt/templates/slot-info.txt (uses {{WORKTREE_DIR}} and {{BRANCH_NAME}}), set [[templates]] source="templates/slot-info.txt" target="slot-info.txt" in config.toml (note: field is `target` not `destination`); `wt sync` exit 0; all 5 slots got correct slot-info.txt with per-slot WORKTREE_DIR and BRANCH_NAME; vacant slots got empty BRANCH_NAME — correct per VISION §7
+- Template modification + re-sync: edited template (version 1 → 2, added line); `wt sync` exit 0; all 5 slots regenerated with new content (always-overwrite behavior confirmed) — correct per VISION §7.3
+- Template regenerated on checkout: `wt checkout feature/new-cli` generated slot-info.txt in target slot with version 2 content — correct per VISION §7 (template generation on checkout, step 9)
+Result: PASS
+
