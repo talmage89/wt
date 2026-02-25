@@ -179,7 +179,7 @@ At minimum, document the hook. Optionally implement `wt hooks show <integration>
 - [x] TUI supports creating new branches via `n` key.
 - [x] TUI polls for state changes every 2 seconds.
 - [x] Config Panel shows change guidance after editing.
-- [ ] Hooks Panel exists in TUI with create/edit/chmod flow.
+- [x] Hooks Panel exists in TUI with create/edit/chmod flow.
 - [ ] Claude Code pin hook documented or implemented.
 - [ ] All existing tests still pass (`pnpm test`).
 - [ ] No type errors (`pnpm tsc --noEmit`).

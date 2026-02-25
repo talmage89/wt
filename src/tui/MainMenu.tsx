@@ -2,7 +2,7 @@ import React from "react";
 import { Box, Text, useInput, useApp } from "ink";
 import SelectInput from "ink-select-input";
 
-type Screen = "worktrees" | "stashes" | "config" | "templates";
+type Screen = "worktrees" | "stashes" | "config" | "templates" | "hooks";
 
 interface MenuItem {
   label: string;
@@ -14,6 +14,7 @@ const items: MenuItem[] = [
   { label: "Manage Stashes", value: "stashes" },
   { label: "Edit Configuration", value: "config" },
   { label: "Edit Templates", value: "templates" },
+  { label: "Edit Hooks", value: "hooks" },
 ];
 
 interface Props {

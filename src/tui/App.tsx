@@ -5,9 +5,10 @@ import { WorktreePanel } from "./WorktreePanel.js";
 import { StashPanel } from "./StashPanel.js";
 import { ConfigPanel } from "./ConfigPanel.js";
 import { TemplatePanel } from "./TemplatePanel.js";
+import { HooksPanel } from "./HooksPanel.js";
 import type { ContainerPaths } from "../core/container.js";
 
-type Screen = "menu" | "worktrees" | "stashes" | "config" | "templates";
+type Screen = "menu" | "worktrees" | "stashes" | "config" | "templates" | "hooks";
 
 interface AppProps {
   containerPaths: ContainerPaths;
@@ -45,6 +46,13 @@ export function App({ containerPaths }: AppProps) {
     case "templates":
       return (
         <TemplatePanel
+          paths={containerPaths}
+          onBack={() => setScreen("menu")}
+        />
+      );
+    case "hooks":
+      return (
+        <HooksPanel
           paths={containerPaths}
           onBack={() => setScreen("menu")}
         />
