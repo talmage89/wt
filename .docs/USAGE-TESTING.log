@@ -1,3 +1,18 @@
+## 2026-02-26T10-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-26T10-00-00Z/
+Tests performed:
+- Stash restore after remote branch advanced (new commits pushed after eviction): evicted `feature/rebase-test` with staged (staged.txt) + untracked (wip.txt) dirty state; pushed a new commit to remote; `wt fetch` updated tracking ref; `wt checkout feature/rebase-test` restored stash — branch remained at OLD HEAD (931ea8c), not new remote tip (78d206d); both staged.txt and wip.txt correctly restored; new remote commit (extra.txt) NOT auto-merged (expected, wt does not auto-pull) — PASS
+- Real file → symlink migration via `wt sync` (two sub-cases):
+  (a) No canonical yet: created `.wt/shared/.config2/` empty dir, dropped real file `settings.json` in one slot; ran `wt sync`; real file was MOVED to canonical (`.wt/shared/.config2/settings.json`), slot got symlink; other slots also got symlinks; user data preserved — PASS (matches VISION §340 "move it to .wt/shared/ and replace with a symlink")
+  (b) Canonical already exists: dropped real file in slot at path where canonical existed; ran `wt sync`; real file DELETED, slot got symlink to existing canonical; slot-specific data lost (canonical wins) — correct behavior; both cases confirmed by inspecting ls -la and file contents
+- `wt stash show` on an archived stash: ran `wt stash show feature/stash-archived` after archival via `wt fetch`; output showed correct diff from patch file including staged files and untracked symlinks captured at eviction time; exit 0 — PASS
+- `wt init` from a dirty repo (staged + unstaged + untracked): created local repo with staged new file (tracked.txt with "tracked"), unstaged modification (appended "staged change"), and untracked file (untracked.txt); ran `wt init` (no URL, move-repo path); exit 0; active slot preserved working directory files (tracked.txt with both lines, untracked.txt); git status showed staged "new file: tracked.txt" with full content + "?? untracked.txt" — correct; dirty state survived init — PASS
+- Checkout of branch with archived stash (auto-restore behavior): after archiving `feature/stash-archived` stash, deleted remote branch, checked out `feature/stash-archived` into a slot; "Restored stash" message NOT printed (correct — VISION §5.5: archived stashes cannot be auto-applied); slot was empty (no archive-test.txt); then ran `wt stash apply feature/stash-archived` → "wt: Stash for 'feature/stash-archived' is archived. Use 'wt clean' to manage archived stashes." (exit 1) — correct error message — PASS
+Result: PASS
+
+---
+
 ## 2026-02-25T23-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T23-00-00Z/
