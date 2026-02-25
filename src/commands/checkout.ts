@@ -13,10 +13,25 @@ import {
   markSlotVacant,
   adjustSlotCount,
 } from "../core/slots.js";
-import { saveStash, restoreStash, touchStash, archiveScan } from "../core/stash.js";
+import { saveStash, restoreStash, touchStash, archiveScan, getStash } from "../core/stash.js";
 import { generateTemplates } from "../core/templates.js";
 import { establishSymlinks, removeSymlinks } from "../core/symlinks.js";
 import { writeNavFile } from "../core/nav.js";
+
+/**
+ * Format an ISO date string as a human-readable relative time.
+ * Examples: "just now", "3 minutes ago", "2 hours ago", "5 days ago"
+ */
+function relativeTime(isoDate: string): string {
+  const ms = Date.now() - new Date(isoDate).getTime();
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
 
 export interface CheckoutOptions {
   branch: string;
@@ -92,6 +107,11 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
     await writeState(paths.wtDir, state);
     const targetDir = path.join(paths.container, existingSlot);
     await writeNavFile(targetDir);
+    // Feedback
+    process.stderr.write(`wt: Checked out ${options.branch} in ${existingSlot}\n`);
+    if (process.env["WT_SHELL_INTEGRATION"]) {
+      process.stderr.write(`wt: Navigating to ${targetDir}\n`);
+    }
     return targetDir;
   }
 
@@ -99,17 +119,23 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
   const targetSlot = selectSlotForCheckout(state);
   const worktreeDir = path.join(paths.container, targetSlot);
 
+  // Feedback tracking
+  let evictedBranch: string | null = null;
+  let wasStashed = false;
+  let branchCreatedFromRemote = false;
+  let stashRestoredAt: string | null = null;
+
   // 8. EVICT (if slot is not vacant)
   if (!isVacant(state.slots[targetSlot])) {
-    const evictedBranch = state.slots[targetSlot].branch!;
+    evictedBranch = state.slots[targetSlot].branch!;
 
     // Save stash if dirty.
     // Note: git stash create does NOT clean the working tree — it only records
     // the dirty state as a commit object. We must reset + clean manually so that
     // the subsequent branch checkout does not fail with "local changes would be
     // overwritten".
-    const stashed = await saveStash(paths.wtDir, paths.repoDir, evictedBranch, worktreeDir, config.shared.directories);
-    if (stashed) {
+    wasStashed = await saveStash(paths.wtDir, paths.repoDir, evictedBranch, worktreeDir, config.shared.directories);
+    if (wasStashed) {
       await git.hardReset(worktreeDir);
       await git.cleanUntracked(worktreeDir);
     }
@@ -139,6 +165,7 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
     );
     if (remoteExists) {
       await git.checkoutTrack(worktreeDir, options.branch);
+      branchCreatedFromRemote = true;
     } else {
       // No remote branch — let git error pass through
       throw checkoutError;
@@ -147,8 +174,13 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
 
   // 10. RESTORE STASH
   if (!options.noRestore) {
-    await restoreStash(paths.wtDir, paths.repoDir, options.branch, worktreeDir);
-    // Warnings already printed by restoreStash on conflict
+    // Read stash metadata before restoring (metadata is deleted on success)
+    const stashMeta = await getStash(paths.wtDir, options.branch);
+    const stashCreatedAt = stashMeta?.created_at ?? null;
+    const stashResult = await restoreStash(paths.wtDir, paths.repoDir, options.branch, worktreeDir);
+    if (stashResult === "restored" && stashCreatedAt) {
+      stashRestoredAt = stashCreatedAt;
+    }
   }
 
   // 11. REGENERATE TEMPLATES
@@ -185,6 +217,23 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
 
   // 15. NAVIGATE
   await writeNavFile(worktreeDir);
+
+  // 16. PRINT FEEDBACK
+  process.stderr.write(`wt: Checked out ${options.branch} in ${targetSlot}\n`);
+  if (evictedBranch !== null) {
+    const dirtyNote = wasStashed ? " (dirty state stashed)" : "";
+    process.stderr.write(`wt: Evicted ${evictedBranch} from ${targetSlot}${dirtyNote}\n`);
+  }
+  if (branchCreatedFromRemote) {
+    process.stderr.write(`wt: Created local branch ${options.branch} from origin/${options.branch}\n`);
+  }
+  if (stashRestoredAt !== null) {
+    process.stderr.write(`wt: Restored stash from ${relativeTime(stashRestoredAt)}\n`);
+  }
+  if (process.env["WT_SHELL_INTEGRATION"]) {
+    process.stderr.write(`wt: Navigating to ${worktreeDir}\n`);
+  }
+
   return worktreeDir;
   } finally {
     await release();
