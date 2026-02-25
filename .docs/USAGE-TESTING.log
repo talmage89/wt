@@ -1,3 +1,17 @@
+## 2026-02-25T54-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T54-00-00Z/
+Tests performed:
+- Shared symlink migration (real file in slot → canonical location): configured `[shared] directories = [".config"]` in config; created `artful-heath-luna/.config/app.json` as a real file (not a symlink) in the active slot; ran `wt sync` → real file automatically migrated to `.wt/shared/.config/app.json`; slot file replaced with symlink (`../../.wt/shared/.config/app.json`); all other 4 slots also received symlinks pointing to canonical location; content preserved ("{"version": "1.0", "env": "local"}"); VISION §6.4 "move it to .wt/shared/ and replace it with a symlink" confirmed working — PASS
+- `wt stash apply` with existing dirty state in slot: checked out feature/alpha, added `alpha-wip.txt` (untracked); evicted via LRU eviction (stash created); re-checked out feature/alpha with `--no-restore`; added `new-wip.txt` to slot (new dirty state); ran `wt stash apply feature/alpha`; stash applied cleanly on top of existing dirty state (exit 0, "Stash applied and cleaned up for 'feature/alpha'."); both `alpha-wip.txt` (from stash) and `new-wip.txt` (new dirty state) coexist in slot; no conflict (untracked files don't conflict with git stash apply) — PASS
+- `slot_count = 0` in config (edge case validation): set `slot_count = 0` in `.wt/config.toml`; ran `wt list`; all 5 worktree slot directories were silently evicted and deleted (exit 0); empty table shown; no warning or confirmation asked; after restoring `slot_count = 5`, 5 new vacant slots were auto-created, all branch assignments lost; additionally tested `slot_count = -1`: correctly rejected with exit 1 but error message was misleading: "Cannot reduce slot count to -1: 0 worktrees are pinned. Unpin worktrees first..." (implies pinned-slots issue, not invalid value); root cause: guard is `newCount < pinnedCount` which catches -1 (since 0 pinned: -1 < 0 = true) but NOT 0 (0 < 0 = false) — BUG FOUND
+- Branch renamed via `git branch -m` + reconcile: checked out feature/alpha in a slot; ran `git branch -m feature/alpha feature/alpha-renamed` inside the slot (bypassing wt); ran `wt list` → reconcile silently detected the rename and updated state to show `feature/alpha-renamed` in the slot; `wt checkout feature/alpha-renamed` correctly treated as idempotent (already in slot); `wt checkout feature/alpha` succeeded by creating a new local tracking branch from remote `origin/feature/alpha` in a different vacant slot (git DWIM behavior, correct) — PASS
+- `wt sync` with git-tracked file at symlink path (after-the-fact tracking): established `.config/app.json` symlink in all slots via `wt sync`; then committed `.config/app.json` as a real tracked file in feature/alpha branch (removing the symlink first, adding as git-tracked file, committing); ran `wt sync` again → "wt: Skipping symlink for .config/app.json: file is tracked by git in branch feature/alpha." (exit 0); feature/alpha slot correctly kept real tracked file (no symlink), all other slots kept symlinks; correct per VISION §6.3 — PASS
+Result: BUG FOUND
+Bug: BUG-027 — `slot_count = 0` silently destroys all worktree slots with no guard; `adjustSlotCount()` guard `newCount < pinnedCount` misses the 0 case (0 < 0 = false); minimum valid slot_count should be 1 (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-25T50-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T50-00-00Z/

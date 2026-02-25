@@ -1,3 +1,65 @@
+## BUG-027: `slot_count = 0` in config silently destroys all worktree slots — no guard for zero or sub-minimum slot count
+
+**Status**: open
+**Found**: 2026-02-25T54:00:00Z
+**Test run**: ~/wt-usage-tests/2026-02-25T54-00-00Z/
+
+### Description
+
+Setting `slot_count = 0` in `.wt/config.toml` and running any `wt` command causes **all worktree slot directories to be silently evicted and deleted** with no warning or confirmation. Exit code is 0 (success). After the operation, the container has no slots and is completely unusable for branch management.
+
+**What happened**:
+```
+# Container has 5 slots with branches checked out
+# User edits config.toml: slot_count = 0
+$ wt list
+Slot                  Branch                Status  Pinned  Last Used
+────────────────────  ────────────────────  ──────  ──────  ──────────
+# EXIT: 0 — empty table, all 5 slot directories deleted
+
+$ ls my-project/
+# EMPTY — all slot directories gone (only .wt/ remains)
+
+# After restoring slot_count = 5:
+$ wt list
+Preparing worktree (detached HEAD ...)  # ×5 new slots
+# 5 new VACANT slots created — all branch assignments LOST
+```
+
+**What should have happened**:
+```
+wt: Error: slot_count must be at least 1.
+[exit 1 — no slots evicted]
+```
+
+### Root cause
+
+In `src/core/slots.ts`, `adjustSlotCount()` has the check:
+
+```typescript
+if (newCount < pinnedCount) {
+  throw new Error(`Cannot reduce slot count to ${newCount}: ...`);
+}
+```
+
+When `newCount = 0` and `pinnedCount = 0` (no pinned slots), `0 < 0` is `false`, so the guard is bypassed and all slots are evicted. The check correctly catches `newCount = -1` (since `-1 < 0` is true), but the error message it produces for negative values is misleading: "Cannot reduce slot count to -1: 0 worktrees are pinned. Unpin worktrees first or choose a higher count." — which implies the issue is about pinned worktrees rather than an invalid slot count.
+
+### Fix
+
+Add an explicit minimum validation before the LRU eviction logic:
+
+```typescript
+if (newCount < 1) {
+  throw new Error(`slot_count must be at least 1.`);
+}
+```
+
+### Vision reference
+
+VISION §10.1: "When the slot count is reduced, the LRU algorithm applies." The minimum valid slot count is 1 — `wt` cannot function without at least one slot. The guard for all-pinned (VISION §3.1.2.c: "error if all pinned") is analogous: the code must prevent configurations that make the container unusable.
+
+---
+
 ## BUG-025: `wt checkout` silently skips archived stash restore — no notification given to user
 
 **Status**: fixed
