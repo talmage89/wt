@@ -1,3 +1,16 @@
+## 2026-02-25T18-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T18-00-00Z/
+Tests performed:
+- Init feedback format (Phase 2.2): ran `wt init <url>` without `WT_SHELL_INTEGRATION`; output correctly showed "Initialized with 5 worktree slots." with all slot names, marked the active one as "(active, branch: main)", and printed the shell integration hint (eval/source instructions for bash/zsh/fish); re-ran with `WT_SHELL_INTEGRATION=1` in env — slot summary shown but shell hint suppressed entirely (exit 0) — PASS (Phase 2.2 init feedback working correctly per spec)
+- Checkout feedback messages (Phase 2.3): verified all feedback lines: (a) simple vacant-slot checkout: "wt: Checked out develop in willet-flint-pond" — PASS; (b) eviction with stash: "wt: Checked out feature/delta in round-poplar-cloud" + "wt: Evicted main from round-poplar-cloud (dirty state stashed)" + "wt: Created branch feature/delta from origin/main" — PASS; (c) stash restore on checkout: "wt: Checked out main in willet-flint-pond" + "wt: Evicted develop from willet-flint-pond" + "wt: Restored stash from just now" — PASS; all message prefixes correct ("wt: "), only applicable lines shown — PASS
+- BUG-016 fix verification — eviction of conflicted slot: set up stash for feature/alpha (dirty: modified file1.txt + untracked file); made conflicting change to feature/alpha on remote; force-updated local branch to remote; checked out feature/alpha → stash apply produced conflicts (conflict markers in file1.txt), message "wt: Stash for feature/alpha produced conflicts. Resolve manually." shown (exit 0); then attempted to evict the conflicted slot by checking out develop (which selected it as LRU) → eviction SUCCEEDED (exit 0), develop checked out correctly; BUG-016 fix confirmed: slots with merge conflicts can now be evicted (dirty state re-stashed using `git checkout -f` / `git clean -fd` fallback) — PASS
+- `wt clean` with archived stashes — FULL LIFECYCLE + BUG FOUND: archived feature/alpha stash (faked last_used_at to 10 days ago, deleted remote branch, ran `wt fetch` which printed "Archived 1 stash(es): feature/alpha"); `wt stash list` showed "archived" status; `printf "none\n" | wt clean` → "Aborted." (exit 0, single-prompt path works); `printf "all\ny\n" | wt clean` → showed selection prompt, read "all", showed confirmation "Delete 1 stash? [y/N]", then CRASHED with "Warning: Detected unsettled top-level await" (exit 13) — BUG FOUND; root cause: first `readline.createInterface` buffers and discards remaining stdin data ("y\n") on `rl.close()`, second readline gets immediate EOF, Promise never resolves
+Result: BUG FOUND
+Bug: BUG-020 — `wt clean` crashes (exit 13) when stdin is piped; readline discards buffered data between selection and confirmation prompts (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-25T16-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T16-00-00Z/

@@ -1,3 +1,50 @@
+## BUG-020: `wt clean` crashes (exit 13) when stdin is piped — readline discards buffered data between prompts
+
+**Status**: open
+**Found**: 2026-02-25T18:00:00Z
+**Fixed**: —
+**Test run**: ~/wt-usage-tests/2026-02-25T18-00-00Z/
+
+### Description
+
+`wt clean` uses `readline.createInterface` sequentially — once for the selection prompt ("Select stashes to delete") and once for the confirmation prompt ("Delete N stash(es)? [y/N]"). When stdin is a pipe (not a TTY), the first readline interface buffers all available data (e.g., `"all\ny\n"`), then `rl.close()` is called which discards the buffered remainder (`"y\n"`). The second readline interface attaches to stdin but finds it at EOF immediately, so the `rl.question` callback is never called, the Promise never resolves, and Node.js emits "Warning: Detected unsettled top-level await" before exiting 13.
+
+**What happened**:
+```
+$ printf "all\ny\n" | wt clean
+Archived stashes:
+
+  [1] feature/alpha  (1m ago, 433 B)
+
+Select stashes to delete (comma-separated numbers, 'all', or 'none'): Delete 1 stash? [y/N] Warning: Detected unsettled top-level await at file:///…/dist/cli.js:…
+await cli.parseAsync();
+^
+
+[exit 13]
+```
+
+**What should have happened**:
+```
+Deleted 1 archived stash.
+[exit 0]
+```
+
+Single-prompt path ("none" selection) works correctly (exit 0, "Aborted."). Crash only occurs when the confirmation prompt is reached.
+
+### Reproduction
+
+```bash
+# In any wt-managed container with an archived stash:
+printf "all\ny\n" | wt clean   # exit 13 — crash
+printf "none\n" | wt clean     # exit 0 — works fine
+```
+
+### Vision reference
+
+The vision doesn't mandate piped-stdin support, but `wt stash drop` was fixed for the same class of crash (BUG-018). `wt clean` uses a different `prompt()` helper based on `readline` rather than the raw-stdin approach added for BUG-018.
+
+---
+
 ## BUG-019: Git errors double-printed — ExecaError message appended after git stderr
 
 **Status**: fixed
