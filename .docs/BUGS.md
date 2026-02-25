@@ -1,3 +1,52 @@
+## BUG-019: Git errors double-printed — ExecaError message appended after git stderr
+
+**Status**: open
+**Found**: 2026-02-25T07:00:00Z
+**Test run**: ~/wt-usage-tests/2026-02-25T07-00-00Z/
+
+### Description
+
+When a git command fails inside a `wt` command, the git stderr is already printed to the terminal via `stdio: ['ignore', 'pipe', 'inherit']` in `core/git.ts`. However, the `catch` blocks in `src/cli.ts` then print `wt: ${(err as Error).message}`, where `(err as Error).message` for an ExecaError includes `"Command failed with exit code N: git <command>"`.
+
+This results in two lines being printed to stderr: the actual git error (correct, verbatim) followed by an extra `wt: Command failed with exit code N: git <command>` line (wrong — violates "git errors pass through verbatim").
+
+**What happened**:
+```
+$ wt checkout totally-nonexistent-branch
+error: pathspec 'totally-nonexistent-branch' did not match any file(s) known to git
+wt: Command failed with exit code 1: git checkout totally-nonexistent-branch
+```
+
+**What should have happened**:
+```
+$ wt checkout totally-nonexistent-branch
+error: pathspec 'totally-nonexistent-branch' did not match any file(s) known to git
+```
+(exit 1, no extra `wt:` line)
+
+Also reproduced with `wt checkout -b main` (branch already exists):
+```
+fatal: a branch named 'main' already exists
+wt: Command failed with exit code 128: git checkout -b main origin/main
+```
+
+### Reproduction
+
+```bash
+# In any wt-managed container:
+wt checkout nonexistent-branch-xyz
+wt checkout -b main   # branch that already exists
+```
+
+### Vision reference
+
+VISION.md: "Git errors pass through verbatim — no wrapping or suppression."
+PLAN.md: "Never catches or wraps git stderr — pipe it through to the user."
+
+The fix: in `src/cli.ts` catch blocks, detect ExecaError (has numeric `exitCode` field) and call `process.exit(exitCode)` without printing `err.message`. The git stderr has already been displayed.
+
+---
+
 ## BUG-018: `wt stash drop` with stdin=/dev/null still crashes (exit 13) — `promptConfirm` fix incomplete
 
 **Status**: fixed

@@ -1,3 +1,15 @@
+## 2026-02-25T07-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T07-00-00Z/
+Tests performed:
+- `wt checkout -b <branch>` creates a new branch from origin/main (Phase 2.4): ran `wt checkout -b feature/new-from-default` in a fresh container; branch created successfully, slot assigned (forest-frog-teal), feedback printed: "wt: Checked out feature/new-from-default in forest-frog-teal" + "wt: Created branch feature/new-from-default from origin/main"; new branch had correct file content (file1.txt, file2.txt from main); exit 0 — PASS
+- `wt checkout -b <branch> <start-point>` creates from explicit start point: ran `wt checkout -b feature/from-develop origin/develop`; branch created in ruby-round-carp; feedback: "Checked out feature/from-develop in ruby-round-carp" + "Created branch feature/from-develop from origin/develop"; slot directory contained develop.txt (develop branch content), confirming correct start point; exit 0 — PASS
+- `wt checkout -b <branch>` when branch already exists: ran `wt checkout -b main` (branch exists); git printed "fatal: a branch named 'main' already exists" (correct, verbatim); then wt ALSO printed "wt: Command failed with exit code 128: git checkout -b main origin/main" — this is extra wrapping on top of the git error; violates VISION "git errors pass through verbatim" — BUG FOUND
+Result: BUG FOUND
+Bug: BUG-019 — Git errors double-printed; ExecaError message appended after git stderr already displayed via inherit (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-25T06-07-14Z
 
 Location: ~/wt-usage-tests/2026-02-25T06-07-14Z/
