@@ -1,3 +1,17 @@
+## 2026-02-25T07-48-23Z
+
+Location: ~/wt-usage-tests/2026-02-25T07-48-23Z/
+Tests performed:
+- Non-`main` remote default branch detection: initialized container (`non-main-default/`) from a remote whose HEAD points to `develop` (not `main`); `wt init` correctly detected `develop` as the default branch and checked it out in the active slot (`dew-crane-lake`); all 4 remaining slots shown as `(vacant)`; init feedback printed "active, branch: develop" (not "active, branch: main"); exit 0 — PASS
+- `wt checkout -b` uses correct default when remote default is `develop`: ran `wt checkout -b feature/new-from-default`; feedback printed "Created branch feature/new-from-default from origin/develop" (not `origin/main`); branch correctly created in `vent-teal-olive`; `wt list` confirmed — PASS
+- `wt checkout <branch>` after `-b` finds existing slot (idempotent): branch `feature/new-from-default` already in `vent-teal-olive`; ran `wt checkout feature/new-from-default` (without `-b`); output: "wt: Checked out feature/new-from-default in vent-teal-olive" (exit 0); no eviction, no stash, just navigation to existing slot; `wt list` unchanged — PASS
+- `wt stash list` with no stashes at all: ran in freshly-initialized container with no evictions; output: "No saved stashes." (exit 0); clean message, no crash — PASS
+- `wt sync` with completely empty config (no shared directories, no templates): default config has `directories = []` and no `[[templates]]` entries; `wt sync` exited 0 with no output — correct no-op, no crash — PASS
+- `wt fetch` prune — remote branch deleted, local exists: pushed `feature/one` to remote during setup; ran `wt fetch` — no prune output (remote still had branch); force-deleted `feature/one` from remote; `wt fetch` ran git prune verbatim output ("- [deleted] (none) -> origin/feature/one") then printed "Fetched latest from remote." (exit 0); `origin/feature/one` removed from tracking refs; `wt checkout feature/one` succeeded (git used DWIM to find local `feature/one` which still existed in bare repo), slot `dark-opal-forest` assigned, exit 0; no stash archival (feature/one had no stash) — PASS
+Result: PASS
+
+---
+
 ## 2026-02-28T10-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-28T10-00-00Z/
