@@ -1,3 +1,17 @@
+## 2026-02-25T09-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T09-00-00Z/
+Tests performed:
+- `wt init` run twice (URL variant): ran `wt init <url>` in an already-initialized container (non-empty directory) → "wt: Directory is not empty. Use 'wt init' from inside an existing repository, or run from an empty directory." (exit 1); correct per VISION §15.1 — PASS
+- `wt init` run twice (no-URL variant): ran `wt init` (no URL) from container root of an already-managed container → "wt: This directory is already a wt-managed container." (exit 1); clean idempotent error — PASS
+- `wt init` from inside a worktree slot: ran `wt init` from inside a wt slot (not a regular git repo root) → "wt: Not a git repository root. Run 'wt init' from a regular git repository, not inside a worktree slot." (exit 1) — PASS
+- Manually `git worktree add` inside container then run `wt` commands: added git worktree at `container/manual-worktree` for feature/beta (on disk, registered in git); `wt list` absorbed it into state via reconcile (correct: dir exists AND registered) but then `adjustSlotCount` (5 slots→5 config) evicted it as LRU (epoch-0 last_used_at); manual-worktree directory deleted silently with no warning; subsequent `wt checkout feature/beta` succeeded in normal wt slot (loon-spray-oblique); container recovered cleanly — behavior is consistent with wt design (slot_count authoritative), though silent directory deletion could surprise users — PASS
+- Pin all slots (all occupied) then checkout new branch: pinned all 5 slots; filled vacant pinned slots by checking out feature/gamma, feature/delta (pins don't prevent use of vacant slots per VISION §11); then with all 5 slots occupied+pinned, ran `wt checkout -b feature/epsilon` → "wt: All worktree slots are pinned. Unpin a worktree or increase the slot count to continue." (exit 1); correct per VISION §11 — PASS; also verified `wt checkout main` (already in slot) succeeded even with all slots pinned (navigates to existing slot, no eviction needed) — PASS
+- Decrease slot_count below pinned count: with 5 slots all pinned, edited config to slot_count=3 → all subsequent commands (`wt list`, `wt checkout main`) failed with "wt: Cannot reduce slot count to 3: 5 worktrees are pinned. Unpin worktrees first or choose a higher count." (exit 1); error blocks ALL commands (adjustSlotCount runs early in every command); user must edit config.toml or unpin slots to recover; after restoring slot_count=5, commands worked normally; also verified: unpin 2 slots then reduce slot_count=3 → 2 LRU unpinned slots evicted, 3 pinned slots preserved correctly (exit 0) — PASS
+Result: PASS
+
+---
+
 ## 2026-02-25T07-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T07-00-00Z/
