@@ -1,3 +1,17 @@
+## 2026-02-25T26-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T25-00-00Z/
+Tests performed:
+- `wt list` output format on fresh init (all slots vacant): table shows correct columns (Slot/Branch/Status/Pinned/Last Used), unicode separator line, active slot shows branch name + "clean" status, vacant slots show "(vacant)" with blank status field, all timestamps show "just now"; exact format confirmed — PASS
+- Post-checkout hook execution via shell function: created `.wt/hooks/post-checkout` (executable, logs args to file); `wt checkout feature/alpha` via shell function → hook called with correct args `$1=/path/to/lone-oblique-moss` (worktree path) and `$2=feature/alpha` (branch name); CWD changed to slot; "wt: Navigating to ..." message printed; hook also runs when checking out to already-occupied slot (nav file written in both cases, hook fires on both) — PASS
+- Non-executable post-checkout hook skipped: `chmod -x` on hook; `wt checkout main` via shell function → CWD changed, nav file written, but hook NOT executed (shell function uses `[ -x ]` guard); hook log empty — PASS
+- `wt hooks show` subcommand: `wt hooks show claude-code` → valid JSON with PreToolUse ("wt pin 2>/dev/null || true") and PostToolUse ("wt unpin 2>/dev/null || true") hooks (exit 0); `wt hooks show totally-unknown-thing` → "wt: Unknown integration 'totally-unknown-thing'. Supported: claude-code" (exit 1); `wt hooks show` (no arg) → "wt: 'hooks show' requires an integration name (e.g., claude-code)" (exit 1); `wt shell-init` and `wt hooks show` both work even with stale `.wt/lock` present (no container dependency → no lock acquired) — PASS
+- Stale `.wt/lock` file blocks all container commands: manually wrote PID 99999 to `.wt/lock`; `wt list`, `wt checkout main`, and `wt fetch` all returned "wt: Another wt operation is in progress. If this is stale, remove .wt/lock." (exit 1); `rm .wt/lock` → immediate recovery, `wt list` succeeded (exit 0); lock-free commands (`wt shell-init bash`, `wt hooks show claude-code`) unaffected by stale lock — PASS
+- "Navigating to" checkout feedback conditioned on shell integration: without `WT_SHELL_INTEGRATION`, `wt checkout` prints only "wt: Checked out <branch> in <slot>"; with `WT_SHELL_INTEGRATION=1`, also prints "wt: Navigating to <path>"; correct per Phase 2.3 spec — PASS
+Result: PASS
+
+---
+
 ## 2026-02-25T07-22-59Z
 
 Location: ~/wt-usage-tests/2026-02-25T07-22-59Z/
