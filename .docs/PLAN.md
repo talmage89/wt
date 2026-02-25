@@ -163,140 +163,19 @@ Thin wrappers around git commands. Every function calls `execa('git', [...args])
 
 ---
 
-## Implementation Phases
+## Current Phases
 
-### Phase 1: Project Scaffolding & Core Utilities
-**Goal**: Buildable project, pure-logic modules with tests.
+Core implementation (the original Phases 1–8) is complete. The project now has three active phases:
 
-1. `pnpm init`, install deps, configure `tsconfig.json`, `vitest`, `tsup`
-2. Implement `core/branch-encode.ts` + tests
-3. Implement `core/words.ts` + curate word list in `data/words.ts` + tests
-4. Implement `core/config.ts` (TOML read/write) + tests
-5. Implement `core/state.ts` (TOML read/write) + tests
-6. Implement `core/nav.ts` + tests
-7. Implement `core/templates.ts` (pure string expansion, file writing) + tests
-8. Implement `core/git.ts` — thin execa wrappers, no logic to unit-test (tested via integration)
-
-**Deliverable**: All pure-logic modules working with unit tests passing.
-
----
-
-### Phase 2: Container & Slot Management
-**Goal**: `wt init` works end-to-end.
-
-1. Implement `core/container.ts` — find/create container
-2. Implement `core/slots.ts` — create slots, LRU selection, eviction logic
-3. Implement `commands/init.ts`:
-   - From existing repo: move repo → `.wt/repo/`, detect default branch, create slots, checkout starting branch in one slot, generate templates, establish symlinks
-   - From URL: bare clone → `.wt/repo/`, same as above
-4. Implement `commands/shell-init.ts` — output shell functions for bash/zsh/fish
-5. Write shell scripts in `src/shell/` (bash.sh, zsh.sh, fish.fish)
-6. Wire up CLI entry point (`src/cli.ts`) with yargs, register `init` and `shell-init` commands
-7. Create `bin/wt.mjs` entry shim
-8. Integration tests: init from existing repo, init from URL, verify directory layout
-
-**Deliverable**: `wt init` creates a fully structured container. `wt shell-init bash` outputs a working shell function.
-
----
-
-### Phase 3: Checkout & Stash Lifecycle
-**Goal**: `wt checkout <branch>` works with stash save/restore.
-
-1. Implement `core/stash.ts` — save, restore, list, drop, show
-2. Implement `core/reconcile.ts` — scan slots, update state
-3. Implement `commands/checkout.ts`:
-   - Centralized fetch
-   - Archive scan
-   - Find existing slot or select via LRU
-   - Evict (stash + detach) if needed
-   - Checkout branch
-   - Restore stash (unless `--no-restore`)
-   - Regenerate templates
-   - Reconcile symlinks
-   - Write nav file
-4. Wire `checkout` / `co` into CLI
-5. Integration tests: checkout new branch, checkout existing branch (navigate), eviction with stash, stash restore, `--no-restore`, checkout with all slots pinned (error)
-
-**Deliverable**: Full checkout flow including stash save/restore, slot eviction, and shell navigation.
-
----
-
-### Phase 4: Symlinks & Templates (Full)
-**Goal**: `wt sync` works. Shared symlinks and template generation are complete.
-
-1. Implement `core/symlinks.ts` — full sync logic (move real files to shared, create symlinks, handle git-tracked conflicts, clean broken symlinks)
-2. Implement `commands/sync.ts` — propagate symlinks + regenerate templates across all slots
-3. Integration tests: sync creates symlinks, git-tracked file skipped, broken symlink cleaned, template regeneration
-
-**Deliverable**: `wt sync` fully operational.
-
----
-
-### Phase 5: Remaining CLI Commands
-**Goal**: All CLI commands implemented.
-
-1. `commands/fetch.ts` — centralized fetch + archive scan
-2. `commands/stash.ts` — subcommands: list, apply, drop, show
-3. `commands/list.ts` — display all slots with branch, status, pin, last-used
-4. `commands/pin.ts` — pin/unpin current or named slot
-5. `commands/clean.ts` — interactive archive review + deletion
-6. Integration tests for each command
-
-**Deliverable**: Complete CLI surface. All commands from Section 9 of the vision work.
-
----
-
-### Phase 6: Stash Archival
-**Goal**: Archive lifecycle (active → archived → deleted) fully works.
-
-1. Implement `archiveStash` in `core/stash.ts` — export patch, compress with zstd, delete git ref, update metadata
-2. Implement archive scan logic fully (check remote, check age, trigger archival)
-3. Implement `wt clean` interactive flow (list archived, select for deletion)
-4. Integration tests: stash ages, gets archived, can be deleted
-
-**Deliverable**: Full stash lifecycle per Section 5.3 of the vision.
-
----
-
-### Phase 7: TUI
-**Goal**: `wt` (no args) opens a fullscreen TUI.
-
-1. Set up Ink rendering in `src/tui/App.tsx`
-2. `MainMenu.tsx` — 4-item menu (Manage Worktrees, Manage Stashes, Edit Config, Edit Templates)
-3. `WorktreePanel.tsx`:
-   - Branch-centric list (pinned → active → inactive)
-   - Status dots (green/yellow)
-   - Metadata (slot name, time since last used, stash indicator)
-   - Actions: checkout, pin/unpin, view status
-   - Branch search (fuzzy, all local+remote branches)
-4. `StashPanel.tsx`:
-   - Grouped by status (active, archived)
-   - Actions: apply, view diff, delete, bulk delete
-5. `ConfigPanel.tsx` — in-terminal editor for config.toml
-6. `TemplatePanel.tsx` — list templates, edit source, prompt regeneration
-7. Wire TUI launch into CLI (no args → TUI if inside container, else help)
-
-**Deliverable**: Full TUI per Section 8 of the vision.
-
----
-
-### Phase 8: Polish & Edge Cases
-**Goal**: Production-ready.
-
-1. Slot count changes (increase: create new slots; decrease: evict excess, error if pinned > new count)
-2. Thorough error handling for all Section 15 scenarios
-3. Reconciliation hardening (detect moved/deleted worktrees, handle corruption)
-4. Performance: parallel git status checks across slots
-5. End-to-end tests simulating real user workflows
-6. `README.md`, `--help` text for all commands
-7. npm `bin` field, `package.json` `files` field, verify `npx wt` works
-
----
+- **Phase 1: UX Improvement Planning** — Audit the CLI and TUI for UX gaps, design concrete improvements, update VISION.md. See `.docs/PHASE-1.md`.
+- **Phase 2: UX Improvement Implementation** — Implement all improvements from Phase 1 (init feedback, checkout feedback, branch creation, TUI live polling, cursor fix, config guidance, hooks panel, Claude Code integration). See `.docs/PHASE-2.md`.
+- **Phase 3: Continuous Usage Testing** — The endless testing loop. Fix open bugs or run manual usage test cycles against the real binary. See `.docs/PHASE-3.md`.
 
 ## Testing Strategy
 
 - **Unit tests** (vitest): Pure logic modules — branch encoding, word generation, config/state parsing, template expansion, slot selection algorithm, nav file I/O.
 - **Integration tests** (vitest): Create real temporary git repos, run actual git commands, verify full flows (init, checkout, stash, symlinks). Use `tmp` directories cleaned up after each test.
+- **Usage tests** (Phase 3): Manual testing against the real built binary, exercising edge cases and adversarial scenarios not covered by automated tests.
 - **No mocking of git**: Integration tests use real git operations. This catches real-world edge cases. Only mock the filesystem for unit tests where needed.
 - **Test naming**: `describe('command name')` → `it('should ...')` — behavior-driven.
 
