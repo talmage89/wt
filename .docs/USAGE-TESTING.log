@@ -1,3 +1,16 @@
+## 2026-02-25T44-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T44-00-00Z/
+Tests performed:
+- `wt init` shell hint suppression with `WT_SHELL_INTEGRATION=1`: ran `wt init <url>` (no env var) → slot summary printed plus shell integration hint ("To enable shell navigation...eval $(wt shell-init bash)..."); ran second init in separate dir with `WT_SHELL_INTEGRATION=1` → slot summary printed, shell hint block absent; suppression works correctly — PASS
+- TUI Hooks Panel — empty list and "+ Create post-checkout hook" option: navigated to "Edit Hooks" (5th main menu item) via 4 down-arrow presses + Enter; panel showed "Loading..." then "Edit Hooks" with "› + Create post-checkout hook" as the single selectable row; footer showed "Enter: edit  Esc: back  q: quit"; no hooks in `.wt/hooks/` at this point — PASS
+- TUI Hooks Panel — create flow + chmod_prompt: with EDITOR=true (no-op, exits immediately), pressed Enter on "+ Create post-checkout hook"; `createAndEdit` wrote template file (`#!/usr/bin/env bash` with comment block, mode 0o644, not executable); editor exited immediately; chmod_prompt appeared: "post-checkout is not executable. Run chmod +x? [y/N]"; pressed 'y'; `chmod +x` ran; panel returned to list mode showing "› post-checkout  [executable]" with status message "post-checkout is now executable."; `ls -la .wt/hooks/post-checkout` confirmed `-rwxr-xr-x`; template content correct; MINOR COSMETIC GLITCH: brief flash of "  is not executable. Run chmod +x?" with empty name during state transition (pendingHook set null before mode transitions to list) — non-functional, no data loss — PASS
+- TUI Config Panel — change detection guidance: navigated to "Edit Configuration" (3rd item); EDITOR set to fake-editor.sh that modifies `shared.directories = []` → `[".shared-config"]`; editor exited; "Config changes" view showed "shared.directories changed  (run 'wt sync' to apply)"; confirmed `.wt/config.toml` was modified on disk; pressed any key → returned to main menu — PASS; also tested no-change path: EDITOR=true (no-op) → "Config changes" view shows "No changes." — PASS
+- TUI live polling — external change detected within ~2s: entered Manage Worktrees panel (main slot = main/notch-crest-balmy, clean); captured initial StatusDot ANSI code: `\x1b[32m●` (green = clean); created untracked file `polling-test.txt` in `notch-crest-balmy` slot directory from external process; waited 3 seconds for poll cycle (every 2 seconds); captured updated StatusDot: `\x1b[33m●` (yellow = dirty); poll correctly re-ran `git status --porcelain`, detected untracked file, updated entry, triggered re-render; live polling confirmed working — PASS
+Result: PASS
+
+---
+
 ## 2026-02-25T42-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T42-00-00Z/
