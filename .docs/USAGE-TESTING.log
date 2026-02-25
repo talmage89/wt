@@ -1,3 +1,15 @@
+## 2026-02-25T34-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T34-00-00Z/
+Tests performed:
+- `wt init <url>` into a directory with a single dotfile (`.gitkeep`): created directory, placed `.gitkeep`, ran `wt init <url>`; error: "Directory is not empty. Use 'wt init' from inside an existing repository, or run from an empty directory." (exit 1); correct per VISION §2.2 which requires empty directory for URL-based init; `readdir` check sees dotfiles — PASS
+- `wt init` twice (double-init from already-managed container): ran `wt init <url>` (success, 5 slots created); ran `wt init <url>` again from container root → "Directory is not empty." (exit 1); ran `wt init` (no URL) from INSIDE container → "This directory is already a wt-managed container." (exit 1); behavioral asymmetry noted: `wt init <url>` from container root gives generic "not empty" while `wt init` from inside gives specific "already managed" — this is technically correct (container root is not empty, container root is not a git repo) but the URL form could give a more informative error; classified as UX note, not a bug — PASS
+- Pin all slots, then try `wt checkout` — verify "all pinned" error: initialized fresh container (5 slots); pinned all 5 slots using `wt pin <slot>`; checked out `feature/alpha` → used vacant pinned slot `loon-brine-dusky` (exit 0, no eviction needed — correct per VISION §3.1.2.c which says error only when no vacant slots exist); continued filling all slots via `wt checkout -b`; when final slot was being filled (all 5 occupied, all pinned, checking out `feature/slot5`) → error "wt: All worktree slots are pinned. Unpin a worktree or increase the slot count to continue." (exit 1); exact wording matches VISION §3.1.2.c — PASS
+- Manually `git worktree add` a new directory in the container — reconcile behavior: cloned container (5 wt-managed slots); added manual worktree inside `.wt/` via `git -C .wt/repo worktree add .wt/manual-extra-slot feature/alpha`; added second manual worktree as sibling of wt-managed slots via `git -C .wt/repo worktree add --detach <CONTAINER>/a-true-sibling`; ran `wt list` → only 5 wt-managed slots shown, both manual worktrees correctly ignored (reconcile tracks only state.toml slots); `wt checkout feature/alpha` fails with verbatim git error "fatal: 'feature/alpha' is already used by worktree at .../.wt/manual-extra-slot" (exit 128) — git error passes through verbatim per VISION; `wt checkout -b feature/brand-new` (non-conflicting) → exit 0, correct checkout into vacant slot; wt continues to function correctly for non-conflicting branches — PASS
+Result: PASS
+
+---
+
 ## 2026-02-25T32-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T32-00-00Z/
