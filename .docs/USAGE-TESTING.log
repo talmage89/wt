@@ -1,3 +1,16 @@
+## 2026-02-25T06-34-58Z
+
+Location: ~/wt-usage-tests/2026-02-25T06-34-58Z/
+Tests performed:
+- `wt clean` with no archived stashes: ran `wt clean` in a freshly-initialized container with no stashes → "No archived stashes to clean." (exit 0); clean output, no crash — PASS
+- `wt stash apply <branch>` when branch not in any slot: created dirty state in feature/alpha slot, evicted (stash created), feature/alpha NOT in any slot; ran `wt stash apply feature/alpha` → "wt: Branch 'feature/alpha' is not checked out in any slot. Run 'wt checkout feature/alpha' first." (exit 1); correct error, no crash — PASS
+- `wt checkout <branch> --no-restore` skips stash restore: with feature/alpha stash present, ran `wt checkout feature/alpha --no-restore`; branch checked out correctly (exit 0), NO "Restored stash from ..." feedback line, wip.txt and wip2.txt NOT present in slot (stash not applied), `wt stash list` confirmed stash still active; then ran `wt stash apply feature/alpha` manually (branch IS in slot) → "Stash applied and cleaned up for 'feature/alpha'." (exit 0), both wip.txt and wip2.txt restored, `wt stash list` showed "No saved stashes." — PASS
+- Delete slot directory then run `wt list`: manually `rm -rf tundra-aloe-ember/` (slot with develop branch); ran `wt list` → reconcile detected missing directory, removed slot from state, adjustSlotCount created new slot `adder-wombat-wide` (vacant) to restore slot_count=5; exit 0, no crash; `git worktree list` confirmed old slot deregistered (pruned) and new slot registered; `develop` branch lost from slots (expected — directory gone) — PASS
+- Template `{{BRANCH_NAME}}` on vacant (detached) slot: configured template with `{{WORKTREE_DIR}}` and `{{BRANCH_NAME}}`; ran `wt sync`; occupied slots expanded branch name correctly (e.g. "Branch: feature/alpha"); vacant slot `adder-wombat-wide` expanded `{{BRANCH_NAME}}` to empty string ("Branch: "), consistent with `generateAllTemplates` using `slot.branch ?? ""`; no crash, no error for vacant slots — PASS
+Result: PASS
+
+---
+
 ## 2026-02-25T13-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T13-00-00Z/
