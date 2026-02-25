@@ -1,3 +1,34 @@
+## BUG-024: TUI branch search shows `origin` as a checkout option — `git branch -r --format=%(refname:short)` formats `origin/HEAD` as just `origin`
+
+**Status**: open
+**Found**: 2026-02-25T40:00:00Z
+**Test run**: ~/wt-usage-tests/2026-02-25T40-00-00Z/
+
+### Description
+
+When the user opens the branch search in the TUI Worktree panel (press `/`), the list of branches includes `origin` as an entry. If the user selects it and presses Enter, `wt checkout origin` is called. Git interprets `origin` as a valid checkout target (DWIM to `origin/HEAD`, i.e., the default remote branch), putting the slot in detached HEAD state (vacant). This evicts whatever branch was previously in that slot (stashing dirty state if present) — a destructive unintended side-effect from selecting what looks like a non-branch remote name.
+
+**Root cause**: `git.listRemoteBranches()` uses `git branch -r --format=%(refname:short)`. When a `origin/HEAD` symbolic ref exists, git formats it as just `origin` (the remote name) rather than `origin/HEAD`. The filter `!l.includes("HEAD")` does not catch this because the string `origin` contains no "HEAD". The resulting list contains `origin` as a branch name, which gets de-prefixed in the TUI as `origin` (since `origin`.replace(/^origin\//, "")` is a no-op — no `/` to strip), appearing in the search results as `origin`.
+
+**What should happen**: `origin` should not appear in the branch search list. The `origin/HEAD` symbolic ref is not a branch; it just points to the default remote branch. It should be filtered out.
+
+### Reproduction
+
+```
+wt init <url>  # any remote with a default branch (origin/HEAD present)
+wt            # open TUI
+# In Manage Worktrees panel, press '/'
+# Observe 'origin' in the branch list (before any filter text)
+# Select 'origin' and press Enter
+# → wt checkout origin runs, slot set to detached HEAD (vacant), branch evicted
+```
+
+### Vision reference
+
+VISION §3 (Checkout): User selects a branch to check out. The branch search should show actual branches, not remote pointers/symrefs. Checking out `origin` is not an intentional user action and should not be possible through the TUI branch search.
+
+---
+
 ## BUG-023: `wt init` on a repo with no commits leaves user in unrecoverable broken state
 
 **Status**: fixed

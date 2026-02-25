@@ -1,3 +1,17 @@
+## 2026-02-25T40-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T40-00-00Z/
+Tests performed:
+- TUI main menu launches and quits cleanly: opened TUI via PTY (python3 `pty.openpty()`), sent `q` to quit; TUI rendered main menu with 5 items ("Manage Worktrees", "Manage Stashes", "Edit Configuration", "Edit Templates", "Edit Hooks") and footer "↑/↓ navigate  Enter select  q quit"; exit 0; no crash — PASS
+- TUI new branch creation via 'n' key in Worktree panel: entered Manage Worktrees (Enter on main menu), pressed 'n', typed "feature/tui-created" character-by-character via PTY, pressed Enter; TUI showed "Checking out feature/tui-created..." then "wt: Checked out feature/tui-created in gust-spur-silent" and "wt: Created branch feature/tui-created from origin/main"; `wt list` confirmed slot correctly assigned; PASS
+- Multi-level slash branch name `feature/frontend/auth` full stash lifecycle: checked out `feature/frontend/auth` (exit 0); created untracked `auth-wip.txt`; forced eviction of that slot → stash created, metadata file named `feature--frontend--auth.toml` (double `/` → double `--`, correct); `wt stash show feature/frontend/auth` showed correct diff of `auth-wip.txt`; re-checked out `feature/frontend/auth` → "wt: Restored stash from just now"; `auth-wip.txt` present in slot; stash list empty after restore; entire lifecycle works end-to-end — PASS
+- TUI Stash panel navigation: navigated to "Manage Stashes" from main menu (down arrow + Enter); panel loaded stash for `main` showing "Active Stashes: main  19s ago  21246ba"; footer showed "a: apply  d: diff  x: delete  X: bulk delete  Esc: back  q: quit"; exit 0 on 'q' press — PASS
+- TUI branch search (`/` key) — `origin` appears as checkout option (BUG FOUND): pressed `/` in Worktree panel; full branch list included `origin` as an entry (along with all real branches); typed "frontend" to filter and correctly narrowed to `feature/evict-frontend-test` and `feature/frontend/auth`; root cause: `git branch -r --format=%(refname:short)` formats `origin/HEAD` (the remote HEAD symref) as just `origin` — the filter `!l.includes("HEAD")` fails to exclude it; confirmed destructive behavior: `wt checkout origin` succeeds (git DWIM to `origin/HEAD`), evicts previous branch, leaves slot vacant — BUG FOUND
+Result: BUG FOUND
+Bug: BUG-024 — TUI branch search includes `origin` as a checkout option because `git branch -r --format=%(refname:short)` formats `origin/HEAD` as just `origin`, bypassing the HEAD filter; selecting it runs `wt checkout origin` which is destructive (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-25T38-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T38-00-00Z/
