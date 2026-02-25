@@ -1,3 +1,16 @@
+## 2026-02-25T07-22-59Z
+
+Location: ~/wt-usage-tests/2026-02-25T07-22-59Z/
+Tests performed:
+- `wt pin` from inside a slot (no args) vs. `wt pin <slot-name>` from container root: both work correctly; `wt pin` from inside `rock-vent-dune` printed "Pinned 'rock-vent-dune' (branch: main). It will not be evicted." (exit 0); `wt pin merlin-flame-bleak` from container root printed equivalent message (exit 0); pinning a vacant slot works ("branch: (vacant)"); `wt unpin` from inside slot and `wt unpin <slot-name>` from container root both work symmetrically with "Unpinned '...' ..." messages (exit 0) — PASS
+- Unpin and immediately evict: pinned `berry-pipit-fresh` (branch: feature/alpha, dirty with wip.txt); filled all 5 slots; faked `last_used_at` to make it LRU; unpinned it (exit 0); immediately checked out new branch `feature/theta` — correct eviction: "wt: Evicted feature/alpha from berry-pipit-fresh (dirty state stashed)" message shown, stash created (confirmed via `wt stash list`), new branch checked out in that slot — PASS
+- `wt` commands from outside any container: ran `wt list`, `wt checkout main`, `wt fetch`, `wt sync`, `wt stash list`, `wt pin`, `wt clean` from `/tmp` (no `.wt/` in any parent); all printed "wt: Not inside a wt-managed container." (exit 1); clean error, no crash, no stack trace — PASS
+- `wt fetch` with unreachable remote: changed remote URL to `file:///nonexistent/path/nowhere.git`; `wt fetch` → git error passed through verbatim: "fatal: '/nonexistent/path/nowhere.git' does not appear to be a git repository" + "fatal: Could not read from remote repository." (exit 128); NO extra "wt: Command failed..." line appended; git errors pass through verbatim per VISION requirement — PASS
+- Error conditions — `wt pin`/`wt unpin` with invalid slot name: both returned "wt: Slot 'nonexistent-slot-xyz' not found." (exit 1) — PASS; `wt unpin` on not-pinned slot: "Slot 'rock-vent-dune' is not pinned." (exit 0, idempotent) — PASS; `wt pin` already-pinned slot: "Slot 'rock-vent-dune' is already pinned." (exit 0, idempotent) — PASS; `wt checkout` with no args: yargs usage error with help text (exit 1) — PASS; `wt checkout -b` with no branch name: yargs usage error (exit 1) — PASS
+Result: PASS
+
+---
+
 ## 2026-02-26T10-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-26T10-00-00Z/
