@@ -1,3 +1,52 @@
+## BUG-022: `wt init` from subdirectory of git repo gives self-contradictory error message
+
+**Status**: open
+**Found**: 2026-02-25T30:00:00Z
+**Test run**: ~/wt-usage-tests/2026-02-25T30-00-00Z/
+
+### Description
+
+When `wt init` (no URL) is run from inside a subdirectory of a git repository (not the root), it outputs:
+
+```
+wt: Not a git repository. Use 'wt init <url>' to clone, or run from inside a git repository.
+```
+
+This message is self-contradictory: the user IS inside a git repository. The advice says "run from inside a git repository" but that is exactly what the user is doing. The check in `src/commands/init.ts:47-58` looks for `.git` in `process.cwd()` specifically — it does not walk up to find the git root. So running from `project/src/` fails because `.git` is in `project/`, not `project/src/`.
+
+**What happened**:
+```
+$ mkdir -p subdir-test/src && cd subdir-test && git init && git commit -m "init" --allow-empty
+$ cd src
+$ wt init
+wt: Not a git repository. Use 'wt init <url>' to clone, or run from inside a git repository.
+# EXIT: 1
+```
+
+**What should have happened**:
+The error message should be accurate. Since `wt init` (no URL) requires the user to run from the repository root (so it can move `.git` into `.wt/repo/`), the correct error is:
+
+```
+wt: Not at the root of a git repository. Run 'wt init' from the repository root (where .git/ lives), or use 'wt init <url>' to clone a new one.
+```
+
+### Reproduction
+
+```sh
+mkdir subdir-test && cd subdir-test
+git init && echo "hello" > README.md && git add . && git commit -m "init"
+mkdir src && cd src
+wt init
+# Expected: clear error about needing to be at git root
+# Got: "Not a git repository... run from inside a git repository" (misleading)
+```
+
+### Vision reference
+
+VISION §2.1: "If `wt init` is run from inside an existing repository, the repository is moved into `.wt/repo/`." — This language may lead users to believe running from any subdirectory works. The error message must be unambiguous.
+
+---
+
 ## BUG-021: Archive scan fires before `last_used_at` reset during `wt checkout` — stash archived even though user is actively checking out the branch
 
 **Status**: fixed

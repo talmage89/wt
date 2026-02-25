@@ -1,3 +1,16 @@
+## 2026-02-25T30-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T30-00-00Z/
+Tests performed:
+- `wt stash show` on an active (non-archived) stash — happy path: evicted main slot with staged new file (staged.txt) + untracked file (wip.txt); filled all 5 slots then forced eviction of main; `wt stash show main` printed correct unified diff showing both files (staged.txt new file mode + wip.txt new file mode); exit 0 — PASS (this path was previously only tested for "no stash" and "archived stash" cases)
+- Post-checkout hook with non-zero exit: installed `.wt/hooks/post-checkout` that prints args and exits 1; ran `wt checkout` via shell function simulation; hook was called with correct args ($1=worktree path, $2=branch name) and output "hook: got worktree=... branch=..."; despite hook exiting 1, shell function returned exit 0 (the wt binary's exit code); hook failure is silently ignored — no "hook failed" message; VISION §4.3 is silent on hook failure behavior; behavior is consistent with the design (hook runs in shell context after navigation) — PASS
+- Branch name with `@` character (percent-encoding): pushed `hotfix/@urgent` branch to remote; `wt checkout hotfix/@urgent` succeeded (exit 0); evicted with dirty state (staged urgent-wip.txt); stash metadata file correctly named `hotfix--%40urgent.toml` (`/`→`--`, `@`→`%40`); `wt stash show hotfix/@urgent` showed correct diff; re-checked out → stash restored (`urgent-wip.txt` staged, `A  urgent-wip.txt`); full stash lifecycle with non-slash special-char branch name works end-to-end — PASS
+- `wt init` from inside a subdirectory of a git repo: created `subdir-test/` git repo, `cd src/` (subdirectory), ran `wt init`; error: "Not a git repository. Use 'wt init <url>' to clone, or run from inside a git repository." (exit 1); this error is MISLEADING — you ARE inside a git repository; `git rev-parse --show-toplevel` from `src/` would return the parent; the error message tells the user to "run from inside a git repository" but they're already inside one; correct message would be "Not at the root of a git repository. Run 'wt init' from the repository root." — BUG FOUND
+Result: BUG FOUND
+Bug: BUG-022 — `wt init` from subdirectory of git repo gives self-contradictory error "Not a git repository... run from inside a git repository" when the user IS inside one (see .docs/BUGS.md)
+
+---
+
 ## 2026-02-25T14-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T14-00-00Z/
