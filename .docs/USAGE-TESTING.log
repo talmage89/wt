@@ -1,3 +1,16 @@
+## 2026-02-25T15-05-46Z
+
+Location: ~/wt-usage-tests/2026-02-25T15-05-46Z/
+Tests performed:
+- Stash commands inferred from slot CWD (no explicit branch argument): created stash for `main` by evicting it with dirty state (untracked `wip.txt`) then re-checking out with `--no-restore`; from INSIDE `alert-hill-well` (main's slot): (a) `wt stash show` (no arg) → showed correct unified diff for `wip.txt`, exit 0; (b) `wt stash drop` (no arg) → "Drop stash for 'main'? ... Stash dropped for 'main'." (exit 0, stash list empty); created second stash for main; from INSIDE `lapwing-hale-buoyant` (main's new slot): (c) `wt stash apply` (no arg) → "Stash applied and cleaned up for 'main'." (exit 0, `wip2.txt` restored); all three stash subcommands correctly infer branch from slot CWD — PASS
+- Pinning a vacant slot — behavior during slot_count reduction and checkout: increased `slot_count` to 6 (created `rush-wind-thrush` vacant); ran `wt pin rush-wind-thrush` → "Pinned 'rush-wind-thrush' (branch: (vacant)). It will not be evicted." (exit 0); `wt list` showed `rush-wind-thrush (vacant) / pinned`; reduced `slot_count` back to 5 → LRU eviction correctly removed `egret-log-hazel/feature/delta` (oldest unpinned) and preserved `rush-wind-thrush` (pinned, even though vacant); checkout of `feature/theta` used `rush-wind-thrush` (pinned vacant) as the target — pinning protects from EVICTION but not from ASSIGNMENT when vacant; slot now shows `rush-wind-thrush / feature/theta / pinned` (correct) — PASS
+- `wt unpin` from inside pinned slot (no arg) + subsequent LRU eviction: from CWD inside `rush-wind-thrush/` (which held `feature/theta`, pinned), ran `wt unpin` (no arg) → "Unpinned 'rush-wind-thrush' (branch: feature/theta). It can now be evicted via LRU." (exit 0); pinned column cleared in `wt list`; backdated `rush-wind-thrush` timestamp to 2019-01-01 to make it LRU; `wt checkout -b feature/iota` → correctly evicted `feature/theta` from `rush-wind-thrush` (LRU unpinned); unpin + immediate eviction cycle confirmed — PASS
+- `wt` commands from 4 levels deep inside a worktree slot (`slot/src/components/button/`): ran `wt list` from 4-level-deep subdirectory → full slot table displayed (exit 0); ran `wt stash show` (no arg) → correctly inferred slot's branch `feature/epsilon` and returned "No stash found" (exit 1, correct); ran `wt checkout feature/zeta` → "Checked out feature/zeta in dome-steep-silent" (exit 0); container detection walks up all directory levels correctly — PASS
+- Very long branch name (60-char) display in `wt list`: created branch `feature/this-is-a-very-long-branch-name-that-exceeds-twenty-chars` (60 chars) on remote; fetched and checked out → "Checked out feature/this-is-a-very-long-branch-name-that-exceeds-twenty-chars in bale-sparse-marsh" (exit 0, full name in feedback message); `wt list` showed "feature/this-is-a..." (truncated to 20 chars with `...` suffix) in Branch column; column alignment preserved; from inside that slot, `wt stash show` (no arg) correctly inferred full 60-char branch name → "No stash found for branch 'feature/this-is-a-very-long-branch-name-that-exceeds-twenty-chars'." (exit 1) — PASS
+Result: PASS
+
+---
+
 ## 2026-02-25T56-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T56-00-00Z/
