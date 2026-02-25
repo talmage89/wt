@@ -63,9 +63,13 @@ async function loadBranchData(paths: ContainerPaths): Promise<BranchEntry[]> {
     });
   }
 
+  // Track all branches already represented in entries
+  const knownBranches = new Set<string>(activeBranches);
+
   // Inactive branches from branch_history (not in any active slot)
   for (const histEntry of state.branch_history) {
     if (activeBranches.has(histEntry.branch)) continue;
+    knownBranches.add(histEntry.branch);
     let hasStash = false;
     try {
       const stash = await getStash(paths.wtDir, histEntry.branch);
@@ -80,6 +84,19 @@ async function loadBranchData(paths: ContainerPaths): Promise<BranchEntry[]> {
       hasStash,
       lastUsedAt: histEntry.last_checkout_at,
     });
+  }
+
+  // Add all local branches not already covered by slots or branch_history
+  try {
+    const localBranches = await git.listLocalBranches(paths.repoDir);
+    for (const branch of localBranches) {
+      if (!knownBranches.has(branch)) {
+        entries.push({ branch, tier: "inactive" });
+        knownBranches.add(branch);
+      }
+    }
+  } catch {
+    // Ignore errors — degrade gracefully
   }
 
   // Sort: pinned first, then active, then inactive — each tier sorted by recency

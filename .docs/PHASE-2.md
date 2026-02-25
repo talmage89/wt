@@ -175,7 +175,7 @@ At minimum, document the hook. Optionally implement `wt hooks show <integration>
 - [x] `wt init` prints slot summary and shell integration hint.
 - [x] `wt checkout` prints action summary (eviction, stash, branch creation).
 - [x] `wt checkout -b <branch>` creates new branches.
-- [ ] TUI Worktree Panel shows all local branches.
+- [x] TUI Worktree Panel shows all local branches.
 - [ ] TUI supports creating new branches via `n` key.
 - [ ] TUI polls for state changes every 2 seconds.
 - [ ] Config Panel shows change guidance after editing.
