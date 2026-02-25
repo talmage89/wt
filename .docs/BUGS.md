@@ -1,26 +1,28 @@
-## BUG-020: `wt clean` crashes (exit 13) when stdin is piped — readline discards buffered data between prompts
+## BUG-020: `wt clean` crashes (exit 13) when stdin is piped — readline 'line' event race condition with multiple sequential prompts
 
-**Status**: fixed
+**Status**: open
 **Found**: 2026-02-25T18:00:00Z
-**Fixed**: 2026-02-25T19:00:00Z
-**Test run**: ~/wt-usage-tests/2026-02-25T18-00-00Z/
+**Reopened**: 2026-02-25T20:00:00Z (fix attempt was incorrect — see below)
+**Test run**: ~/wt-usage-tests/2026-02-25T18-00-00Z/, ~/wt-usage-tests/2026-02-25T20-00-00Z/
 
 ### Description
 
-`wt clean` uses `readline.createInterface` sequentially — once for the selection prompt ("Select stashes to delete") and once for the confirmation prompt ("Delete N stash(es)? [y/N]"). When stdin is a pipe (not a TTY), the first readline interface buffers all available data (e.g., `"all\ny\n"`), then `rl.close()` is called which discards the buffered remainder (`"y\n"`). The second readline interface attaches to stdin but finds it at EOF immediately, so the `rl.question` callback is never called, the Promise never resolves, and Node.js emits "Warning: Detected unsettled top-level await" before exiting 13.
+`wt clean` needs two sequential prompts: a selection prompt ("Select stashes to delete") and a confirmation prompt ("Delete N stash(es)? [y/N]"). When stdin is a pipe, the second prompt never resolves, causing exit 13.
+
+**Root cause (refined)**: `rl.question()` registers a ONE-TIME `'line'` event listener. When stdin is a pipe, readline emits ALL buffered lines as `'line'` events as quickly as possible. The sequence is:
+1. `rl.question(Q1, cb1)` registers one-time 'line' listener → "1" (or "all") arrives → cb1 called, listener removed, promise resolves.
+2. **Async gap**: the `await ask()` completes, control returns to event loop.
+3. readline sees the next buffered line ("y") → emits `'line'` event "y" — but **no handler is registered** (the second `rl.question` hasn't been called yet). Event is lost.
+4. Second `rl.question(Q2, cb2)` registers its one-time listener — but no more 'line' events will come.
+5. Second promise never resolves → "Detected unsettled top-level await" → exit 13.
+
+The `makePrompter` fix (commit 4f6f450) switched from two separate readline interfaces to one, but this did **not** fix the race: the 'line' event emission race exists independently of how many interfaces are used.
 
 **What happened**:
 ```
 $ printf "all\ny\n" | wt clean
-Archived stashes:
-
-  [1] feature/alpha  (1m ago, 433 B)
-
-Select stashes to delete (comma-separated numbers, 'all', or 'none'): Delete 1 stash? [y/N] Warning: Detected unsettled top-level await at file:///…/dist/cli.js:…
-await cli.parseAsync();
-^
-
-[exit 13]
+$ printf "1\ny\n" | wt clean
+# Both: exit 13 — "Warning: Detected unsettled top-level await"
 ```
 
 **What should have happened**:
@@ -29,13 +31,49 @@ Deleted 1 archived stash.
 [exit 0]
 ```
 
-Single-prompt path ("none" selection) works correctly (exit 0, "Aborted."). Crash only occurs when the confirmation prompt is reached.
+Single-prompt path ("none" selection) still works correctly (exit 0, "Aborted.").
+
+### Correct fix
+
+Replace `rl.question` with a queued line reader that buffers incoming 'line' events and dispatches them to awaiting callers — eliminating the race condition:
+
+```ts
+function makePrompter(): { ask: (q: string) => Promise<string>; close: () => void } {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const lineQueue: string[] = [];
+  const pendingResolvers: ((s: string) => void)[] = [];
+
+  rl.on('line', (line) => {
+    if (pendingResolvers.length > 0) {
+      pendingResolvers.shift()!(line.trim());
+    } else {
+      lineQueue.push(line.trim());
+    }
+  });
+
+  rl.on('close', () => {
+    for (const resolve of pendingResolvers) resolve('');
+    pendingResolvers.length = 0;
+  });
+
+  const ask = async (question: string): Promise<string> => {
+    process.stdout.write(question);
+    if (lineQueue.length > 0) return lineQueue.shift()!;
+    return new Promise<string>((resolve) => { pendingResolvers.push(resolve); });
+  };
+
+  return { ask, close: () => rl.close() };
+}
+```
+
+This queues lines that arrive before `ask()` is called and dispatches them immediately when `ask()` does run.
 
 ### Reproduction
 
 ```bash
 # In any wt-managed container with an archived stash:
 printf "all\ny\n" | wt clean   # exit 13 — crash
+printf "1\ny\n" | wt clean     # exit 13 — crash
 printf "none\n" | wt clean     # exit 0 — works fine
 ```
 
