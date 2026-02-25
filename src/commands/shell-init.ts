@@ -6,7 +6,8 @@ export type ShellType = "bash" | "zsh" | "fish";
 //
 // `command wt` bypasses the shell function and invokes the external wt binary
 // directly, preventing infinite recursion when the function shadows the binary.
-const BASH_SCRIPT = `wt() {
+const BASH_SCRIPT = `export WT_SHELL_INTEGRATION=1
+wt() {
   command wt "$@"
   local exit_code=$?
 
@@ -34,7 +35,8 @@ const ZSH_SCRIPT = BASH_SCRIPT;
 
 // `command wt` in fish bypasses the function and calls the external binary,
 // preventing infinite recursion.
-const FISH_SCRIPT = `function wt
+const FISH_SCRIPT = `set -gx WT_SHELL_INTEGRATION 1
+function wt
     command wt $argv
     set -l exit_code $status
 

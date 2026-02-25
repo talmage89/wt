@@ -146,6 +146,9 @@ async function initFromExistingRepo(containerDir: string): Promise<string> {
   await writeConfig(wtDir, config);
   await generateAllTemplates(wtDir, containerDir, state.slots, config.templates);
 
+  // Print post-init summary
+  printInitSummary(slotNames, slotNames[0], startingBranch);
+
   // Write nav file so the shell function can cd into the active slot
   await writeNavFile(slot0Dir);
 
@@ -235,6 +238,9 @@ async function initFromUrl(containerDir: string, url: string): Promise<string> {
   await writeConfig(wtDir, config);
   await generateAllTemplates(wtDir, containerDir, state.slots, config.templates);
 
+  // Print post-init summary
+  printInitSummary(slotNames, slotNames[0], defaultBranchName);
+
   // Write nav file
   await writeNavFile(slot0Dir);
 
@@ -244,6 +250,40 @@ async function initFromUrl(containerDir: string, url: string): Promise<string> {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Print the post-init summary to stderr.
+ * Shows all slot names, marks the active one, and emits a shell integration
+ * hint unless WT_SHELL_INTEGRATION is already set (wrapper already sourced).
+ */
+function printInitSummary(
+  slotNames: string[],
+  activeSlotName: string | null,
+  activeBranch: string | null
+): void {
+  const count = slotNames.length;
+  process.stderr.write(
+    `wt: Initialized with ${count} worktree slot${count === 1 ? "" : "s"}.\n`
+  );
+  for (const name of slotNames) {
+    if (name === activeSlotName && activeBranch) {
+      process.stderr.write(`wt:   ${name}  (active, branch: ${activeBranch})\n`);
+    } else {
+      process.stderr.write(`wt:   ${name}  (vacant)\n`);
+    }
+  }
+  if (!process.env.WT_SHELL_INTEGRATION) {
+    process.stderr.write(`wt:\n`);
+    process.stderr.write(
+      `wt: To enable shell navigation (cd on checkout), add to your shell config:\n`
+    );
+    process.stderr.write(`wt:   eval "$(wt shell-init bash)"    # bash\n`);
+    process.stderr.write(`wt:   eval "$(wt shell-init zsh)"     # zsh\n`);
+    process.stderr.write(`wt:   wt shell-init fish | source     # fish\n`);
+    process.stderr.write(`wt:\n`);
+    process.stderr.write(`wt: Then restart your shell or run the eval command now.\n`);
+  }
+}
 
 /**
  * Check if a path exists.
