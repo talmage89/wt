@@ -149,6 +149,25 @@ export function WorktreePanel({ paths, onBack }: Props) {
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Poll for live updates every 2 seconds (starts after initial load)
+  useEffect(() => {
+    if (loading) return;
+
+    const id = setInterval(() => {
+      loadBranchData(paths)
+        .then((newData) => {
+          setEntries((prev) =>
+            JSON.stringify(prev) !== JSON.stringify(newData) ? newData : prev
+          );
+        })
+        .catch(() => {
+          // Silently ignore polling errors — don't disrupt the UI
+        });
+    }, 2000);
+
+    return () => clearInterval(id);
+  }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Filtered branches for search
   const filteredBranches = searchQuery
     ? allBranches.filter((b) =>

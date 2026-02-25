@@ -177,7 +177,7 @@ At minimum, document the hook. Optionally implement `wt hooks show <integration>
 - [x] `wt checkout -b <branch>` creates new branches.
 - [x] TUI Worktree Panel shows all local branches.
 - [x] TUI supports creating new branches via `n` key.
-- [ ] TUI polls for state changes every 2 seconds.
+- [x] TUI polls for state changes every 2 seconds.
 - [ ] Config Panel shows change guidance after editing.
 - [ ] Hooks Panel exists in TUI with create/edit/chmod flow.
 - [ ] Claude Code pin hook documented or implemented.

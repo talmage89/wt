@@ -120,6 +120,25 @@ export function StashPanel({ paths, onBack }: Props) {
     reload();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Poll for live updates every 2 seconds (starts after initial load)
+  useEffect(() => {
+    if (loading) return;
+
+    const id = setInterval(() => {
+      loadStashData(paths)
+        .then((newGroups) => {
+          setGroups((prev) =>
+            JSON.stringify(prev) !== JSON.stringify(newGroups) ? newGroups : prev
+          );
+        })
+        .catch(() => {
+          // Silently ignore polling errors — don't disrupt the UI
+        });
+    }, 2000);
+
+    return () => clearInterval(id);
+  }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const currentEntry = allEntries[selectedIdx];
 
   const doApply = async (branch: string) => {
