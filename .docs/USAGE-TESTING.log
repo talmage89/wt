@@ -1,3 +1,16 @@
+## 2026-02-25T38-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T38-00-00Z/
+Tests performed:
+- `wt stash show <branch>` where branch has no stash: `wt stash show main` (fresh container, no stashes ever created) → "wt: No stash found for branch 'main'." (exit 1); clean error, matches same message as `wt stash apply` for no-stash case — PASS
+- Modify template source file, run `wt sync` — all slots regenerated: configured `[[templates]] source=templates/env.txt target=.env.local` with initial content `VERSION=1`; ran `wt sync` → all 5 slots got `.env.local` with `VERSION=1` and correct `WORKTREE=<slot>` / `BRANCH=<branch>` expansions; modified source to `VERSION=2`; ran `wt sync` again → all 5 slots regenerated with `VERSION=2`; vacant slots got `BRANCH=` (empty, correct); template "always overwrite" per VISION §7.1 confirmed — PASS
+- Delete canonical symlink target, run `wt sync` — broken symlinks cleaned: configured `[shared] directories = [".config"]` with canonical `.wt/shared/.config/app.json`; ran `wt sync` → all 5 slots got symlink `loud-rook-stoat/.config/app.json → ../../.wt/shared/.config/app.json`; deleted canonical file (`rm .wt/shared/.config/app.json`); ran `wt sync` again → all 5 broken symlinks removed (dangling symlinks cleaned per VISION §342: "If a symlink is broken (target deleted), remove it."); `.config/` directory remains in each slot (empty); exit 0, no crash — PASS
+- Manually delete a slot directory (`rm -rf weasel-kind-soft`), run `wt list` — graceful recovery: listed 5 slots (all vacant except main); `rm -rf weasel-kind-soft`; ran `wt list` → wt detected missing slot, git worktree entry cleaned up, new slot `lynx-cloud-hare` created to maintain slot_count=5 ("Preparing worktree (detached HEAD)" output from git shown); wt list showed correct 5 slots; no crash, no error (exit 0); subsequent `git worktree list` confirmed 5 worktrees consistent with wt state — PASS
+- `wt stash apply <branch>` where branch has stash but is NOT checked out in any slot: evicted `main` (creating a stash for it) into a 6th checkout; all 5 slots occupied by other branches; ran `wt stash apply main` from container root → "wt: Branch 'main' is not checked out in any slot. Run 'wt checkout main' first." (exit 1); stash preserved (not dropped); correct: stash apply requires the branch to be in a slot to know where to apply — PASS
+Result: PASS
+
+---
+
 ## 2026-02-25T36-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T36-00-00Z/
