@@ -53,7 +53,7 @@ async function initFromExistingRepo(containerDir: string): Promise<string> {
   }
   if (!gitStat) {
     throw new Error(
-      "Not a git repository. Use 'wt init <url>' to clone, or run from inside a git repository."
+      "Not at the root of a git repository. Run 'wt init' from the repository root (where .git/ lives), or use 'wt init <url>' to clone a new one."
     );
   }
   if (!gitStat.isDirectory()) {

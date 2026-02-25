@@ -1,6 +1,6 @@
 ## BUG-022: `wt init` from subdirectory of git repo gives self-contradictory error message
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-25T30:00:00Z
 **Test run**: ~/wt-usage-tests/2026-02-25T30-00-00Z/
 

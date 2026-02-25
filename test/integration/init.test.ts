@@ -158,7 +158,18 @@ describe("wt init (from existing repo)", () => {
     // No git init — plain empty directory
 
     await expect(runInit({ cwd: dir })).rejects.toThrow(
-      "Not a git repository"
+      "Not at the root of a git repository"
+    );
+  });
+
+  it("should give a clear error when run from a subdirectory of a git repo (BUG-022)", async () => {
+    const dir = await mktemp();
+    await createTestRepo(dir);
+    const subdir = path.join(dir, "src");
+    await fs.mkdir(subdir, { recursive: true });
+
+    await expect(runInit({ cwd: subdir })).rejects.toThrow(
+      "Not at the root of a git repository"
     );
   });
 
