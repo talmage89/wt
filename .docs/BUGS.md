@@ -1531,8 +1531,9 @@ The vision's prescription of `git stash create -u` doesn't work for untracked fi
 
 ## BUG-026: `wt init` sets identical `last_used_at` for all slots, causing wrong slot to be kept when slot count is reduced immediately after init
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-25T14:30:00Z
+**Fixed**: 2026-02-25T56:00:00Z
 **Test run**: ~/wt-usage-tests/2026-02-25T52-00-00Z/
 
 ### Description

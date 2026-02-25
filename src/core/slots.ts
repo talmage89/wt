@@ -171,13 +171,21 @@ export async function adjustSlotCount(
       );
     }
 
-    // Sort non-pinned slots by last_used_at ascending (LRU first = oldest first)
+    // Sort non-pinned slots for eviction:
+    //   Primary: LRU (oldest last_used_at first)
+    //   Tie-break: vacant slots before occupied ones
+    // The tie-break ensures that after `wt init` (where all slots share the same
+    // timestamp), vacant slots are always evicted before the active slot (BUG-026).
     const evictionCandidates = Object.entries(state.slots)
       .filter(([, slot]) => !slot.pinned)
-      .sort(
-        ([, a], [, b]) =>
-          new Date(a.last_used_at).getTime() - new Date(b.last_used_at).getTime()
-      );
+      .sort(([, a], [, b]) => {
+        const timeDiff = new Date(a.last_used_at).getTime() - new Date(b.last_used_at).getTime();
+        if (timeDiff !== 0) return timeDiff;
+        // Equal timestamps: prefer evicting vacant over occupied
+        const aVacant = a.branch === null ? 0 : 1;
+        const bVacant = b.branch === null ? 0 : 1;
+        return aVacant - bVacant;
+      });
 
     const toEvict = evictionCandidates.slice(0, excessCount);
 

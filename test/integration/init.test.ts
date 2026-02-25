@@ -4,6 +4,7 @@ import path from "node:path";
 import { runInit } from "../../src/commands/init.js";
 import { readState } from "../../src/core/state.js";
 import { readConfig } from "../../src/core/config.js";
+import { adjustSlotCount } from "../../src/core/slots.js";
 import * as git from "../../src/core/git.js";
 import { execa } from "execa";
 import {
@@ -321,5 +322,35 @@ describe("wt init — .wt/repo/ is a valid git repo", () => {
     const config = await readConfig(path.join(dir, ".wt"));
     const slotWorktrees = worktrees.filter((w) => w.path !== repoDir);
     expect(slotWorktrees.length).toBe(config.slot_count);
+  });
+});
+
+describe("adjustSlotCount — BUG-026 regression", () => {
+  it("should evict vacant slots before the active slot when all timestamps are equal", async () => {
+    const dir = await mktemp();
+    await createTestRepo(dir);
+    await runInit({ cwd: dir });
+
+    const wtDir = path.join(dir, ".wt");
+    const repoDir = path.join(dir, ".wt", "repo");
+    const state = await readState(wtDir);
+    const config = await readConfig(wtDir);
+
+    // Confirm all slots share the same timestamp after init (the bug precondition)
+    const timestamps = Object.values(state.slots).map((s) => s.last_used_at);
+    const allSame = timestamps.every((t) => t === timestamps[0]);
+    expect(allSame).toBe(true);
+
+    // Reduce from 5 slots to 1 — should keep the active (occupied) slot
+    const reducedConfig = { ...config, slot_count: 1 };
+    const newState = await adjustSlotCount(repoDir, dir, wtDir, state, reducedConfig);
+
+    const remaining = Object.keys(newState.slots);
+    expect(remaining.length).toBe(1);
+
+    // The remaining slot must be the active one (branch !== null)
+    const remainingSlot = newState.slots[remaining[0]];
+    expect(remainingSlot.branch).not.toBeNull();
+    expect(remainingSlot.branch).toBe("main");
   });
 });
