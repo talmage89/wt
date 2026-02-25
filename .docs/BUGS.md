@@ -1528,3 +1528,48 @@ VISION.md — "Dirty state (staged, unstaged, untracked) is stashed via `git sta
 The vision's prescription of `git stash create -u` doesn't work for untracked files. The implementation needs to either:
 1. Use `git stash push --include-untracked` then read back the resulting stash hash from `refs/stash`, OR
 2. Manually collect untracked files and store them in a separate commit tree anchored with a ref alongside the main stash ref.
+
+## BUG-026: `wt init` sets identical `last_used_at` for all slots, causing wrong slot to be kept when slot count is reduced immediately after init
+
+**Status**: open
+**Found**: 2026-02-25T14:30:00Z
+**Test run**: ~/wt-usage-tests/2026-02-25T52-00-00Z/
+
+### Description
+
+After `wt init`, all slots (both the active main slot and all vacant slots) are assigned the same `last_used_at` timestamp. If the user reduces `slot_count` in `config.toml` before running any other `wt` command, `adjustSlotCount` sorts slots by `last_used_at` and evicts based on insertion order (since all timestamps are equal). This causes the **active slot** (the one with the current branch checked out) to be evicted, while a **vacant slot** is kept.
+
+**What happened** (reducing from 5 to 1 immediately after init):
+
+```
+# wt init → 5 slots: cloud-tundra-spark (main), crow-fair-gravel (vacant), ..., egret-storm-lamb (vacant)
+# user edits config.toml: slot_count = 1
+$ wt list
+Slot                  Branch   Status
+egret-storm-lamb      (vacant) ...
+# ↑ vacant slot kept; cloud-tundra-spark (main) was evicted
+```
+
+**What should have happened**: The active slot (`cloud-tundra-spark`, holding `main`) should be kept, and the 4 vacant slots should be evicted.
+
+### Root cause
+
+In `src/commands/init.ts`, state initialization uses:
+
+```typescript
+const now = new Date().toISOString();
+for (const name of slotNames) {
+  state.slots[name] = { ..., last_used_at: now, ... };
+}
+```
+
+All 5 slots get the same `now` timestamp. When `adjustSlotCount` sorts by `last_used_at` to determine LRU order, ties are broken by insertion order, causing the first-inserted slot (the active slot) to be evicted first.
+
+### Fix
+
+In `init.ts`, set the active slot's `last_used_at` to a timestamp slightly after the vacant slots. Alternatively, fix `adjustSlotCount` to prefer evicting vacant slots over occupied ones when timestamps tie.
+
+### Vision reference
+
+VISION §10.1: "When the slot count is reduced, the LRU algorithm applies." LRU should prefer to evict vacant slots over occupied ones.
+

@@ -865,3 +865,17 @@ Bug: BUG-018 — `wt stash drop` with stdin=/dev/null still crashes (exit 13): `
 
 ---
 
+## 2026-02-25T52-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T52-00-00Z/
+Tests performed:
+- Branch name with `+` sign (`hotfix/plus+sign`) full stash lifecycle: checked out `hotfix/plus+sign` (exit 0); created dirty state (plus-wip.txt + modified plus.txt); forced eviction; stash metadata file correctly encoded as `hotfix--plus%2Bsign.toml` (`/`→`--`, `+`→`%2B`); `wt stash show hotfix/plus+sign` showed correct diff (both files); re-checked out → "wt: Restored stash from just now"; plus-wip.txt present with correct content, plus.txt modified correctly; stash list empty after restore — correct per VISION §14 (branch encoding)
+- `wt stash drop` on currently-active branch's stash (via `--no-restore`): created stash for feature/one via eviction; checked out feature/one with `--no-restore` (stash preserved); ran `printf "y\n" | wt stash drop feature/one` while feature/one IS the current slot's branch; "Stash dropped for 'feature/one'." (exit 0); slot still shows feature/one in `wt list` (drop only removes the stash metadata, not the slot assignment); `wt stash list` showed empty — correct per VISION §5.2.1 (stash drop is independent of slot state)
+- `wt clean` partial selection (1 of 2 archived stashes): created stashes for feature/three and feature/four; archived both via timestamp faking + remote branch deletion + `wt fetch`; `printf "1\ny\n" | wt clean` selected only item [1] (feature/four); displayed "[1] feature/four  (20509d ago, 168 B)  [2] feature/three  (20509d ago, 172 B)"; deleted only feature/four; `wt stash list` showed only feature/three remaining (archived); archive dir contained only `feature--three.patch`; `wt clean` item selection via index number works correctly for partial deletion — PASS
+- `slot_count = 1` single-slot pool: initialized fresh container then reduced to 1 slot via config; single slot (`egret-storm-lamb`) now vacant (see BUG-026 for why the active main slot was evicted); `wt checkout main` → checked out in the single slot (exit 0); created dirty state (wip.txt, modified main.txt); `wt checkout feature/alpha` → evicted main (stash created, "dirty state stashed"), feature/alpha checked out in same slot; `wt stash list` showed stash for main; `wt pin egret-storm-lamb` → pinned; `wt checkout main` → "All worktree slots are pinned." (exit 1); `wt unpin egret-storm-lamb` + `wt checkout main` → evicted feature/alpha, restored main stash, wip.txt and main.txt correctly restored; slot shows "dirty" (untracked files present) — single-slot pool works correctly except for the slot retained on slot count reduction (BUG-026)
+- `wt list` display when slot has MERGE_HEAD state: manually wrote `MERGE_HEAD` to worktree gitdir and placed conflict markers in main.txt; `git status --short` showed ` M main.txt`; `wt list` correctly showed slot as "dirty" (not "clean" or special label); MERGE_HEAD presence does not affect wt's status detection — it uses `git status --porcelain` which correctly reports dirty files regardless of merge state; behavior is correct and consistent with VISION §9.1 (dirty = anything in git status)
+Result: BUG FOUND
+Bug: BUG-026 — `wt init` sets identical `last_used_at` for all slots; when slot count is reduced before any other wt command, LRU tie-breaking evicts the active main slot instead of a vacant slot (see .docs/BUGS.md)
+
+---
+
