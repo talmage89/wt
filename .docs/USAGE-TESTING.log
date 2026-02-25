@@ -1,3 +1,16 @@
+## 2026-02-25T13-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T13-00-00Z/
+Tests performed:
+- Branch with multiple slashes in name (`feature/deep/nested/branch`): pushed branch with 3 slashes to remote; `wt checkout feature/deep/nested/branch` succeeded (exit 0), correct file content (file2.txt with "deep"), stash metadata file named `feature--deep--nested--branch.toml` (encoding correct); created dirty state (`deep-wip.txt`), forced eviction, stash created and shown correctly; re-checked out branch, stash auto-restored with correct file content; full stash roundtrip works for deeply nested slash names — PASS
+- Checkout same branch already in a slot: `wt list` showed `main` in `mist-flock-cairn`; `wt checkout main` (from container root) → "wt: Checked out main in mist-flock-cairn" (exit 0); no eviction, no stash created; re-ran from within `mist-flock-cairn/` slot directory → same result; LRU updated but no slot reassignment; clean idempotent behavior — PASS
+- `wt stash show`, `wt stash apply`, `wt stash drop` on branch with no stash: all three commands on `feature/alpha` (which had no stash) → "wt: No stash found for branch 'feature/alpha'." (exit 1); `wt stash drop totally-nonexistent-branch` → "wt: No stash found for branch 'totally-nonexistent-branch'." (exit 1); clean error messages, no crash, correct exit code — PASS
+- Increase `slot_count` from 5 to 7 in config, run any command: edited `.wt/config.toml` to `slot_count = 7`; ran `wt list` → "Preparing worktree (detached HEAD ...)" printed twice (new slot creation), 2 new slots appeared (`lithe-perch-duck`, `mote-finch-barren`); existing 5 slots and their branches preserved exactly; `ls` confirmed 7 slot directories on disk — PASS
+- `wt init <url>` into a directory with an existing dotfile: created `dotfile-project/` with `.myconfig` file; ran `wt init <url>` → "wt: Directory is not empty. Use 'wt init' from inside an existing repository, or run from an empty directory." (exit 1); correct per VISION §15.1 (dotfile makes directory non-empty; init requires empty dir or existing git repo) — PASS
+Result: PASS
+
+---
+
 ## 2026-02-25T09-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T09-00-00Z/
