@@ -1,3 +1,15 @@
+## 2026-02-25T06-07-14Z
+
+Location: ~/wt-usage-tests/2026-02-25T06-07-14Z/
+Tests performed:
+- `WT_SHELL_INTEGRATION=1` suppresses shell hint on `wt init`: ran `wt init <url>` with `WT_SHELL_INTEGRATION=1` set — output showed slot summary but NO shell integration hint (hint omitted correctly); re-ran without env var — hint appeared as expected. Phase 2.2 detection works correctly. — PASS
+- Template with malformed variable syntax: created template with `{{BRANCH_NAME` (no closing `}}`), `{{BRANCH_NAME}` (one closing `}`), `{{UNKNOWN}}` (unknown variable), and `{{BRANCH_NAME}}` (valid); ran `wt sync`; result: `{{BRANCH_NAME` and `{{BRANCH_NAME}` passed through literally (no crash, no error), `{{UNKNOWN}}` passed through literally, `{{BRANCH_NAME}}` expanded correctly to branch name. Template expansion gracefully handles malformed variables by leaving them as-is. — PASS
+- Untracked symlinks in dirty state survive stash/restore cycle: created dirty state in slot (staged tracked change to README.md + untracked symlink `readme-link.txt -> README.md` + untracked file `untracked.txt`); evicted slot via checkout of new branch with all 5 slots full; verified stash captured symlink as git mode 120000; restored stash via re-checkout of branch; verified `readme-link.txt -> README.md` is a valid symlink in restored slot, untracked file content preserved, staged change content preserved in working tree. Note: staged vs. unstaged state not fully preserved (staged change became unstaged after `git stash apply` without `--index`) — this is pre-existing behavior. — PASS (symlink preserved; staged-state loss is known behavior)
+- Partial state.toml (valid TOML but missing required fields): removed `branch` field from one slot entry and `last_used_at` from another; ran `wt list` — missing `branch` recovered from actual git state via reconciliation (correct branch shown), missing `last_used_at` defaulted to epoch 0 ("20509d ago"), no crash; ran checkout of new branch — slot with missing `last_used_at` (epoch 0) correctly selected as LRU eviction candidate. Graceful degradation confirmed. — PASS
+Result: PASS
+
+---
+
 ## 2026-02-23T14-38-59Z
 
 Location: ~/wt-usage-tests/2026-02-23T14-38-59Z/
