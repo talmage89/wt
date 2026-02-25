@@ -44,19 +44,21 @@ async function archiveSize(archivePath: string): Promise<string> {
 }
 
 /**
- * Prompt for input via readline.
+ * Create a shared readline interface and return an `ask` function that
+ * uses it for all prompts.  A single interface must be shared across
+ * multiple sequential questions — closing and re-opening causes Node to
+ * discard the remaining buffered stdin data, which breaks piped input.
  */
-async function prompt(question: string): Promise<string> {
+function makePrompter(): { ask: (q: string) => Promise<string>; close: () => void } {
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
   });
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer.trim());
+  const ask = (question: string): Promise<string> =>
+    new Promise((resolve) => {
+      rl.question(question, (answer) => resolve(answer.trim()));
     });
-  });
+  return { ask, close: () => rl.close() };
 }
 
 /**
@@ -104,39 +106,44 @@ export async function runClean(options: CleanOptions = {}): Promise<void> {
     if (options.autoConfirm) {
       selected = archived;
     } else {
-      const answer = await prompt(
-        "Select stashes to delete (comma-separated numbers, 'all', or 'none'): "
-      );
+      const { ask, close } = makePrompter();
+      try {
+        const answer = await ask(
+          "Select stashes to delete (comma-separated numbers, 'all', or 'none'): "
+        );
 
-      if (answer === "none" || answer === "") {
-        process.stdout.write("Aborted.\n");
-        return;
-      }
-
-      if (answer === "all") {
-        selected = archived;
-      } else {
-        const indices = answer
-          .split(",")
-          .map((s) => parseInt(s.trim(), 10))
-          .filter((n) => !isNaN(n) && n >= 1 && n <= archived.length)
-          .map((n) => n - 1);
-
-        if (indices.length === 0) {
-          process.stdout.write("No valid selection. Aborted.\n");
+        if (answer === "none" || answer === "") {
+          process.stdout.write("Aborted.\n");
           return;
         }
 
-        selected = indices.map((i) => archived[i]);
-      }
+        if (answer === "all") {
+          selected = archived;
+        } else {
+          const indices = answer
+            .split(",")
+            .map((s) => parseInt(s.trim(), 10))
+            .filter((n) => !isNaN(n) && n >= 1 && n <= archived.length)
+            .map((n) => n - 1);
 
-      const confirmAnswer = await prompt(
-        `Delete ${selected.length} stash${selected.length === 1 ? "" : "es"}? [y/N] `
-      );
+          if (indices.length === 0) {
+            process.stdout.write("No valid selection. Aborted.\n");
+            return;
+          }
 
-      if (confirmAnswer.toLowerCase() !== "y" && confirmAnswer.toLowerCase() !== "yes") {
-        process.stdout.write("Aborted.\n");
-        return;
+          selected = indices.map((i) => archived[i]);
+        }
+
+        const confirmAnswer = await ask(
+          `Delete ${selected.length} stash${selected.length === 1 ? "" : "es"}? [y/N] `
+        );
+
+        if (confirmAnswer.toLowerCase() !== "y" && confirmAnswer.toLowerCase() !== "yes") {
+          process.stdout.write("Aborted.\n");
+          return;
+        }
+      } finally {
+        close();
       }
     }
 

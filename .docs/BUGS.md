@@ -1,8 +1,8 @@
 ## BUG-020: `wt clean` crashes (exit 13) when stdin is piped — readline discards buffered data between prompts
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-25T18:00:00Z
-**Fixed**: —
+**Fixed**: 2026-02-25T19:00:00Z
 **Test run**: ~/wt-usage-tests/2026-02-25T18-00-00Z/
 
 ### Description
