@@ -1,3 +1,15 @@
+## 2026-02-25T58-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T58-00-00Z/
+Tests performed:
+- Multiple simultaneous stashes — evicted 3 branches with dirty state in sequence: (a) `feature/alpha` with staged file (staged.txt), unstaged modification (alpha.txt), and untracked file (alpha-wip.txt); (b) `feature/beta` with staged modification (beta.txt) and untracked (beta-wip.txt); (c) `feature/direct-git-branch` with untracked file (direct-wip.txt); `wt stash list` correctly showed all 3 stashes with distinct base commits (b77e870, fb2355e, 8eddc2d); `wt stash show` on each returned correct diff — PASS
+- Stash restore from multiple stashes — ran `wt checkout feature/alpha` while 3 stashes existed; stash for feature/alpha correctly restored (alpha-wip.txt, alpha.txt modified, staged.txt all present); stash list dropped to 2 entries after successful restore; stash for feature/beta and feature/direct-git-branch unaffected — PASS
+- Stash apply after branch rebase (conflict) — evicted feature/beta (stash created at base commit fb2355e with dirty beta.txt + beta-wip-v2.txt + beta-wip.txt); then rebased feature/beta on remote (force-push; fb2355e no longer in branch history); fetched; ran `wt checkout feature/beta` → stash apply attempted on rebased branch tip (29f7325); conflict on beta.txt: "<<<<<<< Updated upstream / new beta remote change / ======= / modified beta / >>>>>>> Stashed changes"; wt printed "wt: Stash for feature/beta produced conflicts. Resolve manually." + "wt: Run 'wt stash drop feature/beta' after resolution, or 'wt stash show feature/beta' to inspect."; untracked files (beta-wip-v2.txt, beta-wip.txt) applied without conflict; stash NOT consumed (still in stash list at fb2355e); exit 0 — correct per VISION §5.2 (conflicts passed through, user resolves)
+- TUI branch completeness (Phase 2.5) — created `feature/never-managed-by-wt` branch directly via `git branch` in bare repo (never via `wt`; not in branch_history, not in any slot); verified `git.listLocalBranches(repoDir)` returns it alongside all other local branches; per WorktreePanel.tsx loadBranchData() logic, it would appear as "inactive" in TUI since it's not in knownBranches set; also confirmed that branches created via direct `git checkout -b` inside worktree slots (e.g., feature/direct-git-branch) appear in listLocalBranches — correct; Phase 2.5 implementation handles all cases: active slots, branch_history, and pure git-local branches
+Result: PASS
+
+---
+
 ## 2026-02-25T15-05-46Z
 
 Location: ~/wt-usage-tests/2026-02-25T15-05-46Z/
