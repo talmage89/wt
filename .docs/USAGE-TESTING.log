@@ -442,3 +442,18 @@ Tests performed:
 - Template regenerated on checkout: `wt checkout feature/new-cli` generated slot-info.txt in target slot with version 2 content — correct per VISION §7 (template generation on checkout, step 9)
 Result: PASS
 
+---
+
+## 2026-02-25T12-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T12-00-00Z/
+Tests performed:
+- Double init (wt init, no URL) from already-initialized container root: "wt: This directory is already a wt-managed container." (exit 1) — correct; double init with URL from container root: "Directory is not empty" (exit 1) — correct
+- `wt init <url>` from directory containing only a dotfile (.gitignore): "Directory is not empty" (exit 1) — correct; VISION §2.2 requires empty directory; dotfiles count as non-empty (consistent behavior)
+- `wt init` (no URL) from inside a worktree slot (which has .git FILE, not directory): `wt` failed to detect that .git is a file not a directory; init proceeded, moved the .git worktree link file to .wt/repo inside the slot, created partial .wt/ structure, then failed with cryptic "ENOTDIR: git config core.bare true" — BUG FOUND
+- Delete canonical shared file (.wt/shared/.config/settings.json), run `wt sync`: broken symlinks removed from all 5 slots silently (exit 0, no warning) — confirmed via Phase-3 scenario "verify broken symlinks cleaned"; consistent with VISION §6.4 (sync only creates/manages configured files; if canonical file gone, no symlink created; existing broken symlinks removed)
+- Manually `git worktree add` a new directory in the container, then run `wt list`: reconcile detected the manual worktree as a new slot with epoch timestamp (LRU); adjustSlotCount evicted it immediately since state had 6 slots vs config.slot_count=5; manual worktree silently removed; `wt list` showed only 5 managed slots — behavior consistent with VISION §3.2 (silent reconcile), though surprising to user
+- Drop archived stash: evicted slot created stash; faked last_used_at to 55 days ago, deleted remote branch; `wt fetch` archived stash (patch file written to .wt/stashes/archive/); `wt stash list` showed status=archived; `wt stash drop feature/shared-syms` with `y` confirmation: patch file and metadata both deleted; `wt stash list` shows "No saved stashes" — correct per VISION §5.5
+Result: BUG FOUND
+Bug: BUG-017 — `wt init` from inside a worktree slot corrupts the slot because the .git file (worktree link) is not distinguished from a .git/ directory (see .docs/BUGS.md)
+

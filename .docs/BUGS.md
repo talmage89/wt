@@ -1,3 +1,46 @@
+## BUG-017: `wt init` from inside a worktree slot corrupts the slot
+
+**Status**: open
+**Found**: 2026-02-25T12:00:00Z
+**Test run**: ~/wt-usage-tests/2026-02-25T12-00-00Z/
+
+### Description
+
+Running `wt init` (without URL) from inside a worktree slot (which has a `.git` FILE — a git worktree link — rather than a `.git/` directory) corrupts the slot:
+
+1. `init` checks for `.git` existence with `fs.access`, which returns `true` for both files and directories
+2. `init` creates `.wt/repo/` inside the slot, then removes it (`rm`)
+3. `init` renames the `.git` **file** (worktree link) to `.wt/repo` — the slot's `.git` file is now gone
+4. `init` attempts `git config core.bare true` in `.wt/repo/`, which fails with `ENOTDIR` (`.wt/repo` is a file, not a directory)
+
+After this, the slot directory has its `.git` link file gone (moved to `.wt/repo` inside the slot), and a partial `.wt/` structure has been created. The slot is no longer a valid git worktree.
+
+**What happened**: Ran `wt init` from `fern-broad-crisp/` (a vacant slot in `my-project/`). Error: `"wt: Command failed with ENOTDIR: git config core.bare true. The 'cwd' option is not a directory: ...fern-broad-crisp/.wt/repo"`. The slot's `.git` file was moved to `fern-broad-crisp/.wt/repo` and `fern-broad-crisp/.wt/` partial structure was created.
+
+**What should have happened**: `wt init` should detect that `.git` is a regular file (a worktree link), not a `.git/` directory (a real git repo root), and refuse with a clear message like: `"wt: Not a git repository root. Run 'wt init' from a regular git repository, not inside a worktree slot."` After the detection failure, no filesystem changes should be made.
+
+### Reproduction
+
+```bash
+TS=$(date -u +%Y-%m-%dT%H-%M-%SZ)
+mkdir -p ~/wt-usage-tests/$TS && cd ~/wt-usage-tests/$TS
+git init test-remote && cd test-remote && git commit --allow-empty -m "Initial commit" && cd ..
+mkdir my-project && cd my-project
+wt init "file://$(realpath ../test-remote)"
+# Get a slot name
+SLOT=$(ls | grep -v '\.wt')
+# Now run init FROM INSIDE THE SLOT
+cd $SLOT && wt init
+# Observe: cryptic ENOTDIR error, slot .git file is gone
+ls -la  # .wt/ directory present but .git file missing
+```
+
+### Vision reference
+
+VISION.md §2.1: `wt init` from existing repository — "must be a git repository (.git/ must exist)" — the check should verify `.git` is a directory, not just that it exists as any file.
+
+---
+
 ## BUG-016: Eviction fails when slot has unresolved merge conflicts from stash apply
 
 **Status**: fixed
