@@ -1,3 +1,16 @@
+## 2026-02-25T46-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-25T46-00-00Z/
+Tests performed:
+- `wt stash drop <branch>` where no stash exists: fresh container with no stashes; ran `wt stash drop main` → "wt: No stash found for branch 'main'." (exit 1); clean error with correct exit code — PASS
+- `wt sync` with shared directory configured but no canonical files: set `[shared] directories = [".shared-config"]` in config, no `.wt/shared/.shared-config/` directory; ran `wt sync` → exit 0, no output (silent no-op — correct, nothing to symlink); created `.wt/shared/.shared-config/` (empty dir), ran `wt sync` again → exit 0, no output (correct, no files in canonical dir); added `settings.ini` to canonical dir, ran `wt sync` → symlinks created in all 5 slots (`trunk-reed-hazel/.shared-config/settings.ini → ../../.wt/shared/.shared-config/settings.ini`); full progression from missing canonical to populated canonical confirmed — PASS
+- `wt checkout <branch>` from inside the slot already holding that branch (idempotent re-checkout): from inside `trunk-reed-hazel` (holding `main`), ran `wt checkout main` → "wt: Checked out main in trunk-reed-hazel" (exit 0); no eviction, no stash, no error; nav file written pointing to same slot directory; correct idempotent behavior — PASS
+- Local-only branch (no remote tracking) stash + restore cycle: created `feature/local-only` via direct `git checkout -b` in `colt-green-fen` slot (reconcile detected it); added untracked `wip-local.txt` ("secret-wip-content"); faked `colt-green-fen` last_used_at to make it LRU; checked out `feature/d` → `feature/local-only` evicted ("wt: Evicted feature/local-only from colt-green-fen (dirty state stashed)"), stash created at base `30b62d2`; ran `wt checkout feature/local-only` → evicted `main` cleanly (dirty was only wt-managed symlink, removed pre-stash, no stash), restored stash ("wt: Restored stash from just now"); `wip-local.txt` present with correct content; "Created branch..." message correctly absent (branch pre-existed locally); stash lifecycle for local-only branches works correctly — PASS
+- `wt` (no subcommand) from inside a worktree slot: launched from `trunk-reed-hazel/` (a slot directory, not the container root); TUI rendered main menu with all 5 items ("Manage Worktrees", "Manage Stashes", "Edit Configuration", "Edit Templates", "Edit Hooks"); footer "↑/↓ navigate  Enter select  q quit"; exit 0 on 'q'; container detection walked up from worktree slot to find container correctly — PASS
+Result: PASS
+
+---
+
 ## 2026-02-25T44-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-25T44-00-00Z/
