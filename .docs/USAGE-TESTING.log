@@ -2,6 +2,21 @@
 
 Previous test runs archived to `.docs/archive/USAGE-TESTING.log`.
 
+## 2026-02-27T05:30:00Z
+
+Location: ~/wt-usage-tests/2026-02-27T05-30-00Z/
+Tests performed:
+- Config value validation — negative slot_count: `slot_count = -1` and `slot_count = 0` correctly fail with "wt: slot_count must be at least 1." (exit code 1). Validation is in `slots.ts` `adjustSlotCount()`. ✓
+- Config value validation — string slot_count: `slot_count = "abc"` (valid TOML string type) silently falls back to default (5). No error or crash. By design: config parser uses `typeof parsed["slot_count"] === "number"` guard, so non-numeric types fall back to defaults for forward-compatibility. Consistent with unknown-key behavior.
+- Config value validation — negative fetch_cooldown_minutes: `fetch_cooldown_minutes = -5` silently accepted; no error. Negative cooldown means elapsed time is always >= threshold, so every command would fetch. Not ideal UX but not a crash.
+- Stale nav file from crashed session: manually wrote `/some/old/path` to `/tmp/wt-nav-99999`. Running `wt checkout` in a different session (different PID) ignored the stale file — each session uses its own `$$` PID for the nav file, so stale files from other PIDs are harmless. Stale files accumulate in /tmp/ but cause no functional issues. ✓
+- Hook stdout/stderr output during checkout: created `.wt/hooks/post-checkout` that writes to both stdout and stderr. Via shell function, both outputs were correctly visible to the user after `wt` messages. Hook ran with correct args ($1 = worktree path, $2 = branch name). ✓
+- Hook non-zero exit code: hook that exits 1 — error message visible (stderr shown), but shell function returns wt binary's exit code (0), not hook's exit code (1). The shell function uses `return $exit_code` from the `command wt` call; hook exit code is not captured. CWD change still happens. Behavior is consistent (checkout succeeded; hook failure doesn't undo navigation). Not a bug per vision (no spec on hook exit propagation).
+- `wt stash show` on archived stash: archived stash (stored as `.patch` file after zstd-less archival) correctly shown with full diff including untracked files. Output format slightly different (patch file uses `# --- untracked files ---` separator). ✓
+- `wt clean` full lifecycle: one archived stash; tested all interactive paths: (a) select "all" → confirm "y" → deleted correctly; (b) select "1" (number) → confirm "n" → aborted (stash preserved); (c) select "none" → aborted immediately; (d) invalid input "y" → "No valid selection. Aborted." Selection format is comma-separated numbers, "all", or "none". All paths exit 0. ✓
+- Stash archival lifecycle end-to-end: dirty eviction → active stash → manipulate metadata to old date + delete remote branch → `wt fetch` triggers archival (with "Archived 1 stash(es):" message and zstd-not-found warning) → stash shows as "archived" in list → `wt clean all` with "y" → patch file deleted from `.wt/stashes/archive/` and metadata removed. Full workflow verified. ✓
+Result: PASS
+
 ## 2026-02-27T09:00:00Z
 
 Location: ~/wt-usage-tests/2026-02-27T09-00-00Z/
