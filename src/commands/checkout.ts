@@ -134,6 +134,10 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
   const targetSlot = selectSlotForCheckout(state);
   const worktreeDir = path.join(paths.container, targetSlot);
 
+  // Tracks whether the branch existed locally before checkout (used to detect
+  // when git's DWIM creates a local tracking branch — BUG-029).
+  let localBranchExistedBefore = true;
+
   // 7.5. PRE-CHECK: Verify the branch exists before evicting any slot (BUG-028).
   // Eviction is irreversible — if the subsequent checkout fails, the evicted
   // slot is left vacant with its original branch assignment lost. Fail early
@@ -144,6 +148,7 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
       paths.repoDir,
       `refs/heads/${options.branch}`
     );
+    localBranchExistedBefore = localExists;
     if (!localExists) {
       const remoteExists = await git.remoteBranchExists(
         paths.repoDir,
@@ -221,6 +226,11 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
     let checkoutError: unknown = null;
     try {
       await git.checkout(worktreeDir, options.branch);
+      // git's DWIM behavior creates a local tracking branch when a remote-only
+      // branch is checked out. Detect this case using the pre-check result.
+      if (!localBranchExistedBefore) {
+        branchCreatedFromRemote = true;
+      }
     } catch (err) {
       checkoutError = err;
     }
