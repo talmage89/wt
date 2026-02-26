@@ -2,7 +2,7 @@
 
 Bug numbers continue from the archived log. See `.docs/archive/BUGS.md` for BUG-001 through BUG-028.
 
-Next bug number: **BUG-030**
+Next bug number: **BUG-031**
 
 ## BUG-029: "Created local branch" message missing on remote-only branch checkout
 
@@ -68,4 +68,74 @@ wt checkout remote-only
 
 VISION.md section 3.2 (Checkout Output):
 > `wt: Created local branch feature/new from origin/main`
+> The "Created local branch" line appears only when a new branch was created from remote.
+
+---
+
+## BUG-030: "Created local branch from origin/X" message appears incorrectly for local-only branches
+
+**Status**: open
+**Found**: 2026-02-26T20:00:00Z
+**Test run**: ~/wt-usage-tests/2026-02-26T20-00-00/
+
+### Description
+
+When checking out a branch for the first time via `wt`, the `wt: Created local branch <branch> from origin/<branch>` message appears even when the branch was created locally (not from a remote) or when there is no remote at all. The message is factually incorrect in these cases — there is no `origin/<branch>` to reference.
+
+### Root cause
+
+The BUG-029 fix uses `branch_history` as a proxy for detecting "first time checkout = created from remote":
+
+```typescript
+localBranchExistedBefore = state.branch_history.some(
+  (e) => e.branch === options.branch
+);
+```
+
+This is correct for the typical bare-clone workflow (all branches in refs/heads came from the remote), but fires incorrectly when:
+1. The repo has no remote (wt init from a local-only git repo)
+2. A branch was manually created in the bare repo via `git --git-dir=.wt/repo branch <name> <base>` (not via `wt checkout -b`)
+
+In both cases, the branch was not "created from remote" yet `!localBranchExistedBefore` is true, causing the message to appear.
+
+### Correct fix
+
+After a successful checkout where `!localBranchExistedBefore`, additionally verify that a remote tracking ref actually exists for the branch:
+
+```typescript
+// Only set branchCreatedFromRemote if the remote branch exists.
+// This prevents false positives for locally-created branches and no-remote repos.
+if (!localBranchExistedBefore) {
+  const remoteExists = await git.remoteBranchExists(paths.repoDir, options.branch);
+  if (remoteExists) {
+    branchCreatedFromRemote = true;
+  }
+}
+```
+
+This check runs `git ls-remote --heads origin <branch>` which correctly returns false when there's no remote or when the branch is local-only. The pre-check at step 7.5 already calls `remoteBranchExists` when `!localExists`; this fix adds a second call in the success path to guard the message.
+
+### Reproduction
+
+```bash
+# Create a local-only repo (no remote)
+git init local-only && cd local-only
+git config user.email "t@t.com" && git config user.name "T"
+echo "hello" > README.md && git add . && git commit -m "init"
+wt init   # converts local repo to wt container
+
+# Manually create a local branch in the bare repo
+git --git-dir=.wt/repo branch feature/local-only main
+
+# Checkout the local branch via wt
+wt checkout feature/local-only
+
+# Expected: "wt: Checked out feature/local-only in <slot>" (no "Created local branch" line)
+# Actual:   "wt: Created local branch feature/local-only from origin/feature/local-only"
+#           (WRONG: there is no remote and no origin/feature/local-only)
+```
+
+### Vision reference
+
+VISION.md section 3.2 (Checkout Output):
 > The "Created local branch" line appears only when a new branch was created from remote.
