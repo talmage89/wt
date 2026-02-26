@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Box, Text, useApp, useInput } from "ink";
+import { Box, Text, useApp, useInput, useStdin } from "ink";
 import { spawn } from "child_process";
 import { join } from "path";
 import type { ContainerPaths } from "../core/container.js";
@@ -46,6 +46,7 @@ type Phase = "editing" | "summary";
 // Launches $EDITOR on .wt/config.toml per PHASE-7.md Section 7.6
 export function ConfigPanel({ paths, onBack }: Props) {
   const { exit: _exit } = useApp();
+  const { setRawMode } = useStdin();
   const [phase, setPhase] = useState<Phase>("editing");
   const [changes, setChanges] = useState<string[]>([]);
 
@@ -54,8 +55,13 @@ export function ConfigPanel({ paths, onBack }: Props) {
     const configPath = join(paths.wtDir, "config.toml");
 
     const openEditor = (before: Config | null) => {
+      // Disable Ink's raw mode so the external editor has exclusive stdin control.
+      // Without this, Ink intercepts keystrokes meant for the editor, causing
+      // double-registration of each key press.
+      setRawMode(false);
       const child = spawn(editor, [configPath], { stdio: "inherit" });
       child.on("exit", () => {
+        setRawMode(true);
         if (before === null) {
           setChanges([]);
           setPhase("summary");
@@ -72,6 +78,7 @@ export function ConfigPanel({ paths, onBack }: Props) {
           });
       });
       child.on("error", (err) => {
+        setRawMode(true);
         process.stderr.write(`wt: failed to launch editor: ${err.message}\n`);
         onBack();
       });

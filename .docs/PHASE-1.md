@@ -156,8 +156,8 @@ This mirrors `cd -` and `git checkout -` conventions — a single character to g
 
 ## Completion Checklist
 
-- [ ] Config panel registers single keystrokes during editing.
-- [ ] Initial config file includes commented template examples.
+- [x] Config panel registers single keystrokes during editing.
+- [x] Initial config file includes commented template examples.
 - [ ] Worktree menu renders in LRU order; pinned entries are not promoted.
 - [ ] Worktree menu renders instantly without "Loading..." flash.
 - [ ] `wt checkout -b` validates before evicting.
