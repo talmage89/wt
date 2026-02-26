@@ -1,184 +1,170 @@
-# Phase 1: UX Improvement Planning
+# Phase 1: Usage-Testing Polish
 
-**Goal**: Audit the existing CLI and TUI, produce a concrete spec for every UX improvement, and update VISION.md where needed.
+**Goal**: Address UX friction and bugs discovered during continuous usage testing.
 
-**Depends on**: All core implementation complete (old Phases 1–8). All automated tests passing.
-
----
-
-## Context
-
-The CLI and TUI are functionally complete — every operation works. But the tool is uninformative: it assumes the user already understands worktrees, slots, stashing, eviction, and the `wt` mental model. There is no guidance after actions, no feedback during multi-step processes, and no help for first-time users. This phase designs the fixes.
+**Depends on**: All core implementation and UX improvements complete. All automated tests passing.
 
 ---
 
-## 1.1 Audit Existing UX
+## Implementation Items
 
-Walk through every user-facing flow and document what the user sees, what's missing, and what's confusing. Cover:
-
-### CLI Commands
-
-- **`wt init`**: What does the user see after init completes? Are they navigated to the right place? Do they know shell integration needs to be sourced? Do they know what the slot directories are?
-- **`wt checkout <branch>`**: Is there feedback about what happened (eviction, stash save/restore, branch creation)? Is the cursor visible after checkout? Can the user create a new branch (`git checkout -b` equivalent)?
-- **`wt list`**: Is the output self-explanatory? Does it help the user decide what to do next?
-- **`wt fetch`**: Does it show progress? Does it explain what was archived?
-- **`wt sync`**: Does it explain what changed?
-- **`wt stash *`**: Are the subcommands discoverable?
-- **`wt pin/unpin`**: Is there confirmation?
-- **`wt clean`**: Is the interactive prompt clear?
-
-### TUI Panels
-
-- **Worktree Panel**: Does it show ALL known branches (including those created via direct `git checkout -b`)? Is it clear how to create a new branch? Does it update live or require manual refresh?
-- **Stash Panel**: Is the active/archived distinction explained?
-- **Config Panel**: After editing config, what should happen? Is there guidance about what changed or what to do next (e.g., run `wt sync`)?
-- **Template Panel**: Are template variables documented inline?
-
-### Shell Integration
-
-- **Post-init**: Does the user know they need to source the shell wrapper?
-- **Cursor visibility**: Is the cursor restored after TUI exit and after checkout?
-- **Hooks**: Can hooks be edited from the TUI? Is the post-checkout hook discoverable?
+Each item is a self-contained unit of work. Items are ordered by dependency — earlier items do not depend on later ones.
 
 ---
 
-## 1.2 Design Each Improvement
+### 1.1 Fix Double Keystroke in Config Panel
 
-For every gap identified, write a concrete spec. Each spec must include:
+**Files**: `src/tui/ConfigPanel.tsx`
 
-1. **What the user sees now** (current behavior).
-2. **What the user should see** (target behavior).
-3. **Where the change lives** (which file(s) to modify).
-4. **Exact wording** of any new messages, hints, or UI elements.
+When editing the configuration file through the TUI, every key press registers twice. The `useInput` handler (line 85) fires unconditionally on every keystroke regardless of phase, and likely conflicts with the editor subprocess or Ink's input handling during the `"editing"` phase.
 
-### Required Improvements
+**Fix**: Guard `useInput` to only handle input during the `"summary"` phase, or disable Ink's raw mode while the external editor is active.
 
-The following are known gaps that MUST be addressed. The audit may surface additional ones.
-
-#### A. Init Feedback & Shell Guidance
-
-**Current**: `wt init` completes silently. The user's shell is not navigated to the active slot (unless shell integration is sourced). No mention of shell integration.
-
-**Target**: After init, print a summary:
-```
-wt: Initialized with 5 worktree slots.
-wt: Active worktree: <slot-name> (branch: <branch>)
-wt:
-wt: To enable shell navigation (cd on checkout), add to your shell config:
-wt:   eval "$(wt shell-init bash)"    # bash
-wt:   eval "$(wt shell-init zsh)"     # zsh
-wt:   wt shell-init fish | source     # fish
-wt:
-wt: Then restart your shell or run the eval command now.
-```
-
-If shell integration is NOT active (detected by absence of nav file mechanism or environment variable), always include the shell hint. If it IS active, omit it.
-
-#### B. Branch Creation During Checkout
-
-**Current**: `wt checkout <branch>` only checks out existing branches (local or remote). There is no way to create a new branch from the CLI or TUI.
-
-**Target**:
-- CLI: `wt checkout -b <new-branch> [start-point]` creates a new branch from `start-point` (default: current HEAD or `origin/<default-branch>`). Mirrors `git checkout -b`.
-- TUI: Add a "Create Branch" action in the Worktree Panel (e.g., `n` key). Prompts for branch name, creates from `origin/<default-branch>`, and checks it out.
-
-#### C. Checkout Feedback
-
-**Current**: Checkout is silent on success. The user doesn't know if eviction occurred, if a stash was saved/restored, or if a new branch was created from remote.
-
-**Target**: Print a brief summary after checkout:
-```
-wt: Checked out feature/my-branch in <slot-name>
-wt: Evicted <old-branch> from <slot-name> (dirty state stashed)
-wt: Restored stash from 2d ago
-```
-
-Only print lines that are relevant. Keep it terse — one line per significant action.
-
-#### D. Cursor Visibility
-
-**Current**: The cursor disappears after TUI exit or after checkout (likely an Ink cleanup issue).
-
-**Target**: Ensure `process.stdout.write('\x1B[?25h')` (show cursor) is called on TUI exit and after any command that might hide it. This is a terminal escape sequence fix.
-
-#### E. TUI Branch Completeness
-
-**Current**: The Worktree Panel only shows branches known to `wt` (those checked out via `wt checkout`). Branches created via direct `git checkout -b` inside a slot are reconciled into state but may not appear in the TUI's inactive list.
-
-**Target**: The Worktree Panel should show:
-1. All branches currently in slots (active — already works).
-2. All branches previously known to `wt` (inactive — already works).
-3. All local branches in the repo (new section or merged into inactive list, dimmed).
-
-The branch search (`/`) already shows all local+remote branches. The default list should also surface all local branches so the user doesn't have to search to find branches they just created.
-
-#### F. TUI Live Updates
-
-**Current**: The TUI is a static snapshot. If the user has another terminal making changes, the TUI doesn't reflect them until the user navigates away and back.
-
-**Target**: Poll for state changes every 2 seconds. On each tick:
-- Re-run reconciliation.
-- Re-read slot status (dirty/clean).
-- Update the display if anything changed.
-
-Keep it lightweight — only re-read `state.toml` and run `git status --porcelain` per slot. Do NOT re-fetch.
-
-#### G. Config Edit Guidance
-
-**Current**: After editing config in the TUI, the user returns to the main menu with no feedback. Changes to `slot_count`, `shared.directories`, or `templates` may require `wt sync` to take effect.
-
-**Target**: After the editor closes, compare the old and new config. If changes were detected, print guidance:
-```
-Config updated.
-  slot_count: 5 → 7 (run any wt command to create new slots)
-  shared.directories: added ".env.local.d" (run 'wt sync' to propagate)
-  templates: added 1 template (run 'wt sync' to generate)
-```
-
-If no changes detected: "No changes."
-
-#### H. Hook Editing from TUI
-
-**Current**: Hooks (`.wt/hooks/post-checkout`) are not surfaced in the TUI. Users must know about them from documentation.
-
-**Target**: Add a 5th item to the TUI Main Menu: **"Edit Hooks"**. This panel lists hook files in `.wt/hooks/`, allows editing them in `$EDITOR`, and shows a brief description of each hook's purpose. If no hooks exist, offer to create the `post-checkout` hook with a template.
-
-#### I. Claude Code Hook for Worktree Pinning
-
-**Current**: No integration with Claude Code. If Claude Code is running a prompt in a worktree, that worktree could be evicted by another `wt checkout`.
-
-**Target**: Document (and optionally ship) a Claude Code hook that:
-1. On prompt start: runs `wt pin` in the current worktree.
-2. On prompt end: runs `wt unpin` in the current worktree.
-
-This prevents eviction of worktrees actively being used by Claude Code. The hook configuration lives in Claude Code's settings, not in `wt` itself. Provide the hook definition in a new section of the README or as a `wt hooks show claude-code` output.
+**Test**: Open TUI, navigate to Config, edit the file, verify each key registers exactly once.
 
 ---
 
-## 1.3 Update VISION.md
+### 1.2 Add Template Examples to Config File
 
-For each improvement that changes behavior described in the vision, draft the VISION.md amendment. Specifically:
+**Files**: `src/commands/init.ts` (initial config generation), `src/core/config.ts`
 
-- Section 2 (Initialization): Add post-init output spec.
-- Section 3 (Branch Checkout): Add `-b` flag for branch creation. Add checkout feedback output.
-- Section 4 (Shell Integration): Add shell hint on first init.
-- Section 8 (TUI): Add live polling. Add hook editing panel. Add branch creation action. Add config change guidance.
-- New section or appendix: Claude Code hook example.
+The Templates panel says "edit config to add templates" but the config file contains no examples, leaving the user with no guidance on the syntax.
+
+**Fix**: When generating the initial `.wt/config.toml`, include a commented-out `[[templates]]` example block:
+
+```toml
+# [[templates]]
+# source = ".env.template"
+# target = ".env"
+# Variables: {{WORKTREE_DIR}}, {{BRANCH_NAME}}
+```
+
+**Test**: `wt init` produces a config file with the commented template example. Existing configs are not modified.
 
 ---
 
-## 1.4 Write the Phase 2 Spec
+### 1.3 Worktree Menu: LRU Order with Pinned-in-Place
 
-Once all improvements are designed, write the implementation checklist for Phase 2 (the implementation phase). Each item should be a single, testable unit of work.
+**Files**: `src/tui/WorktreePanel.tsx` (sort logic, lines 102–107)
+
+Currently the worktree menu sorts pinned entries first, then active, then inactive. This is disruptive — the list order should be stable and predictable.
+
+**Current sort** (line 102):
+```
+pinned: 0, active: 1, inactive: 2
+```
+
+**Target sort**: All entries sorted by LRU recency (most recently used first). Pinned entries stay in their natural LRU position — they are not promoted to the top. The pin indicator is sufficient to convey pinned status.
+
+**Test**: Pin a worktree that was used a while ago, verify it stays in its LRU position rather than jumping to the top.
+
+---
+
+### 1.4 Worktree Menu: Optimistic UI (No Loading State)
+
+**Files**: `src/tui/WorktreePanel.tsx` (lines 119, 396–401)
+
+The worktree menu shows a "Loading..." message on initial render. This is disruptive — the menu should render immediately with cached/last-known state and update in the background.
+
+**Fix**:
+- On first render, read `state.toml` synchronously (or cache from the previous poll cycle) and render the menu immediately.
+- Run git status checks and reconciliation in the background; update entries as results arrive.
+- Never show a blank "Loading..." screen for the worktree list.
+
+**Test**: Open TUI, verify the worktree menu appears instantly without a loading flash.
+
+---
+
+### 1.5 Pre-validate `wt checkout -b` Before Eviction
+
+**Files**: `src/commands/checkout.ts` (lines 130–147, 182–191)
+
+The BUG-028 fix added pre-validation for regular checkout, but the `-b` (create) path still evicts before attempting `git checkout -b`. If the branch already exists or the start point is invalid, the slot is left vacant.
+
+**Fix**: Before eviction (step 8), when `options.create` is true:
+1. Check if the branch already exists locally (`refs/heads/<branch>`). If so, fail with `"Branch '<branch>' already exists."`.
+2. If a `startPoint` is provided, verify it resolves (`git rev-parse --verify <startPoint>`). If not, fail with the git error.
+
+**Test**: `wt checkout -b existing-branch` fails without evicting. `wt checkout -b new-branch bad-start-point` fails without evicting.
+
+---
+
+### 1.6 Fetch Cooldown
+
+**Files**: `src/core/git.ts`, `src/core/config.ts`, `src/commands/checkout.ts`, `src/commands/fetch.ts`
+
+The tool feels slow, likely because `git fetch` runs on every checkout and many other operations. Fetches should have a cooldown.
+
+**Fix**:
+- Record the last fetch timestamp in `.wt/state.toml` (e.g., `last_fetch_at`).
+- Before fetching, check if the cooldown has elapsed (default: 10 minutes, configurable via `fetch_cooldown_minutes` in config).
+- Skip the fetch if within cooldown. `wt fetch` (explicit) always fetches regardless of cooldown.
+- Print `wt: Skipping fetch (last fetched <N>m ago)` when skipped (only if verbose or debug, otherwise silent).
+
+**Test**: Run `wt checkout` twice within 10 minutes — second run skips fetch. `wt fetch` always runs. Changing `fetch_cooldown_minutes` in config is respected.
+
+---
+
+### 1.7 Stash Tag Layout: Move `[stash]` After Relative Time
+
+**Files**: `src/tui/WorktreePanel.tsx` (lines 524–531)
+
+Currently the display order is: `branch  slot  [stash]  31s ago`. The `[stash]` tag visually pushes the time away from the branch name, making it harder to scan recency at a glance.
+
+**Target**: `branch  slot  31s ago  [stash]`
+
+**Fix**: Swap the render order of the `[stash]` tag and the `RelativeTime` component.
+
+**Test**: Entry with a stash shows time before `[stash]` tag.
+
+---
+
+### 1.8 Config Panel: Immediate Slot Adjustment After `slot_count` Change
+
+**Files**: `src/tui/ConfigPanel.tsx`, `src/core/slots.ts`
+
+After editing the config and changing `slot_count`, the summary currently says "new slots will be created/evicted on next wt command". The user has to leave the TUI and run a command before the change takes effect.
+
+**Fix**: When a `slot_count` change is detected in the summary phase, show a prompt: `"Apply now? (y/n)"`.
+- If **yes**: call `adjustSlotCount()` (the same logic that runs on the next `wt` command) immediately, then display what happened (e.g., "Created 2 new slots: amber-fox-glen, crisp-oak-vale" or "Evicted 1 slot: dusk-fern-mist (dirty state stashed)").
+- If **no** (or any other key): show the existing guidance text and return to the menu.
+
+This keeps the current deferred behavior as the default but gives the user a fast path.
+
+**Test**: Change `slot_count` from 5 to 7 in the TUI config editor, press `y` at the prompt, verify 2 new slots are created immediately. Change from 7 to 5, press `y`, verify LRU eviction of 2 slots.
+
+---
+
+### 1.9 Resume Command (`wt -`)
+
+**Files**: `src/cli.ts`, `src/commands/checkout.ts`, `src/core/state.ts`, `src/core/nav.ts`
+
+After switching between projects or terminals, there's no quick way to get back to the worktree you were last working in. `cd`-ing manually requires remembering the slot name.
+
+**Fix**: `wt -` (or `wt resume`) navigates to the most recently used worktree slot:
+1. Read `state.toml`, find the slot with the most recent `last_used_at`.
+2. Write the nav file pointing to that slot's directory.
+3. The shell function handles the `cd`.
+
+If the MRU slot is the current directory, this is a no-op. If all slots are vacant, print an error.
+
+This mirrors `cd -` and `git checkout -` conventions — a single character to go back to where you were.
+
+**Test**: Check out branch A, then branch B (in a different terminal or after navigating away). Run `wt -`, verify cwd changes to the slot containing branch B (the MRU). Run from outside any worktree, verify it navigates to the MRU slot.
 
 ---
 
 ## Completion Checklist
 
-- [x] Every CLI command audited for UX gaps.
-- [x] Every TUI panel audited for UX gaps.
-- [x] Shell integration audited.
-- [x] Concrete spec written for each improvement (A through I, plus any additional).
-- [x] VISION.md amendments drafted and applied.
-- [x] Phase 2 implementation checklist written.
-- [x] All specs reviewed for consistency with existing VISION.md.
+- [ ] Config panel registers single keystrokes during editing.
+- [ ] Initial config file includes commented template examples.
+- [ ] Worktree menu renders in LRU order; pinned entries are not promoted.
+- [ ] Worktree menu renders instantly without "Loading..." flash.
+- [ ] `wt checkout -b` validates before evicting.
+- [ ] Fetch cooldown prevents redundant fetches (default 10 min).
+- [ ] Stash tag appears after relative time in worktree list.
+- [ ] Config panel offers immediate slot adjustment after `slot_count` change.
+- [ ] `wt -` navigates to the most recently used worktree.
+- [ ] All existing tests still pass (`pnpm test`).
+- [ ] No type errors (`pnpm tsc --noEmit`).
+- [ ] `pnpm build` succeeds and binary reflects all changes.

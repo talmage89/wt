@@ -1,186 +1,181 @@
-# Phase 2: UX Improvement Implementation
+# Phase 2: Continuous Usage Testing
 
-**Goal**: Implement all UX improvements specified in Phase 1.
+**This phase is never complete.** It runs indefinitely after Phase 1. Every agent entering this phase performs one cycle of the loop described below.
 
-**Depends on**: Phase 1 (all specs finalized, VISION.md updated).
-
----
-
-## Implementation Items
-
-Each item is a self-contained unit of work. An agent should complete one item per session, commit, and exit. Items are ordered by dependency — earlier items do not depend on later ones.
+**Depends on**: Phase 1 (all polish items implemented, all automated tests passing).
 
 ---
 
-### 2.1 Cursor Visibility Fix
+## Testing Location
 
-**Files**: `src/tui/App.tsx`, `src/cli.ts`
+All usage tests are performed in `~/wt-usage-tests/`. This directory is **never cleaned up** — it persists between agent sessions so that previous test artifacts can be inspected. Each test run creates a subdirectory named with a timestamp:
 
-Ensure the terminal cursor is restored after:
-- TUI exit (normal quit, error, Ctrl-C).
-- Any CLI command that uses Ink or raw mode.
-
-Write `\x1B[?25h` to stdout on process exit. Add a `process.on('exit', ...)` handler and an Ink cleanup hook.
-
-**Test**: Launch TUI, quit, verify cursor is visible. Run `wt checkout`, verify cursor is visible.
-
----
-
-### 2.2 Init Feedback & Shell Guidance
-
-**Files**: `src/commands/init.ts`, `src/commands/shell-init.ts`
-
-After successful init, print a summary to stderr:
-- Number of slots created and their names.
-- Which slot has the active branch.
-- Shell integration instructions (if shell wrapper is not active).
-
-Detection of shell wrapper: check for an environment variable set by the shell function (e.g., `WT_SHELL_INTEGRATION=1`), or simply always print the hint on first init.
-
-Update shell scripts (`src/shell/bash.sh`, `src/shell/zsh.sh`, `src/shell/fish.fish`) to export `WT_SHELL_INTEGRATION=1` so the CLI can detect it.
-
-**Test**: `wt init <url>` prints slot summary and shell hint. After sourcing shell-init, `wt init` in a new container omits the shell hint.
+```
+~/wt-usage-tests/
+  2026-02-23T14-30-00/
+    test-repo/              # a real git repo used as the remote
+    my-project/             # the wt-managed container
+  2026-02-23T15-45-00/
+    ...
+```
 
 ---
 
-### 2.3 Checkout Feedback
+## Log File
 
-**Files**: `src/commands/checkout.ts`
+All testing activity is recorded in `.docs/USAGE-TESTING.log` in the workspace. Each entry follows this format:
 
-After checkout completes, print a summary to stderr:
-- `Checked out <branch> in <slot-name>`
-- `Evicted <old-branch> from <slot-name> (dirty state stashed)` (if eviction occurred)
-- `Restored stash from <relative-time>` (if stash was restored)
-- `Created local branch <branch> from origin/<branch>` (if branch was newly created from remote)
-- `Navigating to <slot-path>` (if shell integration is active)
+```
+## <ISO timestamp>
 
-Each line prefixed with `wt: `. Only print lines that apply.
-
-**Test**: Checkout triggers appropriate messages. Checkout to existing slot prints only the checkout line.
-
----
-
-### 2.4 Branch Creation (`-b` flag)
-
-**Files**: `src/cli.ts`, `src/commands/checkout.ts`, `src/core/git.ts`
-
-Add `-b` flag to `wt checkout`:
-- `wt checkout -b <new-branch>` creates from `origin/<default-branch>`.
-- `wt checkout -b <new-branch> <start-point>` creates from `<start-point>`.
-
-Implementation: select a slot (same eviction logic), then `git checkout -b <branch> <start-point>` instead of `git checkout <branch>`.
-
-**Test**: `wt checkout -b feature/new` creates branch and checks it out. `wt checkout -b feature/new origin/develop` creates from specified start point.
+Location: ~/wt-usage-tests/<run-dir>/
+Tests performed:
+- <brief description of what was tested>
+- <brief description of what was tested>
+Result: PASS | BUG FOUND
+Bug: <if applicable, one-line summary referencing .docs/BUGS.md>
+```
 
 ---
 
-### 2.5 TUI Branch Completeness
+## Bug File
 
-**Files**: `src/tui/WorktreePanel.tsx`, `src/core/git.ts`
+When a bug is discovered, it is recorded in `.docs/BUGS.md` with the following format:
 
-Add a function to list all local branches: `git branch --format='%(refname:short)'`.
+```
+## BUG-<NNN>: <short title>
 
-In the Worktree Panel, merge local branches into the display:
-- Active branches (in slots): shown as before.
-- Inactive branches (previously known to `wt` + all local branches not in slots): shown dimmed.
-- Deduplicate: if a branch is both in `wt` history and in `git branch`, show it once.
+**Status**: open | fixed
+**Found**: <ISO timestamp>
+**Fixed**: <ISO timestamp, if fixed>
+**Test run**: ~/wt-usage-tests/<run-dir>/
 
-**Test**: Create branches via `git checkout -b` directly, verify they appear in the TUI.
+### Description
+<What happened vs. what should have happened, per the vision.>
 
----
+### Reproduction
+<Exact commands to reproduce.>
 
-### 2.6 TUI Branch Creation
+### Vision reference
+<Which section of VISION.md defines the expected behavior.>
+```
 
-**Files**: `src/tui/WorktreePanel.tsx`
-
-Add `n` keybinding in the Worktree Panel to create a new branch:
-1. Prompt for branch name (text input).
-2. Create from `origin/<default-branch>` (or allow user to type a start point).
-3. Check out the new branch (triggers slot selection / eviction).
-4. Navigate to the slot.
-
-**Test**: Press `n`, type branch name, verify branch is created and checked out.
+Bug numbers are sequential, starting at 001.
 
 ---
 
-### 2.7 TUI Live Polling
+## Agent Loop
 
-**Files**: `src/tui/App.tsx`, `src/tui/WorktreePanel.tsx`, `src/tui/StashPanel.tsx`
+Every agent entering Phase 2 follows this exact sequence:
 
-Add a polling mechanism:
-- Every 2 seconds, re-read state and re-run lightweight status checks.
-- Use `setInterval` in a `useEffect` hook.
-- Only update React state if something changed (avoid unnecessary re-renders).
-- Polling is active only when the TUI is in the foreground (not while `$EDITOR` is open).
+### 1. Check for open bugs
 
-**Test**: Open TUI, make a change in another terminal (e.g., create a file), verify TUI updates within ~2 seconds.
+Read `.docs/BUGS.md`. If any bug has `Status: open`:
+
+1. Implement the fix.
+2. Write a targeted unit or integration test that catches the bug.
+3. Run `pnpm test` — all tests must pass.
+4. Update the bug entry: set `Status: fixed`, add `Fixed` timestamp.
+5. Commit with message: `fix: BUG-<NNN> <short title>`.
+6. **Stop. Exit.** Do not proceed to usage testing. The next agent will.
+
+### 2. Review the log
+
+Read `.docs/USAGE-TESTING.log`. Understand what has already been tested. Identify gaps — scenarios from the vision that have not yet been exercised, or areas that were only lightly covered. Prioritize untested or under-tested behavior.
+
+**Important**: An archive of earlier test runs exists at `.docs/archive/USAGE-TESTING.log`. **Ignore it entirely.** Treat the current log as the only source of truth for coverage. The codebase has changed significantly since the archived runs — those results are stale and may mask regressions. Start fresh: if something was tested in the archive but not in the current log, it counts as untested.
+
+### 3. Plan the test run
+
+Choose 3-5 specific scenarios to test. Prioritize:
+- Behavior described in the vision that hasn't been tested yet.
+- Edge cases and peripheral behavior (not the happy path).
+- Interactions between features (e.g., stash + pin + eviction together).
+- Error conditions and recovery.
+
+Examples of the kind of scenarios to target:
+
+**Init edge cases:**
+- `wt init` from a repo with dirty state and untracked files.
+- `wt init <url>` into a directory that has a single dotfile.
+- Running `wt init` twice.
+
+**Checkout edge cases:**
+- Checkout a branch that only exists on the remote (never local).
+- Checkout a branch with `/` in the name (encoding).
+- Checkout when the current slot is the LRU candidate.
+- Checkout the same branch you're already on.
+- Checkout with `--no-restore`, then manually `wt stash apply`.
+
+**Eviction edge cases:**
+- Evict a slot with staged changes, unstaged changes, AND untracked files.
+- Evict, then restore on a branch that has been rebased since eviction.
+- Evict all slots in sequence — verify stash metadata accumulates correctly.
+
+**Pin edge cases:**
+- Pin all slots, then try checkout — verify error.
+- Pin from within a worktree vs. by slot name.
+- Unpin and immediately evict.
+
+**Symlink edge cases:**
+- Shared file that is git-tracked on one branch but not another — verify symlink appears/disappears on checkout.
+- Create a real file in a shared directory, run sync — verify migration.
+- Delete the canonical file, run sync — verify broken symlinks cleaned.
+
+**Template edge cases:**
+- Template with `{{BRANCH_NAME}}` on a vacant (detached) slot.
+- Modify a template source, run sync — verify all slots regenerated.
+
+**Stash lifecycle:**
+- Create a stash, wait (or fake the timestamp), delete the remote branch, run fetch — verify archival.
+- Drop an archived stash — verify patch file deleted.
+- `wt stash show` on a branch with no stash — verify error.
+- `wt stash apply` on a branch not in any slot — verify error.
+
+**Reconciliation:**
+- Directly `git checkout` a different branch inside a slot, then run any `wt` command — verify state updates silently.
+- Delete a slot directory, then run `wt list` — verify graceful handling.
+- Manually `git worktree add` a new directory in the container — verify it appears or is ignored appropriately.
+
+**Shell integration:**
+- Verify nav file is written and cleaned up after checkout.
+- Verify `wt shell-init bash` output defines a valid `wt()` function.
+- Source the shell init and run a checkout — verify cwd changes.
+
+**Slot count changes:**
+- Increase slot_count in config, run a command — verify new slots appear.
+- Decrease slot_count below current count — verify LRU eviction of excess.
+- Decrease below pinned count — verify error.
+
+**Concurrent/adversarial:**
+- Run `wt checkout A` while another terminal has a file open in a slot.
+- Corrupt `state.toml` (invalid TOML), run a command — verify recovery or clear error.
+
+### 4. Execute the test run
+
+1. Create the run directory: `mkdir -p ~/wt-usage-tests/<timestamp>/`.
+2. Set up a real git repo to act as the remote (or clone a public repo).
+3. Run `wt` commands as a real user would — via the built binary, not test harness.
+4. Use the shell integration if testing shell behavior: `eval "$(node /workspace/bin/wt.mjs shell-init bash)"`.
+5. Observe actual behavior. Compare against VISION.md.
+
+### 5. Log results
+
+Append to `.docs/USAGE-TESTING.log` with the standard format.
+
+- If all tests pass: `Result: PASS`.
+- If a bug is found: `Result: BUG FOUND`, log the bug in `.docs/BUGS.md`, and **stop immediately**. Do not continue testing. Do not fix the bug. Commit the log and bug file, then exit.
+
+### 6. Commit and exit
+
+Commit the updated log file (and bug file if applicable). Exit. The next agent will continue the loop.
 
 ---
 
-### 2.8 Config Edit Guidance
+## Principles
 
-**Files**: `src/tui/ConfigPanel.tsx`, `src/core/config.ts`
-
-After the editor closes:
-1. Re-read config.
-2. Compare with the config snapshot taken before the editor opened.
-3. Display a diff summary showing what changed and what action is needed.
-4. If `slot_count` changed: mention that new slots will be created/evicted on next command.
-5. If `shared.directories` changed: suggest `wt sync`.
-6. If `templates` changed: suggest `wt sync`.
-7. If no changes: show "No changes."
-
-**Test**: Edit config to add a shared directory, verify guidance message appears.
-
----
-
-### 2.9 Hook Editing from TUI
-
-**Files**: `src/tui/App.tsx`, `src/tui/MainMenu.tsx`, new file `src/tui/HooksPanel.tsx`
-
-Add "Edit Hooks" as the 5th main menu item.
-
-The Hooks Panel:
-- Lists files in `.wt/hooks/` (or shows "No hooks configured").
-- Selecting a hook opens it in `$EDITOR`.
-- If no `post-checkout` hook exists, offer to create one with a commented template explaining the arguments (`$1` = worktree path, `$2` = branch name).
-- After editing, show the hook's executable status. If not executable, offer to `chmod +x`.
-
-**Test**: Open TUI, navigate to Edit Hooks, create a post-checkout hook, verify it's executable and runs on next checkout.
-
----
-
-### 2.10 Claude Code Worktree Pin Hook
-
-**Files**: Documentation only (or a new `src/commands/hooks.ts` if adding a `wt hooks` subcommand).
-
-Provide a Claude Code hook configuration that:
-- On `PreToolUse` (or session start): runs `wt pin` in the current worktree.
-- On session end (or `PostToolUse`): runs `wt unpin`.
-
-This can be:
-- A section in the README.
-- Output from `wt hooks show claude-code` (new subcommand).
-- A `.claude/hooks.json` template in `.wt/shared/`.
-
-At minimum, document the hook. Optionally implement `wt hooks show <integration>` to emit the configuration.
-
-**Test**: Manual verification — configure the hook, start a Claude Code session, verify worktree is pinned, end session, verify unpinned.
-
----
-
-## Completion Checklist
-
-- [x] Cursor always visible after TUI exit and CLI commands.
-- [x] `wt init` prints slot summary and shell integration hint.
-- [x] `wt checkout` prints action summary (eviction, stash, branch creation).
-- [x] `wt checkout -b <branch>` creates new branches.
-- [x] TUI Worktree Panel shows all local branches.
-- [x] TUI supports creating new branches via `n` key.
-- [x] TUI polls for state changes every 2 seconds.
-- [x] Config Panel shows change guidance after editing.
-- [x] Hooks Panel exists in TUI with create/edit/chmod flow.
-- [x] Claude Code pin hook documented or implemented.
-- [x] All existing tests still pass (`pnpm test`).
-- [x] No type errors (`pnpm tsc --noEmit`).
-- [x] `pnpm build` succeeds and binary reflects all changes.
+- **Test like a user, not a developer.** Use the built binary. Use the shell function. `cd` around. Make mistakes. Be adversarial.
+- **Peripheral over happy-path.** The happy path is covered by unit and integration tests. Usage testing exists to find the weird stuff.
+- **One agent, one cycle.** Do not run multiple test cycles in a single session. Do your 3-5 scenarios, log, commit, exit.
+- **Never fix and test in the same session.** If you fixed a bug (step 1), exit. If you found a bug (step 5), exit. Separation prevents tunnel vision.
+- **Persist everything.** Test directories in `~/wt-usage-tests/` are never deleted. They are evidence.

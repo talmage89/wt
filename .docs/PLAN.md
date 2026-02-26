@@ -165,11 +165,10 @@ Thin wrappers around git commands. Every function calls `execa('git', [...args])
 
 ## Current Phases
 
-Core implementation (the original Phases 1–8) is complete. The project now has three active phases:
+Core implementation and UX improvements (the original Phases 1–8 plus UX audit/implementation) are complete. The project now has two active phases:
 
-- **Phase 1: UX Improvement Planning** — Audit the CLI and TUI for UX gaps, design concrete improvements, update VISION.md. See `.docs/PHASE-1.md`.
-- **Phase 2: UX Improvement Implementation** — Implement all improvements from Phase 1 (init feedback, checkout feedback, branch creation, TUI live polling, cursor fix, config guidance, hooks panel, Claude Code integration). See `.docs/PHASE-2.md`.
-- **Phase 3: Continuous Usage Testing** — The endless testing loop. Fix open bugs or run manual usage test cycles against the real binary. See `.docs/PHASE-3.md`.
+- **Phase 1: Usage-Testing Polish** — UX friction and bugs surfaced during usage testing (double keystrokes in config, template examples, LRU ordering, optimistic UI, `-b` pre-validation, fetch cooldown, stash tag layout, immediate slot adjustment, `wt -` resume command). See `.docs/PHASE-1.md`.
+- **Phase 2: Continuous Usage Testing** — The endless testing loop. Fix open bugs or run manual usage test cycles against the real binary. See `.docs/PHASE-2.md`.
 
 ## Testing Strategy
 
