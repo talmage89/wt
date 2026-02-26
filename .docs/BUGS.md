@@ -327,8 +327,9 @@ VISION.md §15.1: `wt` should produce clear, actionable error messages. Tell the
 
 ## BUG-034: Branch encoding collision causes silent stash data loss
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-26T09:52:00Z
+**Fixed**: 2026-02-26T10:50:00Z
 **Test run**: ~/wt-usage-tests/2026-02-26T09-52-00Z/
 
 ### Description
