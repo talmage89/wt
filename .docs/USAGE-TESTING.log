@@ -2,6 +2,17 @@
 
 Previous test runs archived to `.docs/archive/USAGE-TESTING.log`.
 
+## 2026-02-27T09:00:00Z
+
+Location: ~/wt-usage-tests/2026-02-27T09-00-00Z/
+Tests performed:
+- `wt fetch` bypasses cooldown (Phase 1 §1.6): set `fetch_cooldown_minutes = 10`, ran `wt checkout` to set `last_fetch_at`, then immediately ran `wt fetch` — fetch ran successfully despite being within the 10-minute window, discovered newly-pushed branch-d, updated `last_fetch_at`; confirms explicit `wt fetch` always fetches regardless of cooldown
+- `wt stash drop` for branch with no stash (VISION §5.2.1): tried `wt stash drop no-stash-branch` and `wt stash drop main` — both returned "wt: No stash found for branch 'X'" with exit code 1; clean error messages
+- Symlink dynamically appears/disappears on checkout between branches (VISION §6.3): checked out branch-b (no tracked configs/app.env) into slot → symlink created at slot/configs/app.env pointing to .wt/shared; evicted that slot and checked out branch-d (tracks configs/app.env) → symlink was correctly replaced by git-tracked regular file, with "Skipping symlink: file is tracked by git" printed; observation: wt list shows slot as "dirty" when slot has only wt-managed untracked symlinks, but on eviction saveStash() removes managed symlinks before stashing so no stash is created (by design — symlinks are recreated on checkout); the dirty indicator is technically accurate (git status sees them) but no user state is lost
+- `wt -` from inside MRU slot (Phase 1 §1.9): ran `wt -` from inside rind-willet-fern (the MRU slot, branch-d) — printed "wt: Already in the most recently used worktree (branch-d in rind-willet-fern)" with exit code 0, no navigation; correct no-op behavior
+- `wt checkout` when remote is unreachable (VISION §15.3): changed remote URL to http://localhost:9999/nonexistent.git, reset fetch cooldown; ran `wt checkout branch-a` — git error printed verbatim ("fatal: unable to access…"), checkout of already-local branch-a succeeded (exit 0); ran `wt checkout totally-nonexistent-branch` — git fetch error printed verbatim, then "wt: Branch 'totally-nonexistent-branch' not found locally or on remote" (exit 1); fetch errors are non-fatal for local branches but correctly fail for nonexistent branches
+Result: PASS
+
 ## 2026-02-27T07:00:00Z
 
 Location: ~/wt-usage-tests/2026-02-27T07-00-00Z/
