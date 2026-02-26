@@ -2,7 +2,7 @@
 
 Bug numbers continue from the archived log. See `.docs/archive/BUGS.md` for BUG-001 through BUG-028.
 
-Next bug number: **BUG-034**
+Next bug number: **BUG-035**
 
 ## BUG-029: "Created local branch" message missing on remote-only branch checkout
 
@@ -324,3 +324,101 @@ wt stash show br-test
 VISION.md §15.3: All user-facing errors emit `wt: <message>`. No raw Node.js error objects or stack traces.
 
 VISION.md §15.1: `wt` should produce clear, actionable error messages. Tell the user exactly what happened and what to do next.
+
+## BUG-034: Branch encoding collision causes silent stash data loss
+
+**Status**: open
+**Found**: 2026-02-26T09:52:00Z
+**Test run**: ~/wt-usage-tests/2026-02-26T09-52-00Z/
+
+### Description
+
+When two branch names collide under the `encodeBranch()` scheme — specifically, a branch containing `--` (double-dash) and a branch containing `/` (slash) at the same position (e.g., `feature--test` and `feature/test`) — they produce identical encoded forms (`feature--test`). This causes:
+
+1. Identical stash metadata file paths: both map to `.wt/stashes/feature--test.toml`
+2. Identical git ref names: both map to `refs/wt/stashes/feature--test`
+
+When both branches are evicted with dirty state, the second eviction silently overwrites both the TOML file and the git ref of the first. The first branch's stash commit becomes a dangling object (no ref) and will be collected by `git gc`.
+
+**Observed impact**:
+- `wt stash list` shows only the second branch (the first is invisible)
+- `wt stash show <first-branch>` shows the second branch's diff (wrong content)
+- The first branch's dirty state is silently and permanently lost
+- No warning or error is produced at any point
+
+### Root cause
+
+`encodeBranch()` in `src/core/branch-encode.ts` replaces `/` with `--`. Because `--` is a valid character sequence in git branch names, the reverse mapping is ambiguous: `feature--test` could mean `feature/test` or `feature--test`. The encoding is not injective — two distinct branch names map to the same encoded string.
+
+```typescript
+// Both produce "feature--test":
+encodeBranch("feature/test")   // "/" → "--"
+encodeBranch("feature--test")  // "--" passes through unchanged
+```
+
+### Correct fix
+
+The encoding scheme must ensure injectivity (one-to-one mapping). Two options:
+
+**Option A** (minimal change): Percent-encode `--` occurrences in the original branch name before the `/` → `--` replacement, so literal `--` in branch names becomes `%2D%2D` and does not collide with the separator:
+
+```typescript
+export function encodeBranch(name: string): string {
+  // Step 1: percent-encode existing "--" sequences so they don't collide with the "/" separator
+  const dashEncoded = name.replace(/--/g, "%2D%2D");
+  // Step 2: replace "/" with "--" (now unambiguous)
+  const slashReplaced = dashEncoded.replace(/\//g, "--");
+  // ... rest of encoding unchanged
+}
+
+export function decodeBranch(encoded: string): string {
+  // Step 1: percent-decode (restores "%2D%2D" → "--")
+  const percentDecoded = encoded.replace(/%([0-9A-Fa-f]{2})/g, (_, hex) =>
+    String.fromCharCode(parseInt(hex, 16))
+  );
+  // Step 2: replace "--" back with "/" (now unambiguous since literal "--" was encoded)
+  return percentDecoded.replace(/--/g, "/");
+}
+```
+
+**Option B** (cleanest): Use `%2F` for `/` instead of `--`, avoiding the issue entirely. This changes the on-disk format (breaking change for existing stash files and refs).
+
+Option A is preferred as it is backward-compatible for branch names that do not contain `--` (the common case) and only changes encoding for branches that actually contain `--`.
+
+**Migration concern**: Option A changes the encoding for all branch names containing `--`. Existing stash TOML files and refs using the old encoding would need to be migrated, or the decoder must handle both forms. A migration step on first run after upgrade, or a fallback decode that tries both forms, would handle existing installations.
+
+### Reproduction
+
+```bash
+# Set up a remote with both collision branches
+git init --bare remote.git
+git clone remote.git local-setup && cd local-setup
+git config user.email "t@t.com" && git config user.name "T"
+echo "init" > README.md && git add . && git commit -m "init"
+git push origin main
+git checkout -b "feature/test" && echo "a" > a.txt && git add . && git commit -m "feat/test" && git push origin "feature/test"
+git checkout main
+git checkout -b "feature--test" && echo "b" > b.txt && git add . && git commit -m "feat--test" && git push origin "feature--test"
+git checkout main && cd ..
+
+# Init wt and checkout both collision branches
+mkdir proj && cd proj
+wt init /path/to/remote.git
+wt checkout "feature/test"
+wt checkout "feature--test"
+
+# Fill all slots (so LRU eviction occurs)
+# Add dirty state to feature--test slot:
+echo "dirty1" > <feature--test-slot>/dirty1.txt
+# ...fill remaining slots and trigger eviction of feature--test first
+# ...then add dirty state to feature/test slot and trigger its eviction
+
+# Expected: Two separate stash entries (one per branch)
+# Actual:   Only one stash entry; the first branch's stash is silently overwritten and lost
+```
+
+### Vision reference
+
+VISION.md §5.1: "If the worktree has dirty state, it is stashed before eviction." The stash must be per-branch and must persist independently of other branches' stashes. Silent data loss violates this contract.
+
+VISION.md §15.1: Clear, actionable error messages. No silent data loss.
