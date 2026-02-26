@@ -165,6 +165,6 @@ This mirrors `cd -` and `git checkout -` conventions — a single character to g
 - [x] Stash tag appears after relative time in worktree list.
 - [x] Config panel offers immediate slot adjustment after `slot_count` change.
 - [x] `wt -` navigates to the most recently used worktree.
-- [ ] All existing tests still pass (`pnpm test`).
-- [ ] No type errors (`pnpm tsc --noEmit`).
-- [ ] `pnpm build` succeeds and binary reflects all changes.
+- [x] All existing tests still pass (`pnpm test`).
+- [x] No type errors (`pnpm tsc --noEmit`).
+- [x] `pnpm build` succeeds and binary reflects all changes.

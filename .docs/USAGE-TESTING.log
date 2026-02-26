@@ -1,3 +1,14 @@
 # Usage Testing Log
 
 Previous test runs archived to `.docs/archive/USAGE-TESTING.log`.
+
+## 2026-02-26T04:20:00Z
+
+Location: ~/wt-usage-tests/2026-02-26T04-20-00/
+Tests performed:
+- `wt init <remote-url>`: init from a local bare repo used as remote — verified slot summary (5 slots, one on main, four vacant) and shell integration hint printed correctly
+- `wt list`: verified tabular output shows slot name, branch, status, pinned flag, and last-used timestamp
+- `wt -` (resume command): checked out feature/login then feature/signup; ran `wt -` — correctly navigated to most-recently-used slot (onyx-algae-wood / feature/signup), nav file written to correct path
+- Shell integration: `wt shell-init bash` outputs valid `wt()` function; nav file written by binary at `/tmp/wt-nav-<ppid>`; checkout prints "wt: Navigating to <dir>"
+- Reconciliation: directly ran `git checkout -b local-only-branch` inside gravel-puffin-wynd slot (bypassing wt); subsequent `wt list` silently updated state to show local-only-branch — no errors, no warnings
+Result: PASS
