@@ -101,6 +101,8 @@ export async function saveStash(
     status: "active",
   };
 
+  // BUG-032: ensure .wt/stashes/ exists in case it was deleted after init
+  await mkdir(join(wtDir, "stashes"), { recursive: true });
   await writeFile(
     stashFilePath(wtDir, branch),
     stringify(serializeMetadata(meta)),

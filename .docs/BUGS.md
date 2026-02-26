@@ -208,7 +208,7 @@ VISION.md §15.3: git errors pass through verbatim — satisfied. The issue is t
 
 ## BUG-032: Missing `.wt/stashes/` directory causes raw ENOENT crash on dirty eviction
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-26T09:18:12Z
 **Test run**: ~/wt-usage-tests/2026-02-26T09-18-12Z/
 
