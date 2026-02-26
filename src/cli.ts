@@ -22,7 +22,20 @@ import { runList } from "./commands/list.js";
 import { runPin, runUnpin } from "./commands/pin.js";
 import { runClean } from "./commands/clean.js";
 import { runHooksShow } from "./commands/hooks.js";
+import { runResume } from "./commands/resume.js";
 import { findContainer } from "./core/container.js";
+
+// `wt -` is a shorthand for `wt resume`. Handle before yargs parses it,
+// since `.strict()` would reject `-` as an unknown command.
+if (process.argv[2] === "-") {
+  try {
+    await runResume();
+  } catch (err: unknown) {
+    process.stderr.write(`wt: ${(err as Error).message}\n`);
+    process.exit(1);
+  }
+  process.exit(0);
+}
 
 // When invoked with no arguments, launch the TUI (if inside a container)
 // or show help (if outside).
@@ -239,6 +252,18 @@ const cli = yargs(hideBin(process.argv))
     async (argv) => {
       try {
         await runUnpin(argv.slot as string | undefined);
+      } catch (err: unknown) {
+        handleCliError(err);
+      }
+    }
+  )
+  .command(
+    "resume",
+    "Navigate to the most recently used worktree (like cd -)",
+    () => {},
+    async () => {
+      try {
+        await runResume();
       } catch (err: unknown) {
         handleCliError(err);
       }
