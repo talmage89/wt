@@ -162,7 +162,7 @@ This mirrors `cd -` and `git checkout -` conventions — a single character to g
 - [x] Worktree menu renders instantly without "Loading..." flash.
 - [x] `wt checkout -b` validates before evicting.
 - [x] Fetch cooldown prevents redundant fetches (default 10 min).
-- [ ] Stash tag appears after relative time in worktree list.
+- [x] Stash tag appears after relative time in worktree list.
 - [ ] Config panel offers immediate slot adjustment after `slot_count` change.
 - [ ] `wt -` navigates to the most recently used worktree.
 - [ ] All existing tests still pass (`pnpm test`).

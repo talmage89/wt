@@ -547,14 +547,14 @@ export function WorktreePanel({ paths, onBack }: Props) {
                 {entry.slotName && (
                   <Text dimColor>  {entry.slotName}</Text>
                 )}
-                {entry.hasStash && (
-                  <Text color="yellow">  [stash]</Text>
-                )}
                 {entry.lastUsedAt && (
                   <>
                     <Text dimColor>  </Text>
                     <RelativeTime isoDate={entry.lastUsedAt} dimColor />
                   </>
+                )}
+                {entry.hasStash && (
+                  <Text color="yellow">  [stash]</Text>
                 )}
               </Box>
             );
