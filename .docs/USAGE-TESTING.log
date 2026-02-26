@@ -44,3 +44,14 @@ Tests performed:
 - `wt checkout remote-only-branch` (branch exists only on remote): checkout succeeded, git DWIM created local tracking branch — but "Created local branch remote-only-branch from origin/remote-only-branch" message was NOT printed (BUG-029)
 Result: BUG FOUND
 Bug: BUG-029 — "Created local branch" message missing when remote-only branch checkout succeeds via git DWIM
+
+## 2026-02-26T09:00:00Z
+
+Location: ~/wt-usage-tests/2026-02-26T09-00-00/
+Tests performed:
+- Symlink shared file creation: configured `directories = ["configs"]`, placed `.wt/shared/configs/app.env`, ran `wt sync` — symlinks created correctly in all 5 slots (`configs/app.env -> ../../.wt/shared/configs/app.env`)
+- Git-tracked file takes precedence over symlink: created `feature/gamma` branch with `configs/app.env` as a git-tracked file; `wt checkout feature/gamma` removed the pre-existing symlink (via `removeSymlinks` step 9), git placed the tracked file, then `establishSymlinks` detected the file was tracked and skipped creating the symlink (printed "Skipping symlink for configs/app.env: file is tracked by git in branch feature/gamma.") — result: slot has the branch-specific tracked file, not the shared symlink
+- Template expansion: configured `[[templates]]` with `source = "build.sh.template"`, `target = "build.sh"`, variables `{{BRANCH_NAME}}` and `{{WORKTREE_DIR}}`; `wt sync` generated `build.sh` correctly in all slots with branch-specific values; vacant slot gets empty `{{BRANCH_NAME}}`
+- Reconciliation with deleted slot dir: manually `rm -rf bolt-mild-lucid`; ran `wt list` — reconcile detected missing slot, silently ran `git worktree add` to create a new slot (`newt-flume-larch`), maintaining the configured 5-slot count; no crash, clean output
+- Broken symlink cleanup: deleted canonical `.wt/shared/configs/app.env` file; ran `wt sync` — all broken symlinks in all slots were removed correctly
+Result: PASS
