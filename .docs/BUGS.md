@@ -74,7 +74,7 @@ VISION.md section 3.2 (Checkout Output):
 
 ## BUG-030: "Created local branch from origin/X" message appears incorrectly for local-only branches
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-26T20:00:00Z
 **Test run**: ~/wt-usage-tests/2026-02-26T20-00-00/
 

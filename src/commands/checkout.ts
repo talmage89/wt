@@ -233,8 +233,13 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
       await git.checkout(worktreeDir, options.branch);
       // git's DWIM behavior creates a local tracking branch when a remote-only
       // branch is checked out. Detect this case using the pre-check result.
+      // BUG-030: also verify a remote tracking ref exists — without this check,
+      // locally-created branches and no-remote repos trigger a false positive.
       if (!localBranchExistedBefore) {
-        branchCreatedFromRemote = true;
+        const remoteExists = await git.remoteBranchExists(paths.repoDir, options.branch);
+        if (remoteExists) {
+          branchCreatedFromRemote = true;
+        }
       }
     } catch (err) {
       checkoutError = err;
