@@ -2,6 +2,17 @@
 
 Previous test runs archived to `.docs/archive/USAGE-TESTING.log`.
 
+## 2026-02-27T07:00:00Z
+
+Location: ~/wt-usage-tests/2026-02-27T07-00-00Z/
+Tests performed:
+- Checkout already-in-slot branch from different directory: `wt checkout feature/alpha` when feature/alpha is already in sheer-tern-pebble — navigates to existing slot without eviction or stash; prints "wt: Checked out feature/alpha in sheer-tern-pebble" only
+- Checkout current branch from within its slot: `wt checkout main` from inside the main slot (bale-vista-bold) — no-op navigation, prints "wt: Checked out main in bale-vista-bold", no eviction
+- `--no-restore` then manual `wt stash apply` flow: evicted feature/alpha with dirty state (creating stash), re-checked-out with `--no-restore` (stash preserved, working tree clean), then `wt stash apply feature/alpha` — stash applied, dirty state restored (alpha.txt modified + untracked.txt), stash cleaned up
+- Multiple evictions of same branch (stash overwrite): evicted feature/alpha (stash #1 created), checked out with `--no-restore` (stash preserved), added new dirty state, evicted again — stash #1 silently overwritten by stash #2; restored stash contains latest dirty state only; old stash #1 data (original untracked.txt) is lost without warning — this is by design per current implementation
+- `wt init <url>` into dotfile-only directory: directory with single `.gitkeep` file — correctly rejected with "Directory is not empty" error; directory remains clean with no partial `.wt/` created
+Result: PASS
+
 ## 2026-02-26T04:20:00Z
 
 Location: ~/wt-usage-tests/2026-02-26T04-20-00/
