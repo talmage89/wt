@@ -75,3 +75,14 @@ Tests performed:
 - Stash restore with conflicts (VISION §5.2, §15.2): created stash at commit e9de83f with `conflict-file.txt` modifications; then advanced local branch to a new commit (3d90e0a) where `conflict-file.txt` has conflicting content; re-checkout triggered stash apply failure — wt printed "wt: Stash for conflict-test produced conflicts. Resolve manually." and "wt: Run 'wt stash drop conflict-test' after resolution, or 'wt stash show conflict-test' to inspect."; checkout succeeded (exit 0), conflict markers visible in working tree, stash retained (not deleted) — correct per spec
 - `wt init` from inside existing repo (VISION §2.1): created plain git repo with README.md and one commit; ran `wt init` (no URL) from inside — `.git/` moved to `.wt/repo/`, 5 worktree slots created, active slot (`wide-pearl-ridge`) has `main` checked out with README.md; container root has no `.git` and no working files (correct); shell integration hint printed
 Result: PASS
+
+## 2026-02-26T12:00:00Z
+
+Location: ~/wt-usage-tests/2026-02-26T12-00-00/
+Tests performed:
+- `wt init <url>` into non-empty non-git directory (VISION §15.1): created dir with single dotfile `.envrc`, ran `wt init <url>` — correctly failed with "Directory is not empty. Use 'wt init' from inside an existing repository, or run from an empty directory." (exit 1), no partial state left
+- Evict all slots in sequence — stash accumulation (VISION §5.1): checked out 5 branches filling all slots, dirtied each with staged + untracked files, then triggered 5 sequential evictions via new checkouts — all 5 stash metadata TOML files accumulated in `.wt/stashes/`; `wt stash list` showed all 5 entries; re-checkout of branch-1 correctly restored staged and untracked files (newly-staged files restore as staged, consistent with git stash apply behavior)
+- `wt -` from container directory vs. outside container (VISION §9, Phase 1 §1.9): from container root (outside any slot), `wt -` navigated to MRU slot correctly; from unrelated directory (`/tmp`), `wt -` correctly failed with "Not inside a wt-managed container." (exit 1) — expected since no container to infer
+- Modify template source + `wt sync` regenerates all slots (VISION §7.4): created `templates/app.env` with `{{BRANCH_NAME}}` and `{{WORKTREE_DIR}}` variables, configured in `.wt/config.toml`; `wt sync` generated `.env` in all 5 slots; modified template source (changed APP_ENV and added DB_HOST); second `wt sync` regenerated all 5 `.env` files with new content — all slots updated correctly
+- Unpin and immediately evict (VISION §11): pinned MRU slot, dirtied it, then unpinned; subsequent checkouts drove LRU selection; when slot finally became LRU candidate it was evicted with "dirty state stashed" message; `wt stash list` confirmed stash entry created for the formerly-pinned branch — pin removal correctly restores LRU eligibility
+Result: PASS
