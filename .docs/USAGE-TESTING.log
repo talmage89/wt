@@ -2,6 +2,23 @@
 
 Previous test runs archived to `.docs/archive/USAGE-TESTING.log`.
 
+## 2026-02-26T08:30:00Z
+
+Location: ~/wt-usage-tests/2026-02-27T18-00-00Z/
+Tests performed:
+- `wt -` (resume) from container directory — correctly navigated to MRU slot (feature/dashboard in thrush-notch-swamp). ✓
+- `wt -` from within MRU slot — correctly printed "Already in the most recently used worktree (feature/dashboard in thrush-notch-swamp)" and exited 0. ✓
+- `wt -` from completely outside container (/tmp) — correctly printed "Not inside a wt-managed container." and exited 1. ✓
+- `wt -` when all slots are vacant (detached all slots manually) — correctly printed "No worktree slots are currently in use." and exited 1. ✓
+- `wt checkout -b main` (branch already exists) — pre-validation correctly rejected before eviction: "Branch 'main' already exists." exit 1. Slot state unchanged. ✓
+- `wt checkout -b feature/auth` (branch already exists) — same pre-validation rejection. ✓
+- `wt checkout -b new-feature bad-sha-that-doesnt-exist` — git error passed through verbatim: "fatal: Needed a single revision" exit 128. No eviction occurred. ✓
+- `wt stash show feature/auth` when no stash exists — "No stash found for branch 'feature/auth'." exit 1. ✓
+- `wt stash apply feature/auth` when branch not in any slot (but stash exists) — "Branch 'feature/auth' is not checked out in any slot. Run 'wt checkout feature/auth' first." exit 1. ✓
+- Stash auto-restore on checkout: created dirty state in feature/auth (1 modified + 1 untracked file), evicted via LRU checkout, stash created. Checked out feature/auth: evicted main, restored stash ("Restored stash from 1 minute ago"), verified both files present, stash list now empty. ✓
+- Fetch cooldown: cooldown=10min; second checkout within seconds correctly skipped fetch (timestamp unchanged). Setting `fetch_cooldown_minutes=0` caused immediate re-fetch on next checkout (timestamp updated). ✓
+Result: PASS
+
 ## 2026-02-27T05:30:00Z
 
 Location: ~/wt-usage-tests/2026-02-27T05-30-00Z/
