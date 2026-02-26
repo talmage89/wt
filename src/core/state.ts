@@ -1,5 +1,6 @@
 import { parse, stringify } from "smol-toml";
 import { readFile, writeFile } from "fs/promises";
+import { readFileSync } from "fs";
 import { join } from "path";
 
 export interface SlotState {
@@ -29,20 +30,9 @@ export function defaultState(): State {
 }
 
 /**
- * Read state from .wt/state.toml. Returns defaultState() if file is missing.
+ * Parse a raw TOML string into a State object.
  */
-export async function readState(wtDir: string): Promise<State> {
-  const statePath = join(wtDir, "state.toml");
-  let raw: string;
-  try {
-    raw = await readFile(statePath, "utf8");
-  } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-      return defaultState();
-    }
-    throw err;
-  }
-
+function parseStateRaw(raw: string): State {
   let parsed: Record<string, unknown>;
   try {
     parsed = parse(raw) as Record<string, unknown>;
@@ -92,6 +82,41 @@ export async function readState(wtDir: string): Promise<State> {
   }
 
   return { slots, branch_history };
+}
+
+/**
+ * Read state from .wt/state.toml. Returns defaultState() if file is missing.
+ */
+export async function readState(wtDir: string): Promise<State> {
+  const statePath = join(wtDir, "state.toml");
+  let raw: string;
+  try {
+    raw = await readFile(statePath, "utf8");
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return defaultState();
+    }
+    throw err;
+  }
+  return parseStateRaw(raw);
+}
+
+/**
+ * Read state from .wt/state.toml synchronously. Returns defaultState() if file is missing.
+ * Use only in TUI initialization paths where async is not available.
+ */
+export function readStateSync(wtDir: string): State {
+  const statePath = join(wtDir, "state.toml");
+  let raw: string;
+  try {
+    raw = readFileSync(statePath, "utf8");
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return defaultState();
+    }
+    throw err;
+  }
+  return parseStateRaw(raw);
 }
 
 /**

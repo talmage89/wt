@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Box, Text, useInput, useApp } from "ink";
 import { join } from "path";
 import type { ContainerPaths } from "../core/container.js";
-import { readState, writeState } from "../core/state.js";
+import { readState, readStateSync, writeState } from "../core/state.js";
+import type { State } from "../core/state.js";
 import { reconcile } from "../core/reconcile.js";
 import { getStash, showStash } from "../core/stash.js";
 import * as git from "../core/git.js";
@@ -24,6 +25,46 @@ type Mode = "list" | "search" | "status" | "diff" | "checking_out" | "new_branch
 interface Props {
   paths: ContainerPaths;
   onBack: () => void;
+}
+
+/**
+ * Build a fast initial entry list from state.toml alone — no git operations.
+ * Dirty status is unknown at this point (shown as clean until the full load arrives).
+ */
+function buildInitialEntries(state: State): BranchEntry[] {
+  const entries: BranchEntry[] = [];
+  const activeBranches = new Set<string>();
+
+  for (const [slotName, slot] of Object.entries(state.slots)) {
+    if (slot.branch !== null) {
+      activeBranches.add(slot.branch);
+      entries.push({
+        branch: slot.branch,
+        tier: slot.pinned ? "pinned" : "active",
+        slotName,
+        dirty: false,
+        lastUsedAt: slot.last_used_at,
+      });
+    }
+  }
+
+  for (const histEntry of state.branch_history) {
+    if (!activeBranches.has(histEntry.branch)) {
+      entries.push({
+        branch: histEntry.branch,
+        tier: "inactive",
+        lastUsedAt: histEntry.last_checkout_at,
+      });
+    }
+  }
+
+  entries.sort((a, b) => {
+    const aTime = a.lastUsedAt ? new Date(a.lastUsedAt).getTime() : 0;
+    const bTime = b.lastUsedAt ? new Date(b.lastUsedAt).getTime() : 0;
+    return bTime - aTime;
+  });
+
+  return entries;
 }
 
 async function loadBranchData(paths: ContainerPaths): Promise<BranchEntry[]> {
@@ -113,8 +154,13 @@ async function loadBranchData(paths: ContainerPaths): Promise<BranchEntry[]> {
 export function WorktreePanel({ paths, onBack }: Props) {
   const { exit } = useApp();
   const [mode, setMode] = useState<Mode>("list");
-  const [entries, setEntries] = useState<BranchEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [entries, setEntries] = useState<BranchEntry[]>(() => {
+    try {
+      return buildInitialEntries(readStateSync(paths.wtDir));
+    } catch {
+      return [];
+    }
+  });
   const [selectedIdx, setSelectedIdx] = useState(0);
 
   // Search state
@@ -134,23 +180,19 @@ export function WorktreePanel({ paths, onBack }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [checkoutBranch, setCheckoutBranch] = useState<string | null>(null);
 
-  // Load data on mount
+  // Load full data on mount (git status, reconcile, local branches) — update in background
   useEffect(() => {
     loadBranchData(paths)
       .then((data) => {
         setEntries(data);
-        setLoading(false);
       })
       .catch((err: unknown) => {
         setError(String(err));
-        setLoading(false);
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Poll for live updates every 2 seconds (starts after initial load)
+  // Poll for live updates every 2 seconds
   useEffect(() => {
-    if (loading) return;
-
     const id = setInterval(() => {
       loadBranchData(paths)
         .then((newData) => {
@@ -164,7 +206,7 @@ export function WorktreePanel({ paths, onBack }: Props) {
     }, 2000);
 
     return () => clearInterval(id);
-  }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Filtered branches for search
   const filteredBranches = searchQuery
@@ -175,15 +217,12 @@ export function WorktreePanel({ paths, onBack }: Props) {
 
   const reload = () => {
     setError(null);
-    setLoading(true);
     loadBranchData(paths)
       .then((data) => {
         setEntries(data);
-        setLoading(false);
       })
       .catch((err: unknown) => {
         setError(String(err));
-        setLoading(false);
       });
   };
 
@@ -386,17 +425,6 @@ export function WorktreePanel({ paths, onBack }: Props) {
         </Box>
         <Box marginTop={1}>
           <Text dimColor>Press any key to continue, q to quit</Text>
-        </Box>
-      </Box>
-    );
-  }
-
-  if (loading) {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Text bold>Manage Worktrees</Text>
-        <Box marginTop={1}>
-          <Text dimColor>Loading...</Text>
         </Box>
       </Box>
     );

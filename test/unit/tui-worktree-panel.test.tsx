@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock all I/O dependencies before importing the component
 vi.mock("../../src/core/state.js", () => ({
   readState: vi.fn(),
+  readStateSync: vi.fn(),
   writeState: vi.fn(),
 }));
 vi.mock("../../src/core/reconcile.js", () => ({
@@ -24,7 +25,7 @@ vi.mock("../../src/commands/checkout.js", () => ({
 }));
 
 import { WorktreePanel } from "../../src/tui/WorktreePanel.js";
-import { readState } from "../../src/core/state.js";
+import { readState, readStateSync } from "../../src/core/state.js";
 import { reconcile } from "../../src/core/reconcile.js";
 import { getStash } from "../../src/core/stash.js";
 import * as gitMod from "../../src/core/git.js";
@@ -46,18 +47,20 @@ describe("WorktreePanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(readState).mockResolvedValue(emptyState);
+    vi.mocked(readStateSync).mockReturnValue(emptyState);
     vi.mocked(reconcile).mockImplementation(async (_, __, state) => state);
     vi.mocked(getStash).mockResolvedValue(null);
     vi.mocked(gitMod.status).mockResolvedValue("");
   });
 
-  it("shows loading state on first render", () => {
+  it("renders the list immediately without a loading flash", () => {
     const { lastFrame } = render(
       <WorktreePanel paths={mockPaths} onBack={() => {}} />
     );
     const frame = lastFrame() ?? "";
     expect(frame).toContain("Manage Worktrees");
-    expect(frame).toContain("Loading...");
+    // Must never show a loading placeholder — the list is available on first render
+    expect(frame).not.toContain("Loading...");
   });
 
   it("shows empty state after loading completes with no data", async () => {
