@@ -594,6 +594,16 @@ Tests performed:
 Result: PASS
 Result: PASS
 
+## 2026-02-26T56-00-00Z
+
+Location: ~/wt-usage-tests/2026-02-26T56-00-00Z/
+Tests performed:
+- BUG-032 fix verification — missing `.wt/stashes/` dir on dirty eviction (VISION §5.1): deleted `.wt/stashes/` entirely after filling all 5 slots; triggered dirty eviction of `main` (had modified README.md + untracked file) by checking out `br-e`; eviction printed "wt: Evicted main from golden-raven-merlin (dirty state stashed)" (exit 0); `.wt/stashes/` auto-recreated (confirmed with `ls`); `main.toml` stash metadata file written; `wt stash list` showed main stash correctly — BUG-032 fix confirmed: `mkdir({recursive:true})` in `saveStash()` transparently recreates the stashes directory, no ENOENT crash ✓
+- Branch with `%` in name (`feat%bugfix`) end-to-end (VISION §3.1, §5): pushed `feat%bugfix` to remote; `wt checkout feat%bugfix` → "wt: Created local branch feat%bugfix from origin/feat%bugfix" (exit 0); added dirty state (modified README.md + untracked `percent-untracked.txt`); triggered dirty eviction → stash file created as `feat%25bugfix.toml` (`%` encoded as `%25`); git ref `refs/wt/stashes/feat%25bugfix`; `wt stash list` displayed `feat%bugfix` correctly (decoded); `wt stash show feat%bugfix` showed full diff (modified README.md + untracked file); `wt checkout feat%bugfix` auto-restored stash — modified README.md and untracked file both present; stash list cleared; `%` in branch names is percent-encoded to `%25` in filenames/refs, decode round-trip is correct end-to-end ✓
+- Stale lock file as regular file (VISION §15.2): created `.wt/lock` as regular file (`echo "12345" > .wt/lock`); ran `wt checkout main` → "wt: Another wt operation is in progress. If this is stale, remove .wt/lock." (exit 1); clear, actionable message; then `rm .wt/lock` and retry `wt checkout main` → succeeded (exit 0) with stash auto-restore for main branch; stale lock as regular file correctly blocks all operations until removed ✓
+- `wt sync` from deeply nested subdirectory inside a worktree slot (VISION §6, §7): configured `[shared] directories = ["configs"]` and `[[templates]]` entry; created `stag-cairn-stem/src/components/ui/` subdirectory; ran `node wt.mjs sync` from within `stag-cairn-stem/src/components/ui/` (4 levels deep inside a slot); sync completed (exit 0); all 5 slots got `configs/app.env → ../../.wt/shared/configs/app.env` symlink and `info.sh` template with correct branch names; container discovery via parent-walk works from deeply nested paths inside slots, sync operates correctly from any depth ✓
+Result: PASS
+
 ## 2026-02-26T55-00-00Z
 
 Location: ~/wt-usage-tests/2026-02-26T55-00-00Z/
