@@ -531,6 +531,17 @@ Tests performed:
 - `wt stash list` with mix of active and archived stashes (VISION §5.2.1): archived stash for `br-e` (20d ago, no remote) + active stash for `br-f` (just now); `wt stash list` displayed both in one table with correct Status column — `br-e` shows "archived" and 20d-ago age, `br-f` shows "active" and "just now" age; display format clearly distinguishes active vs archived, sorted by branch name; exit 0 ✓
 Result: PASS
 
+## 2026-02-26T10:20:52Z
+
+Location: ~/wt-usage-tests/2026-02-26T10-20-52Z/
+Tests performed:
+- `wt checkout --no-restore` when no stash exists for the branch (VISION §3.1 step 7): checked out `feature/alpha` with `--no-restore` flag when there was no stash for the branch — checkout succeeded cleanly ("wt: Checked out feature/alpha in river-elk-sable", "wt: Created local branch feature/alpha from origin/feature/alpha"), no stash-related messages or errors, exit 0; `wt stash list` showed "No saved stashes." — `--no-restore` with no stash is a clean no-op with no error ✓
+- `wt sync` with missing template source file (VISION §7): configured `[[templates]]` with `source = "templates/nonexistent-source.sh"` pointing to a nonexistent file; ran `wt sync` — printed "wt: template source not found: <full-path>" once per slot (5 times total); exit 0 (partial success — sync continues for other templates/symlinks); error message includes the full absolute path, making it clear where the file should be placed; consistent with non-fatal partial-sync design ✓
+- `wt checkout` of branch already checked out in a pinned slot (VISION §3.1 step 3, §11): pinned `river-elk-sable` (which held `feature/alpha`); ran `wt checkout feature/alpha` — correctly short-circuited at step 3 ("branch already in a slot"), navigated to `river-elk-sable` with message "wt: Checked out feature/alpha in river-elk-sable", no eviction attempted, no error about pinned slot; VISION §3.1 step 3 fires before step 4 (slot selection), so pinned status of the target slot is irrelevant ✓
+- `wt init` from a git repo with detached HEAD (VISION §2.1): created a git repo (`main`, `other-branch`) and detached HEAD at `main`'s tip; ran `wt init` from inside — 5 slots created, ALL vacant (no starting branch to check out, since HEAD was detached); no crash, no error, exit 0; init summary showed all 5 slots as "(vacant)"; subsequent `wt checkout main` succeeded ("wt: Checked out main in late-egret-lamb", exit 0); no "Created local branch" message (local-only repo, no remote — remoteBranchExists guard fires correctly); detached-HEAD init degrades gracefully to all-vacant state ✓
+- `wt sync` with nested subdirectories in shared canonical dir (VISION §6): created `.wt/shared/configs/top.env` and `.wt/shared/configs/subdir/nested.env` + `subdir/deep.env`; configured `[shared] directories = ["configs"]`; ran `wt sync` — in each slot: `configs/top.env` symlinked as `slot/configs/top.env -> ../../.wt/shared/configs/top.env`; `configs/subdir/` created as a real directory; `configs/subdir/nested.env` and `configs/subdir/deep.env` symlinked with correct depth-adjusted relative paths (`../../../.wt/shared/configs/subdir/nested.env`); works in both active and vacant slots; exit 0; per-file recursive symlink creation correctly handles nested subdirectory trees ✓
+Result: PASS
+
 ## 2026-02-28T18:00:00Z
 
 Location: ~/wt-usage-tests/2026-02-28T18-00-00Z/
