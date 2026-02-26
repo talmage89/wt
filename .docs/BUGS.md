@@ -269,7 +269,7 @@ VISION.md §15.1: `wt` should produce clear, actionable error messages. A raw EN
 
 ## BUG-033: `wt stash show` emits raw ENOENT when archived stash patch file is missing
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-28T14:00:00Z
 **Test run**: ~/wt-usage-tests/2026-02-28T14-00-00Z/
 
