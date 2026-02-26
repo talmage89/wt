@@ -148,7 +148,12 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
       paths.repoDir,
       `refs/heads/${options.branch}`
     );
-    localBranchExistedBefore = localExists;
+    // BUG-029: bare clone creates refs/heads/* for all remote branches, so
+    // refExists is always true for known branches. Use branch_history to
+    // detect first-time checkout (i.e., "created from remote").
+    localBranchExistedBefore = state.branch_history.some(
+      (e) => e.branch === options.branch
+    );
     if (!localExists) {
       const remoteExists = await git.remoteBranchExists(
         paths.repoDir,

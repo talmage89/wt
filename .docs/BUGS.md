@@ -6,7 +6,7 @@ Next bug number: **BUG-030**
 
 ## BUG-029: "Created local branch" message missing on remote-only branch checkout
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-26T07:30:00Z
 **Re-opened**: 2026-02-26T13:00:00Z (prior fix ineffective — see updated root cause below)
 **Test run**: ~/wt-usage-tests/2026-02-26T07-30-00/, ~/wt-usage-tests/2026-02-26T13-00-00/
