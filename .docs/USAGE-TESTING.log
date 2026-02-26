@@ -23,3 +23,14 @@ Tests performed:
 - Slot count increase via config: edited `.wt/config.toml` directly (slot_count 5→7), ran `wt list` — two new vacant slots created immediately (tundra-loam-brisk, lupine-rustic-ruby) with `git worktree add` printed to terminal
 - `wt checkout -b` pre-validation: tried `wt checkout -b main` (existing branch) → "wt: Branch 'main' already exists." with exit 1, no eviction; tried `wt checkout -b new-branch nonexistent-sha` → git fatal error with exit 128, no eviction
 Result: PASS
+
+## 2026-02-26T06:30:00Z
+
+Location: ~/wt-usage-tests/2026-02-26T06-30-00/
+Tests performed:
+- Stash commands (list/show/drop + error cases): created dirty state (staged + untracked), triggered eviction, verified `wt stash list` shows entry; `wt stash show <branch>` displays full diff including untracked files; `wt stash show <branch-with-no-stash>` returns "No stash found" with exit 1; `wt stash apply <nonexistent-branch>` returns "No stash found" with exit 1; `wt stash drop <branch>` prompts for confirmation, drops stash on `y`; list shows empty after drop
+- `wt checkout --no-restore` + manual apply: evicted branch with dirty state (staged README.md + untracked file), then checked it back out with `--no-restore` — dirty state was NOT restored (clean working tree), stash entry was preserved; `wt stash apply <branch>` then successfully restored all changes; note: staged change is restored as unstaged after apply (standard git behavior without --index, per spec)
+- Slot count decrease via config (5→3): edited config directly, ran `wt list` — 2 LRU slots (puffin-hoar-silent/main, clam-spur-dune/br-a) were silently evicted, directories removed, 3 slots remain
+- Slot count decrease below pinned count: pinned all 3 remaining slots, decreased slot_count to 2 → error "Cannot reduce slot count to 2: 3 worktrees are pinned. Unpin worktrees first or choose a higher count." with exit 1, no eviction
+- Fetch cooldown: first checkout records `last_fetch_at` in state.toml; second checkout within 10 min does NOT update timestamp (fetch skipped); explicit `wt fetch` always runs and updates timestamp; setting `fetch_cooldown_minutes = 0` in config causes every checkout to fetch
+Result: PASS
