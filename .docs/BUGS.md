@@ -2,7 +2,7 @@
 
 Bug numbers continue from the archived log. See `.docs/archive/BUGS.md` for BUG-001 through BUG-028.
 
-Next bug number: **BUG-031**
+Next bug number: **BUG-032**
 
 ## BUG-029: "Created local branch" message missing on remote-only branch checkout
 
@@ -139,3 +139,67 @@ wt checkout feature/local-only
 
 VISION.md section 3.2 (Checkout Output):
 > The "Created local branch" line appears only when a new branch was created from remote.
+
+---
+
+## BUG-031: `wt init <url>` leaves partial `.wt/` directory on clone failure, blocking retry
+
+**Status**: open
+**Found**: 2026-02-27T01:00:00Z
+**Test run**: ~/wt-usage-tests/2026-02-27T01-00-00/
+
+### Description
+
+When `wt init <url>` is run and the git clone fails (e.g., bad URL, network error, auth failure), the `.wt/` directory structure has already been created before the clone attempt. The clone failure leaves a partial `.wt/` tree behind. Any subsequent `wt init <corrected-url>` in the same directory immediately fails with "Directory is not empty" because the partial `.wt/` makes the directory non-empty. The user is stuck and must manually `rm -rf .wt` before retrying.
+
+### Root cause
+
+In `src/commands/init.ts`, `initFromUrl()` calls `createContainerStructure(containerDir)` (line 194) to create the `.wt/` directory tree before running `git.cloneBare(url, repoDir)` (line 200). If the clone fails, the already-created `.wt/` directories are never cleaned up.
+
+```typescript
+// .wt/ is created here:
+const wtDir = await createContainerStructure(containerDir);
+const repoDir = join(wtDir, "repo");
+
+// If this throws (e.g. bad URL), .wt/ is left behind:
+await git.cloneBare(url, repoDir);
+```
+
+The non-empty directory check at line 186 correctly rejects non-empty dirs before init, but a subsequent retry hits this check because the partial `.wt/` from the failed attempt is still present.
+
+### Correct fix
+
+Wrap the clone (and all subsequent work) in a try/catch. On any error after `createContainerStructure`, remove the `.wt/` directory before re-throwing:
+
+```typescript
+const wtDir = await createContainerStructure(containerDir);
+const repoDir = join(wtDir, "repo");
+
+try {
+  await git.cloneBare(url, repoDir);
+  // ... rest of initFromUrl ...
+} catch (err) {
+  // Clean up partial .wt/ so the user can retry
+  await rm(wtDir, { recursive: true, force: true });
+  throw err;
+}
+```
+
+### Reproduction
+
+```bash
+mkdir test-dir && cd test-dir
+wt init http://not-a-real-git-repo.invalid/nonexistent.git
+# Expected: fails with git error, directory remains usable for retry
+# Actual: fails with git error AND leaves .wt/ behind
+
+wt init https://github.com/real/repo.git
+# Expected: succeeds (or fails for a different reason)
+# Actual: "Directory is not empty. Use 'wt init' from inside an existing repository..."
+```
+
+### Vision reference
+
+VISION.md §2.2 (Init from URL): the directory must be empty before init. After a failed clone, the directory is no longer empty, trapping the user.
+
+VISION.md §15.3: git errors pass through verbatim — satisfied. The issue is the unrecoverable partial state left behind.
