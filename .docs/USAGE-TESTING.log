@@ -116,3 +116,14 @@ Tests performed:
 - `wt` with no args outside managed container (VISION §8): ran from `/tmp` — printed full CLI help listing all commands with descriptions and aliases; exit code 0 — correct behavior per spec ("display help/usage" when not inside managed container)
 - Container discovery from deeply nested subdirectory (VISION §1, implicit): created `stoat-sharp-meadow/src/components/ui/buttons/`; ran `wt ls`, `wt stash list`, and `wt checkout main` from within — all correctly found the container by walking up the directory tree; `wt checkout main` navigated to `peat-gull-vivid` (already had main) without eviction — container discovery via parent-walk works at arbitrary depth
 Result: PASS
+
+## 2026-02-26T17:00:00Z
+
+Location: ~/wt-usage-tests/2026-02-26T17-00-00/
+Tests performed:
+- `wt pin` / `wt unpin` with no arg from within a worktree (VISION §11): from within `hart-ember-pitch` (branch: main), ran `wt pin` with no argument — correctly auto-detected current slot, printed "Pinned 'hart-ember-pitch' (branch: main). It will not be evicted.", pin flag visible in `wt list`; `wt unpin` (no arg) correctly cleared pin flag — both commands auto-detect slot from cwd when no argument given
+- `wt stash show` with no arg (VISION §5.2.1): checked out `br-b` with `--no-restore` (stash retained); from within `br-b`'s slot ran `wt stash show` (no arg) — defaulted to current branch `br-b`, displayed full stash diff including staged file and untracked file, exit 0; also tested error case: from main's slot after stash auto-restored, `wt stash show` (no arg) returned "No stash found for branch 'main'" with exit 0 — both cases correct
+- `wt shell-init zsh` (VISION §4.1): output is syntactically valid (bash -n check passes); exports `WT_SHELL_INTEGRATION=1`; defines `wt()` function; includes nav file mechanism (`/tmp/wt-nav-$$`) and post-checkout hook execution; output is identical to bash shell-init (POSIX-compatible, valid for zsh)
+- Clean eviction — no dirty state → no stash created (VISION §5.1): evicted `br-d` (clean slot) by checking out `br-g`; eviction message "wt: Evicted br-d from brisk-pool-snipe" had NO "(dirty state stashed)" suffix; stash list unchanged (no new entry for br-d); VISION §5.1 requirement "If the worktree has no dirty state, no stash is created" confirmed
+- `wt sync` with no shared dirs or templates configured (VISION §6.4): config has `directories = []` and no `[[templates]]` entries; ran `wt sync` — completed cleanly with no output, exit 0; no stray files created in `.wt/shared/` or `.wt/templates/` — graceful no-op confirmed
+Result: PASS
