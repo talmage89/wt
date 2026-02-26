@@ -497,6 +497,18 @@ Tests performed:
 - BUG-032 fix extension -- `.wt/stashes/archive/` auto-creation during archival: had stash for `feature/archive-dir-test` (aged 20 days, remote branch not present); `.wt/stashes/archive/` did NOT exist; ran `wt fetch` -- archival triggered: "Warning: zstd not found. Archived stash stored uncompressed." then "Archived 1 stash(es): feature/archive-dir-test"; `.wt/stashes/archive/` auto-created, `feature--archive-dir-test.patch` written; `wt stash list` shows "archived" status; BUG-032 fix (`mkdir(archiveDir, { recursive: true })` before writing archive file) confirmed working for archive subdirectory too
 Result: PASS
 
+## 2026-02-28T14:00:00Z
+
+Location: ~/wt-usage-tests/2026-02-28T14-00-00Z/
+Tests performed:
+- `wt init` from inside a managed slot without URL (VISION §2.1): ran `wt init` from inside `flat-grain-wide` — correctly printed "wt: Not a git repository root. Run 'wt init' from a regular git repository, not inside a worktree slot." (exit 1); no partial state created; clear, actionable error message ✓
+- `wt init <url>` from inside a managed slot (non-empty dir): ran `wt init <url>` from inside `flat-grain-wide` — correctly printed "wt: Directory is not empty. Use 'wt init' from inside an existing repository, or run from an empty directory." (exit 1); no partial state created ✓
+- `wt list` and `wt checkout` from inside `.wt/` directory (VISION §1): ran `wt list` from `.wt/` — container discovery correctly found the container (`.wt/` is a child of the container root, not a slot), listed all 5 slots; ran `wt checkout main` from `.wt/shared/` — correctly navigated to existing main slot; container discovery works from any subdirectory of the container including `.wt/` metadata dirs ✓
+- Detached HEAD slot with dirty state — eviction behavior (VISION §3.1, §5.1): forced `flat-grain-wide` slot into detached HEAD via `git -C flat-grain-wide checkout --detach HEAD`; added dirty state (modified README.md + untracked.txt); `wt list` showed slot as `(vacant)` (detached HEAD = vacant); triggered eviction by checking out `br-e`; eviction message NOT printed (correct: vacant slot eviction is silent); no stash created for the detached slot (correct: no branch to stash for); dirty state carried over to new checkout (standard git behavior — git preserves unstaged changes when checking out new branch); slot shows as "dirty" after checkout; no data loss, no crash; vacancy check correctly suppresses stash for detached slots ✓
+- `wt stash show` on missing archive patch file (VISION §15.3): archived stash for `br-d` (staged + unstaged + untracked dirty state); deleted `.wt/stashes/archive/br-d.patch`; ran `wt stash show br-d` — emitted raw ENOENT: "wt: ENOENT: no such file or directory, open '.../archive/br-d.patch'" (exit 1); raw Node.js error object exposed, not actionable — BUG-033
+Result: BUG FOUND
+Bug: BUG-033 — `wt stash show` emits raw ENOENT when archived stash patch file is missing
+
 ## 2026-02-28T12:00:00Z
 
 Location: ~/wt-usage-tests/2026-02-28T12-00-00Z/

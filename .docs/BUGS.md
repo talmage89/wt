@@ -264,3 +264,63 @@ wt checkout branch-new
 VISION.md §5.1: stash creation is an integral part of eviction. A missing directory is an infrastructure failure, not a user error — `wt` should recover transparently by recreating managed infrastructure directories.
 
 VISION.md §15.1: `wt` should produce clear, actionable error messages. A raw ENOENT path is neither clear nor actionable.
+
+---
+
+## BUG-033: `wt stash show` emits raw ENOENT when archived stash patch file is missing
+
+**Status**: open
+**Found**: 2026-02-28T14:00:00Z
+**Test run**: ~/wt-usage-tests/2026-02-28T14-00-00Z/
+
+### Description
+
+When `wt stash show <branch>` is run for an archived stash whose patch file has been deleted (e.g., via `rm .wt/stashes/archive/<branch>.patch`), the command emits a raw Node.js ENOENT error:
+
+```
+wt: ENOENT: no such file or directory, open '/path/to/.wt/stashes/archive/br-d.patch'
+```
+
+This violates VISION §15.3 ("No raw Node.js error objects or stack traces") and §15.1 ("clear, actionable error messages"). The user has no guidance on what happened or how to recover.
+
+The recovery path (`wt stash drop <branch>`) works correctly — it cleans up the orphaned TOML metadata even when the archive file is gone. But the user cannot discover this from the error message.
+
+### Correct fix
+
+In `src/core/stash.ts` (or wherever `showStash` reads the archive file), catch the ENOENT and emit an actionable error:
+
+```
+wt: Archived stash for 'br-d' patch file not found. The archive may have been deleted manually.
+wt: Run 'wt stash drop br-d' to clean up the stash metadata.
+```
+
+### Reproduction
+
+```bash
+mkdir test-proj && cd test-proj
+wt init <url>
+
+# Create a stash for some branch
+wt checkout br-test
+echo "dirty" >> somefile.txt
+wt checkout main   # evicts br-test, creates stash
+
+# Archive the stash (fake age + delete remote branch + fetch)
+# ... set last_used_at to epoch in .wt/stashes/br-test.toml
+# ... git push origin --delete br-test
+wt fetch            # triggers archival → .wt/stashes/archive/br-test.patch
+
+# Delete the archive file manually
+rm .wt/stashes/archive/br-test.patch
+
+# Attempt to show the stash
+wt stash show br-test
+# Expected: "wt: Archived stash for 'br-test' patch file not found. Run 'wt stash drop br-test' to clean up."
+# Actual:   "wt: ENOENT: no such file or directory, open '.../archive/br-test.patch'"
+```
+
+### Vision reference
+
+VISION.md §15.3: All user-facing errors emit `wt: <message>`. No raw Node.js error objects or stack traces.
+
+VISION.md §15.1: `wt` should produce clear, actionable error messages. Tell the user exactly what happened and what to do next.
