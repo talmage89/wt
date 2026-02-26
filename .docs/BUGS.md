@@ -2,7 +2,7 @@
 
 Bug numbers continue from the archived log. See `.docs/archive/BUGS.md` for BUG-001 through BUG-028.
 
-Next bug number: **BUG-032**
+Next bug number: **BUG-033**
 
 ## BUG-029: "Created local branch" message missing on remote-only branch checkout
 
@@ -203,3 +203,64 @@ wt init https://github.com/real/repo.git
 VISION.md §2.2 (Init from URL): the directory must be empty before init. After a failed clone, the directory is no longer empty, trapping the user.
 
 VISION.md §15.3: git errors pass through verbatim — satisfied. The issue is the unrecoverable partial state left behind.
+
+---
+
+## BUG-032: Missing `.wt/stashes/` directory causes raw ENOENT crash on dirty eviction
+
+**Status**: open
+**Found**: 2026-02-26T09:18:12Z
+**Test run**: ~/wt-usage-tests/2026-02-26T09-18-12Z/
+
+### Description
+
+If the `.wt/stashes/` directory is deleted (e.g., by an accidental `rm -rf`, `git clean`, or manual cleanup), any subsequent `wt checkout` that triggers eviction of a **dirty** slot fails with a cryptic raw Node.js error:
+
+```
+wt: ENOENT: no such file or directory, open '.wt/stashes/main.toml'
+```
+
+The error is unactionable (the user has no hint that the stashes directory is missing or how to fix it) and aborts the entire checkout operation, leaving the slot still assigned to the old dirty branch with no checkout performed.
+
+### Root cause
+
+`src/core/stash.ts` writes the stash metadata TOML file to `.wt/stashes/<encoded-branch>.toml` without first ensuring the directory exists. If `.wt/stashes/` was deleted (the directory is created by `createContainerStructure()` during `wt init` and is normally always present), the `fs.writeFile` call throws ENOENT.
+
+### Correct fix
+
+Before writing the stash metadata file in `saveStash()`, ensure the stashes directory exists:
+
+```typescript
+await mkdir(stashesDir, { recursive: true });
+```
+
+Similarly, the archive subdirectory `.wt/stashes/archive/` should also be auto-created before writing archive files. Using `{ recursive: true }` means no-op if the directory already exists, so this is a safe defense-in-depth fix.
+
+### Reproduction
+
+```bash
+mkdir test-proj && cd test-proj
+wt init <url>
+
+# Fill all 5 slots
+wt checkout branch-a && wt checkout branch-b && wt checkout branch-c
+# (checkout 2 more to fill remaining slots)
+
+# Add dirty state to the LRU slot
+echo "dirty" >> some-file.txt
+
+# Delete the stashes directory
+rm -rf .wt/stashes/
+
+# Trigger eviction of dirty slot
+wt checkout branch-new
+# Expected: evicts dirty slot, creates stash in recreated .wt/stashes/, checks out branch-new
+# Actual:   "wt: ENOENT: no such file or directory, open '.wt/stashes/<branch>.toml'"
+#           exit 1, checkout does not complete
+```
+
+### Vision reference
+
+VISION.md §5.1: stash creation is an integral part of eviction. A missing directory is an infrastructure failure, not a user error — `wt` should recover transparently by recreating managed infrastructure directories.
+
+VISION.md §15.1: `wt` should produce clear, actionable error messages. A raw ENOENT path is neither clear nor actionable.
