@@ -2,7 +2,7 @@
 
 Bug numbers continue from the archived log. See `.docs/archive/BUGS.md` for BUG-001 through BUG-028.
 
-Next bug number: **BUG-033**
+Next bug number: **BUG-034**
 
 ## BUG-029: "Created local branch" message missing on remote-only branch checkout
 
