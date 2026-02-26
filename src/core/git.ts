@@ -595,3 +595,14 @@ export async function refExists(repoDir: string, ref: string): Promise<boolean> 
     return false;
   }
 }
+
+/**
+ * Verify that a revision (branch name, commit hash, tag, etc.) resolves.
+ * Passes git errors through verbatim if the revision does not exist.
+ */
+export async function verifyRevision(repoDir: string, rev: string): Promise<void> {
+  await execa("git", ["rev-parse", "--verify", rev], {
+    cwd: repoDir,
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+}

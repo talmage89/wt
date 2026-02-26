@@ -146,6 +146,23 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
     }
   }
 
+  // 7.6. PRE-CHECK for -b: Validate before evicting (item 1.5).
+  // If the branch already exists locally or the start point is invalid, a slot
+  // would be evicted and left vacant when the subsequent checkout fails.
+  // Fail early to prevent that.
+  if (options.create) {
+    const localExists = await git.refExists(
+      paths.repoDir,
+      `refs/heads/${options.branch}`
+    );
+    if (localExists) {
+      throw new Error(`Branch '${options.branch}' already exists.`);
+    }
+    if (options.startPoint) {
+      await git.verifyRevision(paths.repoDir, options.startPoint);
+    }
+  }
+
   // Feedback tracking
   let evictedBranch: string | null = null;
   let wasStashed = false;

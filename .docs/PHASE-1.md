@@ -160,7 +160,7 @@ This mirrors `cd -` and `git checkout -` conventions — a single character to g
 - [x] Initial config file includes commented template examples.
 - [x] Worktree menu renders in LRU order; pinned entries are not promoted.
 - [x] Worktree menu renders instantly without "Loading..." flash.
-- [ ] `wt checkout -b` validates before evicting.
+- [x] `wt checkout -b` validates before evicting.
 - [ ] Fetch cooldown prevents redundant fetches (default 10 min).
 - [ ] Stash tag appears after relative time in worktree list.
 - [ ] Config panel offers immediate slot adjustment after `slot_count` change.

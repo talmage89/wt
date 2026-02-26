@@ -813,13 +813,75 @@ describe("wt checkout — -b flag: branch creation", () => {
     expect(state.slots[mainSlot].branch).toBe("feature/evict-test");
   });
 
-  it("should error when trying to create a branch that already exists locally", async () => {
-    const { containerDir } = await setupContainerFromUrl();
+  it("should error when trying to create a branch that already exists locally (without evicting)", async () => {
+    const { containerDir, wtDir, repoDir } = await setupContainerFromUrl();
 
-    // 'main' already exists as a local branch
+    // Fill all vacant slots so eviction would be required
+    await fillVacantSlots(containerDir, repoDir, ["b1", "b2", "b3", "b4"]);
+
+    // Force main's slot to be LRU so it would be the eviction candidate
+    let state = await readState(wtDir);
+    const mainSlot = Object.keys(state.slots).find(
+      (n) => state.slots[n].branch === "main"
+    )!;
+    state.slots[mainSlot].last_used_at = new Date(0).toISOString();
+    await writeState(wtDir, state);
+
+    // Record slot assignments before the failed attempt
+    const stateBefore = await readState(wtDir);
+    const slotsBefore = Object.fromEntries(
+      Object.entries(stateBefore.slots).map(([k, v]) => [k, v.branch])
+    );
+
+    // 'main' already exists locally — should fail with a clear error
     await expect(
       runCheckout({ branch: "main", create: true, cwd: containerDir })
+    ).rejects.toThrow("already exists");
+
+    // No eviction should have occurred — all slot assignments unchanged
+    const stateAfter = await readState(wtDir);
+    const slotsAfter = Object.fromEntries(
+      Object.entries(stateAfter.slots).map(([k, v]) => [k, v.branch])
+    );
+    expect(slotsAfter).toEqual(slotsBefore);
+  });
+
+  it("should error when start-point is invalid (without evicting)", async () => {
+    const { containerDir, wtDir, repoDir } = await setupContainerFromUrl();
+
+    // Fill all vacant slots so eviction would be required
+    await fillVacantSlots(containerDir, repoDir, ["b1", "b2", "b3", "b4"]);
+
+    // Force main's slot to be LRU so it would be the eviction candidate
+    let state = await readState(wtDir);
+    const mainSlot = Object.keys(state.slots).find(
+      (n) => state.slots[n].branch === "main"
+    )!;
+    state.slots[mainSlot].last_used_at = new Date(0).toISOString();
+    await writeState(wtDir, state);
+
+    // Record slot assignments before the failed attempt
+    const stateBefore = await readState(wtDir);
+    const slotsBefore = Object.fromEntries(
+      Object.entries(stateBefore.slots).map(([k, v]) => [k, v.branch])
+    );
+
+    // Bad start-point — should fail before evicting
+    await expect(
+      runCheckout({
+        branch: "feature/new-from-bad-base",
+        create: true,
+        startPoint: "origin/nonexistent-bad-start",
+        cwd: containerDir,
+      })
     ).rejects.toBeDefined();
+
+    // No eviction should have occurred
+    const stateAfter = await readState(wtDir);
+    const slotsAfter = Object.fromEntries(
+      Object.entries(stateAfter.slots).map(([k, v]) => [k, v.branch])
+    );
+    expect(slotsAfter).toEqual(slotsBefore);
   });
 });
 
