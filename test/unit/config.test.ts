@@ -24,6 +24,7 @@ describe("defaultConfig", () => {
     const cfg = defaultConfig();
     expect(cfg.slot_count).toBe(5);
     expect(cfg.archive_after_days).toBe(7);
+    expect(cfg.fetch_cooldown_minutes).toBe(10);
     expect(cfg.shared.directories).toEqual([]);
     expect(cfg.templates).toEqual([]);
   });
@@ -73,8 +74,16 @@ target = "Makefile"
     const cfg = await readConfig(tmpDir);
     expect(cfg.slot_count).toBe(8);
     expect(cfg.archive_after_days).toBe(7);
+    expect(cfg.fetch_cooldown_minutes).toBe(10);
     expect(cfg.shared.directories).toEqual([]);
     expect(cfg.templates).toEqual([]);
+  });
+
+  it("parses fetch_cooldown_minutes from config", async () => {
+    const toml = `fetch_cooldown_minutes = 5\n`;
+    await writeFile(join(tmpDir, "config.toml"), toml, "utf8");
+    const cfg = await readConfig(tmpDir);
+    expect(cfg.fetch_cooldown_minutes).toBe(5);
   });
 });
 
@@ -83,6 +92,7 @@ describe("writeConfig / round-trip", () => {
     const original = {
       slot_count: 4,
       archive_after_days: 30,
+      fetch_cooldown_minutes: 15,
       shared: { directories: ["vendor"] },
       templates: [{ source: "src.tmpl", target: "dest.txt" }],
     };
@@ -90,6 +100,7 @@ describe("writeConfig / round-trip", () => {
     const loaded = await readConfig(tmpDir);
     expect(loaded.slot_count).toBe(4);
     expect(loaded.archive_after_days).toBe(30);
+    expect(loaded.fetch_cooldown_minutes).toBe(15);
     expect(loaded.shared.directories).toEqual(["vendor"]);
     expect(loaded.templates).toEqual([{ source: "src.tmpl", target: "dest.txt" }]);
   });

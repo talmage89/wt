@@ -19,6 +19,7 @@ describe("defaultState", () => {
     const s = defaultState();
     expect(s.slots).toEqual({});
     expect(s.branch_history).toEqual([]);
+    expect(s.last_fetch_at).toBeUndefined();
   });
 });
 
@@ -71,6 +72,20 @@ pinned = false
     await writeFile(join(tmpDir, "state.toml"), toml, "utf8");
     const s = await readState(tmpDir);
     expect(s.slots["empty-slot-name"].branch).toBeNull();
+  });
+
+  it("parses last_fetch_at when present", async () => {
+    const toml = `last_fetch_at = "2024-06-01T12:00:00.000Z"\n`;
+    await writeFile(join(tmpDir, "state.toml"), toml, "utf8");
+    const s = await readState(tmpDir);
+    expect(s.last_fetch_at).toBe("2024-06-01T12:00:00.000Z");
+  });
+
+  it("returns undefined last_fetch_at when absent", async () => {
+    const toml = `[slots]\n`;
+    await writeFile(join(tmpDir, "state.toml"), toml, "utf8");
+    const s = await readState(tmpDir);
+    expect(s.last_fetch_at).toBeUndefined();
   });
 
   it("preserves branch_history order", async () => {
@@ -148,5 +163,24 @@ describe("writeState / round-trip", () => {
     expect(loaded.slots["slot-two"].pinned).toBe(false);
     expect(loaded.branch_history).toHaveLength(1);
     expect(loaded.branch_history[0].branch).toBe("main");
+  });
+
+  it("round-trips last_fetch_at", async () => {
+    const ts = "2024-06-01T12:00:00.000Z";
+    const state = {
+      slots: {},
+      branch_history: [],
+      last_fetch_at: ts,
+    };
+    await writeState(tmpDir, state);
+    const loaded = await readState(tmpDir);
+    expect(loaded.last_fetch_at).toBe(ts);
+  });
+
+  it("omits last_fetch_at from TOML when undefined", async () => {
+    const state = { slots: {}, branch_history: [] };
+    await writeState(tmpDir, state);
+    const loaded = await readState(tmpDir);
+    expect(loaded.last_fetch_at).toBeUndefined();
   });
 });

@@ -31,9 +31,10 @@ export async function runFetch(options: FetchOptions = {}): Promise<void> {
   try {
     let state = await readState(paths.wtDir);
     state = await reconcile(paths.wtDir, paths.container, state);
-    await writeState(paths.wtDir, state);
 
     await git.fetch(paths.repoDir);
+    state.last_fetch_at = new Date().toISOString();
+    await writeState(paths.wtDir, state);
     process.stdout.write("Fetched latest from remote.\n");
 
     const config = await readConfig(paths.wtDir);

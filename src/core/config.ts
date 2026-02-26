@@ -12,8 +12,9 @@ export interface SharedConfig {
 }
 
 export interface Config {
-  slot_count: number;         // default: 5
-  archive_after_days: number; // default: 7
+  slot_count: number;              // default: 5
+  archive_after_days: number;      // default: 7
+  fetch_cooldown_minutes: number;  // default: 10
   shared: SharedConfig;
   templates: TemplateConfig[];
 }
@@ -25,6 +26,7 @@ export function defaultConfig(): Config {
   return {
     slot_count: 5,
     archive_after_days: 7,
+    fetch_cooldown_minutes: 10,
     shared: { directories: [] },
     templates: [],
   };
@@ -57,6 +59,10 @@ export async function readConfig(wtDir: string): Promise<Config> {
     typeof parsed["archive_after_days"] === "number"
       ? parsed["archive_after_days"]
       : defaults.archive_after_days;
+  const fetch_cooldown_minutes =
+    typeof parsed["fetch_cooldown_minutes"] === "number"
+      ? parsed["fetch_cooldown_minutes"]
+      : defaults.fetch_cooldown_minutes;
 
   let shared: SharedConfig = defaults.shared;
   if (parsed["shared"] && typeof parsed["shared"] === "object") {
@@ -76,7 +82,7 @@ export async function readConfig(wtDir: string): Promise<Config> {
     }));
   }
 
-  return { slot_count, archive_after_days, shared, templates };
+  return { slot_count, archive_after_days, fetch_cooldown_minutes, shared, templates };
 }
 
 /**
@@ -87,6 +93,7 @@ export async function writeConfig(wtDir: string, config: Config): Promise<void> 
   const data: Record<string, unknown> = {
     slot_count: config.slot_count,
     archive_after_days: config.archive_after_days,
+    fetch_cooldown_minutes: config.fetch_cooldown_minutes,
     shared: { directories: config.shared.directories },
   };
   if (config.templates.length > 0) {

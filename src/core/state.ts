@@ -15,8 +15,9 @@ export interface BranchHistoryEntry {
 }
 
 export interface State {
-  slots: Record<string, SlotState>;    // keyed by slot directory name
+  slots: Record<string, SlotState>;     // keyed by slot directory name
   branch_history: BranchHistoryEntry[]; // ordered by recency (most recent first)
+  last_fetch_at?: string;               // ISO 8601 timestamp of last successful fetch
 }
 
 /**
@@ -81,7 +82,12 @@ function parseStateRaw(raw: string): State {
     }
   }
 
-  return { slots, branch_history };
+  const last_fetch_at =
+    typeof parsed["last_fetch_at"] === "string"
+      ? parsed["last_fetch_at"]
+      : undefined;
+
+  return { slots, branch_history, last_fetch_at };
 }
 
 /**
@@ -152,6 +158,9 @@ export async function writeState(wtDir: string, state: State): Promise<void> {
     slots: slotsData,
     branch_history: state.branch_history,
   };
+  if (state.last_fetch_at !== undefined) {
+    data["last_fetch_at"] = state.last_fetch_at;
+  }
 
   await writeFile(statePath, stringify(data), "utf8");
 }

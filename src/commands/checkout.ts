@@ -69,11 +69,22 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
     state = await adjustSlotCount(paths.repoDir, paths.container, paths.wtDir, state, config);
   }
 
-  // 4. FETCH (errors pass through verbatim)
-  try {
-    await git.fetch(paths.repoDir);
-  } catch {
-    // Fetch errors are not fatal — continue with local state
+  // 4. FETCH WITH COOLDOWN — skip if last fetch was within the configured window
+  {
+    const cooldownMs = (config.fetch_cooldown_minutes) * 60_000;
+    const lastFetchAt = state.last_fetch_at;
+    const elapsed = lastFetchAt
+      ? Date.now() - new Date(lastFetchAt).getTime()
+      : Infinity;
+    if (elapsed >= cooldownMs) {
+      try {
+        await git.fetch(paths.repoDir);
+        state.last_fetch_at = new Date().toISOString();
+      } catch {
+        // Fetch errors are not fatal — continue with local state
+      }
+    }
+    // else: silently skip (within cooldown window)
   }
 
   // 5. ARCHIVE SCAN — exclude the target branch so its stash is not archived
