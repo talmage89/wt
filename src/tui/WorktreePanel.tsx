@@ -99,11 +99,9 @@ async function loadBranchData(paths: ContainerPaths): Promise<BranchEntry[]> {
     // Ignore errors — degrade gracefully
   }
 
-  // Sort: pinned first, then active, then inactive — each tier sorted by recency
+  // Sort: all entries by LRU recency (most recently used first).
+  // Pinned entries stay in their natural LRU position — not promoted to top.
   entries.sort((a, b) => {
-    const tierOrder: Record<string, number> = { pinned: 0, active: 1, inactive: 2 };
-    const diff = tierOrder[a.tier] - tierOrder[b.tier];
-    if (diff !== 0) return diff;
     const aTime = a.lastUsedAt ? new Date(a.lastUsedAt).getTime() : 0;
     const bTime = b.lastUsedAt ? new Date(b.lastUsedAt).getTime() : 0;
     return bTime - aTime;
