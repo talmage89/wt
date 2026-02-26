@@ -55,3 +55,13 @@ Tests performed:
 - Reconciliation with deleted slot dir: manually `rm -rf bolt-mild-lucid`; ran `wt list` — reconcile detected missing slot, silently ran `git worktree add` to create a new slot (`newt-flume-larch`), maintaining the configured 5-slot count; no crash, clean output
 - Broken symlink cleanup: deleted canonical `.wt/shared/configs/app.env` file; ran `wt sync` — all broken symlinks in all slots were removed correctly
 Result: PASS
+
+## 2026-02-26T10:00:00Z
+
+Location: ~/wt-usage-tests/2026-02-26T10-00-00/
+Tests performed:
+- Stash archival lifecycle: created dirty state on `will-be-deleted`, evicted to create stash, faked `last_used_at` to 8 days ago in stash metadata, deleted remote branch from bare repo, ran `wt fetch` — stash archived correctly ("Archived 1 stash(es): will-be-deleted"), patch file written to `.wt/stashes/archive/will-be-deleted.patch` containing full diff including untracked files; note: zstd not available so patch stored uncompressed (expected "Warning: zstd not found. Archived stash stored uncompressed.")
+- Drop archived stash: ran `wt stash list` — showed entry with status "archived"; `wt stash drop will-be-deleted` with confirmation → "Stash dropped for 'will-be-deleted'"; archive patch file deleted from disk; `wt stash list` showed "No saved stashes." — full archived stash lifecycle verified
+- Corrupt state.toml: wrote invalid TOML (`%CORRUPTED TOML%\n[[[bad section\nkey =`) to `.wt/state.toml`; ran `wt list` — printed "Warning: .wt/state.toml is corrupted. Regenerating from git state." to stderr, then successfully regenerated all 5 slots from git worktree list with epoch timestamps (20510d ago), clean exit code 0 — graceful recovery confirmed
+- Manual `git worktree add` in container: ran `git --git-dir=.wt/repo worktree add ./manual-worktree -b manual-branch` directly (bypassing wt); ran `wt list` — reconcile discovered `manual-worktree` as a new slot and added it to state; but because slot count in config is 5 and there were now 6 slots (5 original + manual), `adjustSlotCount` LRU-evicted one original slot (`arch-short-wynd`, branch-a) since all had epoch timestamps from the prior state corruption recovery; `manual-worktree` (manual-branch) appeared in the list as a managed slot — adoption of external worktrees works, slot count enforcement is immediate
+Result: PASS
