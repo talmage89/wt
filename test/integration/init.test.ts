@@ -94,6 +94,23 @@ describe("wt init (from existing repo)", () => {
     expect(await exists(path.join(dir, ".wt", "config.toml"))).toBe(true);
   });
 
+  it("should include commented template example in initial config.toml", async () => {
+    const dir = await mktemp();
+    await createTestRepo(dir);
+
+    await runInit({ cwd: dir });
+
+    const configContent = await fs.readFile(
+      path.join(dir, ".wt", "config.toml"),
+      "utf8"
+    );
+    expect(configContent).toContain("# [[templates]]");
+    expect(configContent).toContain('# source = ".env.template"');
+    expect(configContent).toContain('# target = ".env"');
+    expect(configContent).toContain("{{WORKTREE_DIR}}");
+    expect(configContent).toContain("{{BRANCH_NAME}}");
+  });
+
   it("should record the starting branch in branch_history", async () => {
     const dir = await mktemp();
     await createTestRepo(dir);

@@ -1,4 +1,4 @@
-import { access, readdir, rename, rm, stat } from "fs/promises";
+import { access, appendFile, readdir, rename, rm, stat } from "fs/promises";
 import { join } from "path";
 import { execa } from "execa";
 import { createContainerStructure } from "../core/container.js";
@@ -165,6 +165,7 @@ async function initFromExistingRepo(containerDir: string): Promise<string> {
 
   await writeState(wtDir, state);
   await writeConfig(wtDir, config);
+  await appendTemplateExamples(wtDir);
   await generateAllTemplates(wtDir, containerDir, state.slots, config.templates);
 
   // Print post-init summary
@@ -257,6 +258,7 @@ async function initFromUrl(containerDir: string, url: string): Promise<string> {
 
   await writeState(wtDir, state);
   await writeConfig(wtDir, config);
+  await appendTemplateExamples(wtDir);
   await generateAllTemplates(wtDir, containerDir, state.slots, config.templates);
 
   // Print post-init summary
@@ -271,6 +273,24 @@ async function initFromUrl(containerDir: string, url: string): Promise<string> {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Append a commented-out template example block to .wt/config.toml.
+ * smol-toml stringify does not support comments, so we append raw text.
+ * Only called during init — existing configs are never modified.
+ */
+async function appendTemplateExamples(wtDir: string): Promise<void> {
+  const configPath = join(wtDir, "config.toml");
+  const example = [
+    "",
+    "# [[templates]]",
+    '# source = ".env.template"',
+    '# target = ".env"',
+    "# Variables: {{WORKTREE_DIR}}, {{BRANCH_NAME}}",
+    "",
+  ].join("\n");
+  await appendFile(configPath, example, "utf8");
+}
 
 /**
  * Print the post-init summary to stderr.
