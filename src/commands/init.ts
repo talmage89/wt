@@ -194,80 +194,86 @@ async function initFromUrl(containerDir: string, url: string): Promise<string> {
   const wtDir = await createContainerStructure(containerDir);
   const repoDir = join(wtDir, "repo");
 
-  // Bare-clone into .wt/repo/.
-  // Note: createContainerStructure creates .wt/repo/ as an empty dir;
-  // git clone --bare into an existing empty directory works fine.
-  await git.cloneBare(url, repoDir);
-
-  // git clone --bare uses a non-standard fetch refspec (+refs/heads/*:refs/heads/*)
-  // that does NOT create refs/remotes/origin/* tracking refs. Switch to the
-  // standard tracking refspec so subsequent fetches populate refs/remotes/origin/*.
-  await git.setConfig(
-    repoDir,
-    "remote.origin.fetch",
-    "+refs/heads/*:refs/remotes/origin/*"
-  );
-
-  // Fetch to populate refs/remotes/origin/* with the corrected refspec.
-  // This enables defaultBranch() to work and origin/<branch> refs for slot creation.
-  await git.fetch(repoDir);
-
-  // Set refs/remotes/origin/HEAD to the remote's actual default branch.
-  // Bare clone + fetch does not create this ref automatically, but
-  // defaultBranch() relies on it as the primary detection method.
   try {
-    await execa("git", ["remote", "set-head", "origin", "--auto"], {
-      cwd: repoDir,
-      stdio: ["ignore", "pipe", "pipe"],
+    // Bare-clone into .wt/repo/.
+    // Note: createContainerStructure creates .wt/repo/ as an empty dir;
+    // git clone --bare into an existing empty directory works fine.
+    await git.cloneBare(url, repoDir);
+
+    // git clone --bare uses a non-standard fetch refspec (+refs/heads/*:refs/heads/*)
+    // that does NOT create refs/remotes/origin/* tracking refs. Switch to the
+    // standard tracking refspec so subsequent fetches populate refs/remotes/origin/*.
+    await git.setConfig(
+      repoDir,
+      "remote.origin.fetch",
+      "+refs/heads/*:refs/remotes/origin/*"
+    );
+
+    // Fetch to populate refs/remotes/origin/* with the corrected refspec.
+    // This enables defaultBranch() to work and origin/<branch> refs for slot creation.
+    await git.fetch(repoDir);
+
+    // Set refs/remotes/origin/HEAD to the remote's actual default branch.
+    // Bare clone + fetch does not create this ref automatically, but
+    // defaultBranch() relies on it as the primary detection method.
+    try {
+      await execa("git", ["remote", "set-head", "origin", "--auto"], {
+        cwd: repoDir,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch {
+      // Non-fatal: defaultBranch() has fallbacks for this case
+    }
+
+    // Detect default branch from remote tracking refs (now populated).
+    const defaultBranchName = await git.defaultBranch(repoDir);
+
+    // Create worktree slots, all detached at the default branch tip
+    const config = defaultConfig();
+    const slotNames = await createSlots(
+      repoDir,
+      containerDir,
+      config.slot_count,
+      `origin/${defaultBranchName}`,
+      new Set()
+    );
+
+    // Checkout the default branch in slot 0
+    const slot0Dir = join(containerDir, slotNames[0]);
+    await checkoutOrTrack(slot0Dir, defaultBranchName);
+
+    // Build initial state
+    const now = new Date().toISOString();
+    const state = defaultState();
+    for (const name of slotNames) {
+      state.slots[name] = {
+        branch: name === slotNames[0] ? defaultBranchName : null,
+        last_used_at: now,
+        pinned: false,
+      };
+    }
+    state.branch_history.push({
+      branch: defaultBranchName,
+      last_checkout_at: now,
     });
-  } catch {
-    // Non-fatal: defaultBranch() has fallbacks for this case
+
+    await writeState(wtDir, state);
+    await writeConfig(wtDir, config);
+    await appendTemplateExamples(wtDir);
+    await generateAllTemplates(wtDir, containerDir, state.slots, config.templates);
+
+    // Print post-init summary
+    printInitSummary(slotNames, slotNames[0], defaultBranchName);
+
+    // Write nav file
+    await writeNavFile(slot0Dir);
+
+    return slot0Dir;
+  } catch (err) {
+    // BUG-031: clean up partial .wt/ so the user can retry with a corrected URL
+    await rm(wtDir, { recursive: true, force: true });
+    throw err;
   }
-
-  // Detect default branch from remote tracking refs (now populated).
-  const defaultBranchName = await git.defaultBranch(repoDir);
-
-  // Create worktree slots, all detached at the default branch tip
-  const config = defaultConfig();
-  const slotNames = await createSlots(
-    repoDir,
-    containerDir,
-    config.slot_count,
-    `origin/${defaultBranchName}`,
-    new Set()
-  );
-
-  // Checkout the default branch in slot 0
-  const slot0Dir = join(containerDir, slotNames[0]);
-  await checkoutOrTrack(slot0Dir, defaultBranchName);
-
-  // Build initial state
-  const now = new Date().toISOString();
-  const state = defaultState();
-  for (const name of slotNames) {
-    state.slots[name] = {
-      branch: name === slotNames[0] ? defaultBranchName : null,
-      last_used_at: now,
-      pinned: false,
-    };
-  }
-  state.branch_history.push({
-    branch: defaultBranchName,
-    last_checkout_at: now,
-  });
-
-  await writeState(wtDir, state);
-  await writeConfig(wtDir, config);
-  await appendTemplateExamples(wtDir);
-  await generateAllTemplates(wtDir, containerDir, state.slots, config.templates);
-
-  // Print post-init summary
-  printInitSummary(slotNames, slotNames[0], defaultBranchName);
-
-  // Write nav file
-  await writeNavFile(slot0Dir);
-
-  return slot0Dir;
 }
 
 // ---------------------------------------------------------------------------

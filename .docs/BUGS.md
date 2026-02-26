@@ -144,7 +144,7 @@ VISION.md section 3.2 (Checkout Output):
 
 ## BUG-031: `wt init <url>` leaves partial `.wt/` directory on clone failure, blocking retry
 
-**Status**: open
+**Status**: fixed
 **Found**: 2026-02-27T01:00:00Z
 **Test run**: ~/wt-usage-tests/2026-02-27T01-00-00/
 
