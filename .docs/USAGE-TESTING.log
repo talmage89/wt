@@ -34,3 +34,13 @@ Tests performed:
 - Slot count decrease below pinned count: pinned all 3 remaining slots, decreased slot_count to 2 → error "Cannot reduce slot count to 2: 3 worktrees are pinned. Unpin worktrees first or choose a higher count." with exit 1, no eviction
 - Fetch cooldown: first checkout records `last_fetch_at` in state.toml; second checkout within 10 min does NOT update timestamp (fetch skipped); explicit `wt fetch` always runs and updates timestamp; setting `fetch_cooldown_minutes = 0` in config causes every checkout to fetch
 Result: PASS
+
+## 2026-02-26T07:30:00Z
+
+Location: ~/wt-usage-tests/2026-02-26T07-30-00/
+Tests performed:
+- `wt init` twice: second `wt init` on already-initialized container returns "Directory is not empty" with exit 1 — clear error, no corruption
+- `wt checkout main` when main already checked out: correctly navigates to existing slot (orbit-sharp-light), prints "Checked out main in orbit-sharp-light", nav file written with correct path — no spurious eviction
+- `wt checkout remote-only-branch` (branch exists only on remote): checkout succeeded, git DWIM created local tracking branch — but "Created local branch remote-only-branch from origin/remote-only-branch" message was NOT printed (BUG-029)
+Result: BUG FOUND
+Bug: BUG-029 — "Created local branch" message missing when remote-only branch checkout succeeds via git DWIM
