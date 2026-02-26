@@ -12,3 +12,14 @@ Tests performed:
 - Shell integration: `wt shell-init bash` outputs valid `wt()` function; nav file written by binary at `/tmp/wt-nav-<ppid>`; checkout prints "wt: Navigating to <dir>"
 - Reconciliation: directly ran `git checkout -b local-only-branch` inside gravel-puffin-wynd slot (bypassing wt); subsequent `wt list` silently updated state to show local-only-branch — no errors, no warnings
 Result: PASS
+
+## 2026-02-26T05:30:00Z
+
+Location: ~/wt-usage-tests/2026-02-26T05-30-00/
+Tests performed:
+- Checkout branch with `/` in name (`feature/auth/oauth`): correctly checked out into slot, branch name displayed accurately in `wt list`, slot directory populated correctly — encoding/decoding of `/` works
+- Eviction with full dirty state (staged + unstaged + untracked): filled all 5 slots, created dirty state in main slot (MM README.md + ?? new-untracked.txt), triggered eviction by checking out new branch — eviction stashed dirty state, restore on re-checkout returned all changes including untracked file
+- Pin all slots then checkout new branch: pinned all 5 slots, ran `wt checkout -b should-fail-all-pinned` — received clear error "All worktree slots are pinned. Unpin a worktree or increase the slot count to continue." with exit 1, no partial state left
+- Slot count increase via config: edited `.wt/config.toml` directly (slot_count 5→7), ran `wt list` — two new vacant slots created immediately (tundra-loam-brisk, lupine-rustic-ruby) with `git worktree add` printed to terminal
+- `wt checkout -b` pre-validation: tried `wt checkout -b main` (existing branch) → "wt: Branch 'main' already exists." with exit 1, no eviction; tried `wt checkout -b new-branch nonexistent-sha` → git fatal error with exit 128, no eviction
+Result: PASS
