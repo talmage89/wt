@@ -244,14 +244,34 @@ export async function runStashShow(
     }
     const { readFile } = await import("fs/promises");
     let content: string;
-    if (stash.archive_path.endsWith(".zst")) {
-      const { execa } = await import("execa");
-      const result = await execa("zstd", ["-d", "-c", stash.archive_path], {
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-      content = result.stdout;
-    } else {
-      content = await readFile(stash.archive_path, "utf8");
+    try {
+      if (stash.archive_path.endsWith(".zst")) {
+        const { execa } = await import("execa");
+        const result = await execa("zstd", ["-d", "-c", stash.archive_path], {
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+        content = result.stdout;
+      } else {
+        content = await readFile(stash.archive_path, "utf8");
+      }
+    } catch (err: unknown) {
+      // BUG-033: patch file deleted manually — emit actionable error instead of raw ENOENT
+      const nodeErr = err as NodeJS.ErrnoException & { stderr?: string };
+      const isMissing =
+        nodeErr.code === "ENOENT" ||
+        (typeof nodeErr.stderr === "string" &&
+          nodeErr.stderr.toLowerCase().includes("no such file"));
+      if (isMissing) {
+        process.stderr.write(
+          `wt: Archived stash for '${resolvedBranch}' patch file not found. The archive may have been deleted manually.\n`
+        );
+        process.stderr.write(
+          `wt: Run 'wt stash drop ${resolvedBranch}' to clean up the stash metadata.\n`
+        );
+        // exitCode: 1 signals handleCliError to exit silently (we already printed)
+        throw Object.assign(new Error(""), { exitCode: 1 });
+      }
+      throw err;
     }
     process.stdout.write(content + "\n");
     return;

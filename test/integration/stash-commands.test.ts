@@ -13,7 +13,7 @@ import {
 } from "../../src/commands/stash.js";
 import { readState, writeState } from "../../src/core/state.js";
 import { readConfig, writeConfig } from "../../src/core/config.js";
-import { getStash } from "../../src/core/stash.js";
+import { getStash, archiveStash } from "../../src/core/stash.js";
 import { establishSymlinks } from "../../src/core/symlinks.js";
 import { createTempDir, createTestRepo, cleanup } from "./helpers.js";
 
@@ -415,5 +415,50 @@ describe("wt stash show", () => {
     await expect(
       runStashShow("no-such-branch", { cwd: dir })
     ).rejects.toThrow("No stash found");
+  });
+
+  it("emits actionable error when archived stash patch file is missing (BUG-033)", async () => {
+    const dir = await mktemp();
+    const { wtDir, repoDir } = await setupContainer(dir);
+
+    await createStashViaEviction(dir, wtDir, repoDir);
+
+    // Archive the active stash directly
+    await archiveStash(wtDir, repoDir, "main");
+
+    const meta = await getStash(wtDir, "main");
+    expect(meta).not.toBeNull();
+    expect(meta!.status).toBe("archived");
+    expect(meta!.archive_path).toBeDefined();
+
+    // Delete the archive file to simulate manual removal
+    await fs.unlink(meta!.archive_path!);
+
+    // Capture stderr
+    const stderrLines: string[] = [];
+    const origStderrWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk: string | Uint8Array): boolean => {
+      if (typeof chunk === "string") stderrLines.push(chunk);
+      return true;
+    };
+
+    let caughtErr: unknown;
+    try {
+      await runStashShow("main", { cwd: dir });
+    } catch (err) {
+      caughtErr = err;
+    } finally {
+      process.stderr.write = origStderrWrite;
+    }
+
+    // Should exit with code 1 (via exitCode property, not a raw ENOENT)
+    expect(caughtErr).toBeDefined();
+    expect((caughtErr as { exitCode?: number }).exitCode).toBe(1);
+    expect((caughtErr as Error).message).not.toMatch(/ENOENT/);
+
+    // Stderr should contain the actionable message
+    const stderrOutput = stderrLines.join("");
+    expect(stderrOutput).toContain("patch file not found");
+    expect(stderrOutput).toContain("wt stash drop main");
   });
 });
