@@ -86,3 +86,11 @@ Tests performed:
 - Modify template source + `wt sync` regenerates all slots (VISION §7.4): created `templates/app.env` with `{{BRANCH_NAME}}` and `{{WORKTREE_DIR}}` variables, configured in `.wt/config.toml`; `wt sync` generated `.env` in all 5 slots; modified template source (changed APP_ENV and added DB_HOST); second `wt sync` regenerated all 5 `.env` files with new content — all slots updated correctly
 - Unpin and immediately evict (VISION §11): pinned MRU slot, dirtied it, then unpinned; subsequent checkouts drove LRU selection; when slot finally became LRU candidate it was evicted with "dirty state stashed" message; `wt stash list` confirmed stash entry created for the formerly-pinned branch — pin removal correctly restores LRU eligibility
 Result: PASS
+
+## 2026-02-26T13:00:00Z
+
+Location: ~/wt-usage-tests/2026-02-26T13-00-00/
+Tests performed:
+- BUG-029 fix verification (`wt checkout remote-only-feature`): set up a bare remote with `remote-only-feature` pushed only to remote; ran `wt init <remote>` then `wt checkout remote-only-feature` — checkout succeeded and git DWIM created a local tracking branch ("Switched to branch 'remote-only-feature'"), but the "wt: Created local branch remote-only-feature from origin/remote-only-feature" message was STILL NOT PRINTED — BUG-029 fix is ineffective. Root cause: `git clone --bare` creates `refs/heads/*` for ALL remote branches, so `git.refExists(repoDir, 'refs/heads/remote-only-feature')` returns `true` even for "remote-only" branches, causing `localBranchExistedBefore = true` and suppressing the message. The fix must use `branch_history` instead of `refExists` to detect first-time checkout.
+Result: BUG FOUND
+Bug: BUG-029 (re-opened) — BUG-029 fix ineffective: bare clone creates refs/heads/* for all remote branches, making localBranchExistedBefore always true

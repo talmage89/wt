@@ -6,19 +6,42 @@ Next bug number: **BUG-030**
 
 ## BUG-029: "Created local branch" message missing on remote-only branch checkout
 
-**Status**: fixed
+**Status**: open
 **Found**: 2026-02-26T07:30:00Z
-**Test run**: ~/wt-usage-tests/2026-02-26T07-30-00/
+**Re-opened**: 2026-02-26T13:00:00Z (prior fix ineffective — see updated root cause below)
+**Test run**: ~/wt-usage-tests/2026-02-26T07-30-00/, ~/wt-usage-tests/2026-02-26T13-00-00/
 
 ### Description
 
-When checking out a branch that exists only on the remote (e.g., `origin/remote-only-branch` but no local `refs/heads/remote-only-branch`), git's DWIM behavior makes `git checkout <branch>` succeed and automatically create a local tracking branch. However, the `wt: Created local branch <branch> from origin/<branch>` message is never printed.
+When checking out a branch that exists only on the remote (e.g., `origin/remote-only-branch` but no local `refs/heads/remote-only-branch`), the `wt: Created local branch <branch> from origin/<branch>` message is never printed.
 
-The message is supposed to appear per VISION.md section 3.2: "The 'Created local branch' line appears only when a new branch was created from remote." A local tracking branch was created from the remote, but no message was shown.
+The message is supposed to appear per VISION.md section 3.2: "The 'Created local branch' line appears only when a new branch was created from remote."
 
-**Root cause**: `branchCreatedFromRemote` is only set to `true` in the error-fallback code path (lines 234–236 of `src/commands/checkout.ts`). When git's DWIM makes the initial `git checkout <branch>` succeed (because `origin/<branch>` exists), the fallback is never reached and the flag is never set.
+### Root cause (corrected)
 
-The fix is to pre-check whether the branch exists locally _before_ the checkout (the pre-validation section at lines 143–157 already computes this). If the branch did not exist locally before checkout and the checkout succeeds, set `branchCreatedFromRemote = true`.
+`wt` uses a bare repo (`.wt/repo/`) cloned with `git clone --bare`. `git clone --bare` maps ALL remote branches directly to `refs/heads/*` in the bare repo — there is no `refs/remotes/` distinction in the same sense as a normal clone. As a result, `git.refExists(repoDir, 'refs/heads/<branch>')` returns `true` for every branch that existed on the remote at clone time, even branches the user has never personally worked with.
+
+The attempted fix (commit `cec6dbd`) set `localBranchExistedBefore` based on `refExists(repoDir, 'refs/heads/<branch>')`. Because bare clones pre-populate `refs/heads/` for all remote branches, `localBranchExistedBefore` is always `true` for any known remote branch, so `branchCreatedFromRemote` is never set.
+
+### Correct fix
+
+Use `branch_history` in `state.toml` instead of `refExists` to detect first-time checkout. `branch_history` tracks every branch the user has explicitly checked out via `wt`. A branch that has never been in `branch_history` is being worked with for the first time — i.e., "created from remote."
+
+In `src/commands/checkout.ts`, section 7.5, replace:
+```typescript
+localBranchExistedBefore = localExists;
+```
+with:
+```typescript
+// BUG-029: bare clone creates refs/heads/* for all remote branches, so
+// refExists is always true for known branches. Use branch_history to
+// detect first-time checkout (i.e., "created from remote").
+localBranchExistedBefore = state.branch_history.some(
+  (e) => e.branch === options.branch
+);
+```
+
+The `localExists` / `remoteBranchExists` checks above are still needed for BUG-028 (fail before eviction if branch not found anywhere). Only the `localBranchExistedBefore` assignment changes.
 
 ### Reproduction
 
