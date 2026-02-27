@@ -319,6 +319,37 @@ export async function listLocalBranches(repoDir: string): Promise<string[]> {
 }
 
 /**
+ * List all local branches with their latest commit dates.
+ * Uses for-each-ref which reads packed refs — same cost as listLocalBranches.
+ */
+export async function listLocalBranchesWithDates(
+  repoDir: string
+): Promise<{ branch: string; commitDate: string }[]> {
+  const result = await execa(
+    "git",
+    [
+      "for-each-ref",
+      "--format=%(refname:short)\t%(committerdate:iso-strict)",
+      "refs/heads/",
+    ],
+    {
+      cwd: repoDir,
+      stdio: ["ignore", "pipe", "inherit"],
+    }
+  );
+  return result.stdout
+    .split("\n")
+    .filter((l) => l.length > 0)
+    .map((line) => {
+      const tab = line.indexOf("\t");
+      return {
+        branch: line.substring(0, tab),
+        commitDate: line.substring(tab + 1),
+      };
+    });
+}
+
+/**
  * List all remote branches (without the "origin/" prefix).
  */
 export async function listRemoteBranches(repoDir: string): Promise<string[]> {

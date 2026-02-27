@@ -135,12 +135,13 @@ async function loadBranchData(paths: ContainerPaths, currentBranch?: string | nu
     });
   }
 
-  // Add all local branches not already covered by slots or branch_history
+  // Add all local branches not already covered by slots or branch_history.
+  // Uses commit dates as fallback sort key for branches with no LRU history.
   try {
-    const localBranches = await git.listLocalBranches(paths.repoDir);
-    for (const branch of localBranches) {
+    const localBranches = await git.listLocalBranchesWithDates(paths.repoDir);
+    for (const { branch, commitDate } of localBranches) {
       if (!knownBranches.has(branch)) {
-        entries.push({ branch, tier: "inactive" });
+        entries.push({ branch, tier: "inactive", lastUsedAt: commitDate });
         knownBranches.add(branch);
       }
     }
