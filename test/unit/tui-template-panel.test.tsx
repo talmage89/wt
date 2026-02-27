@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../../src/core/config.js", () => ({
   readConfig: vi.fn(),
+  writeConfig: vi.fn(),
 }));
 vi.mock("../../src/core/state.js", () => ({
   readState: vi.fn(),
@@ -44,20 +45,22 @@ describe("TemplatePanel", () => {
     expect(lastFrame()).toContain("Loading...");
   });
 
-  it("shows empty state when no templates configured", async () => {
+  it("shows create option when no templates configured", async () => {
     vi.mocked(readConfig).mockResolvedValue({
       slot_count: 5,
       archive_after_days: 7,
+      fetch_cooldown_minutes: 10,
       shared: { directories: [] },
       templates: [],
     });
     const { lastFrame } = render(
       <TemplatePanel paths={mockPaths} onBack={() => {}} />
     );
-    await waitForEffects();
+    // Wait for the config promise to resolve and component to re-render
+    await new Promise((resolve) => setTimeout(resolve, 50));
     const frame = lastFrame() ?? "";
     expect(frame).toContain("Edit Templates");
-    expect(frame).toContain("No templates configured");
+    expect(frame).toContain("Create template");
     expect(frame).not.toContain("Loading...");
   });
 

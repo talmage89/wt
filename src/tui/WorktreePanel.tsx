@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Box, Text, useInput, useApp } from "ink";
 import { join } from "path";
 import type { ContainerPaths } from "../core/container.js";
+import { currentSlotName } from "../core/container.js";
 import { readState, readStateSync, writeState } from "../core/state.js";
 import type { State } from "../core/state.js";
 import { reconcile } from "../core/reconcile.js";
@@ -18,6 +19,7 @@ interface BranchEntry {
   dirty?: boolean;
   lastUsedAt?: string;
   hasStash?: boolean;
+  isCurrent?: boolean;
 }
 
 type Mode = "list" | "search" | "status" | "diff" | "checking_out" | "new_branch";
@@ -31,7 +33,7 @@ interface Props {
  * Build a fast initial entry list from state.toml alone — no git operations.
  * Dirty status is unknown at this point (shown as clean until the full load arrives).
  */
-function buildInitialEntries(state: State): BranchEntry[] {
+function buildInitialEntries(state: State, currentBranch?: string | null): BranchEntry[] {
   const entries: BranchEntry[] = [];
   const activeBranches = new Set<string>();
 
@@ -44,6 +46,7 @@ function buildInitialEntries(state: State): BranchEntry[] {
         slotName,
         dirty: false,
         lastUsedAt: slot.last_used_at,
+        isCurrent: slot.branch === currentBranch,
       });
     }
   }
@@ -59,6 +62,9 @@ function buildInitialEntries(state: State): BranchEntry[] {
   }
 
   entries.sort((a, b) => {
+    // Current branch always first
+    if (a.isCurrent) return -1;
+    if (b.isCurrent) return 1;
     const aTime = a.lastUsedAt ? new Date(a.lastUsedAt).getTime() : 0;
     const bTime = b.lastUsedAt ? new Date(b.lastUsedAt).getTime() : 0;
     return bTime - aTime;
@@ -67,7 +73,7 @@ function buildInitialEntries(state: State): BranchEntry[] {
   return entries;
 }
 
-async function loadBranchData(paths: ContainerPaths): Promise<BranchEntry[]> {
+async function loadBranchData(paths: ContainerPaths, currentBranch?: string | null): Promise<BranchEntry[]> {
   let state = await readState(paths.wtDir);
   state = await reconcile(paths.wtDir, paths.container, state);
 
@@ -101,6 +107,7 @@ async function loadBranchData(paths: ContainerPaths): Promise<BranchEntry[]> {
       slotName,
       dirty,
       lastUsedAt: slot.last_used_at,
+      isCurrent: branch === currentBranch,
     });
   }
 
@@ -140,9 +147,11 @@ async function loadBranchData(paths: ContainerPaths): Promise<BranchEntry[]> {
     // Ignore errors — degrade gracefully
   }
 
-  // Sort: all entries by LRU recency (most recently used first).
+  // Sort: current branch always first, then by LRU recency (most recently used first).
   // Pinned entries stay in their natural LRU position — not promoted to top.
   entries.sort((a, b) => {
+    if (a.isCurrent) return -1;
+    if (b.isCurrent) return 1;
     const aTime = a.lastUsedAt ? new Date(a.lastUsedAt).getTime() : 0;
     const bTime = b.lastUsedAt ? new Date(b.lastUsedAt).getTime() : 0;
     return bTime - aTime;
@@ -154,9 +163,22 @@ async function loadBranchData(paths: ContainerPaths): Promise<BranchEntry[]> {
 export function WorktreePanel({ paths, onBack }: Props) {
   const { exit } = useApp();
   const [mode, setMode] = useState<Mode>("list");
+
+  // Detect which branch the user is currently sitting in
+  const [currentBranch] = useState<string | null>(() => {
+    const slot = currentSlotName(process.cwd(), paths);
+    if (!slot) return null;
+    try {
+      const state = readStateSync(paths.wtDir);
+      return state.slots[slot]?.branch ?? null;
+    } catch {
+      return null;
+    }
+  });
+
   const [entries, setEntries] = useState<BranchEntry[]>(() => {
     try {
-      return buildInitialEntries(readStateSync(paths.wtDir));
+      return buildInitialEntries(readStateSync(paths.wtDir), currentBranch);
     } catch {
       return [];
     }
@@ -182,7 +204,7 @@ export function WorktreePanel({ paths, onBack }: Props) {
 
   // Load full data on mount (git status, reconcile, local branches) — update in background
   useEffect(() => {
-    loadBranchData(paths)
+    loadBranchData(paths, currentBranch)
       .then((data) => {
         setEntries(data);
       })
@@ -194,7 +216,7 @@ export function WorktreePanel({ paths, onBack }: Props) {
   // Poll for live updates every 2 seconds
   useEffect(() => {
     const id = setInterval(() => {
-      loadBranchData(paths)
+      loadBranchData(paths, currentBranch)
         .then((newData) => {
           setEntries((prev) =>
             JSON.stringify(prev) !== JSON.stringify(newData) ? newData : prev
@@ -217,7 +239,7 @@ export function WorktreePanel({ paths, onBack }: Props) {
 
   const reload = () => {
     setError(null);
-    loadBranchData(paths)
+    loadBranchData(paths, currentBranch)
       .then((data) => {
         setEntries(data);
       })
@@ -526,6 +548,7 @@ export function WorktreePanel({ paths, onBack }: Props) {
                 <Text color={isSelected ? "cyan" : undefined}>
                   {isSelected ? "› " : "  "}
                 </Text>
+                {entry.isCurrent && <Text color="green">* </Text>}
                 {entry.tier === "pinned" && <Text>📌 </Text>}
                 {(entry.tier === "pinned" || entry.tier === "active") && (
                   <StatusDot dirty={entry.dirty ?? false} />

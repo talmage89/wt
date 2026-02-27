@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Box, Text, useApp, useInput } from "ink";
 import { spawn, execFile } from "child_process";
-import { readdir, writeFile, access } from "fs/promises";
+import { readdir, writeFile, access, unlink } from "fs/promises";
 import { constants } from "fs";
 import { join } from "path";
 import type { ContainerPaths } from "../core/container.js";
@@ -23,7 +23,7 @@ interface HookFile {
   executable: boolean;
 }
 
-type Mode = "list" | "editing" | "chmod_prompt" | "creating";
+type Mode = "list" | "editing" | "chmod_prompt" | "creating" | "confirm_delete";
 
 interface Props {
   paths: ContainerPaths;
@@ -50,6 +50,7 @@ export function HooksPanel({ paths, onBack }: Props) {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [pendingHook, setPendingHook] = useState<HookFile | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<HookFile | null>(null);
 
   const loadHooks = (): Promise<void> => {
     return readdir(hooksDir)
@@ -152,6 +153,31 @@ export function HooksPanel({ paths, onBack }: Props) {
       return;
     }
 
+    if (mode === "confirm_delete") {
+      if (input === "y" || input === "Y") {
+        if (deleteTarget) {
+          unlink(deleteTarget.path)
+            .then(() => {
+              const name = deleteTarget.name;
+              setDeleteTarget(null);
+              setStatusMsg(`Deleted ${name}.`);
+              setSelectedIdx((i) => Math.max(0, i - 1));
+              return loadHooks();
+            })
+            .then(() => setMode("list"))
+            .catch((err: unknown) => {
+              setError(String(err));
+              setDeleteTarget(null);
+              setMode("list");
+            });
+        }
+      } else {
+        setDeleteTarget(null);
+        setMode("list");
+      }
+      return;
+    }
+
     // List mode
     if (key.escape) {
       onBack();
@@ -167,6 +193,12 @@ export function HooksPanel({ paths, onBack }: Props) {
         if (hook) openEditor(hook);
       } else if (!hasPostCheckout) {
         createAndEdit("post-checkout", POST_CHECKOUT_TEMPLATE);
+      }
+    } else if (input === "x") {
+      const hook = hooks[selectedIdx];
+      if (hook) {
+        setDeleteTarget(hook);
+        setMode("confirm_delete");
       }
     } else if (statusMsg !== null) {
       setStatusMsg(null);
@@ -217,6 +249,26 @@ export function HooksPanel({ paths, onBack }: Props) {
     );
   }
 
+  if (mode === "confirm_delete") {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Text bold>Edit Hooks</Text>
+        <Box marginTop={1}>
+          <Text>
+            Delete hook{" "}
+            <Text bold color="yellow">
+              {deleteTarget?.name}
+            </Text>
+            ? [y/N]
+          </Text>
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>y: yes  any other key: cancel</Text>
+        </Box>
+      </Box>
+    );
+  }
+
   return (
     <Box flexDirection="column" padding={1}>
       <Text bold>Edit Hooks</Text>
@@ -261,7 +313,7 @@ export function HooksPanel({ paths, onBack }: Props) {
         </Box>
       )}
       <Box marginTop={1}>
-        <Text dimColor>Enter: edit  Esc: back  q: quit</Text>
+        <Text dimColor>Enter: edit  x: delete  Esc: back  q: quit</Text>
       </Box>
     </Box>
   );
