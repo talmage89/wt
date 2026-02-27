@@ -236,9 +236,9 @@ export function StashPanel({ paths, onBack }: Props) {
         setBulkSelected(new Set());
       } else if (input === "q") {
         exit();
-      } else if (key.upArrow || input === "k") {
+      } else if (key.upArrow || input === "k" || (key.ctrl && input === "p")) {
         setSelectedIdx((i) => Math.max(0, i - 1));
-      } else if (key.downArrow || input === "j") {
+      } else if (key.downArrow || input === "j" || (key.ctrl && input === "n")) {
         setSelectedIdx((i) =>
           allEntries.length === 0 ? 0 : Math.min(allEntries.length - 1, i + 1)
         );
@@ -283,9 +283,9 @@ export function StashPanel({ paths, onBack }: Props) {
       onBack();
     } else if (input === "q") {
       exit();
-    } else if (key.upArrow || input === "k") {
+    } else if (key.upArrow || input === "k" || (key.ctrl && input === "p")) {
       setSelectedIdx((i) => Math.max(0, i - 1));
-    } else if (key.downArrow || input === "j") {
+    } else if (key.downArrow || input === "j" || (key.ctrl && input === "n")) {
       setSelectedIdx((i) =>
         allEntries.length === 0 ? 0 : Math.min(allEntries.length - 1, i + 1)
       );

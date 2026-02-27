@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Box, Text, useInput, useApp } from "ink";
+import { Box, Text, useInput, useApp, useStdin } from "ink";
 import { spawn } from "child_process";
 import { join, dirname } from "path";
 import { writeFile, mkdir } from "fs/promises";
@@ -8,6 +8,7 @@ import type { TemplateConfig } from "../core/config.js";
 import { readConfig, writeConfig } from "../core/config.js";
 import { readState } from "../core/state.js";
 import { generateAllTemplates } from "../core/templates.js";
+import { handleTextEditingKeys } from "./input-helpers.js";
 
 type Mode =
   | "list"
@@ -25,6 +26,7 @@ interface Props {
 
 export function TemplatePanel({ paths, onBack }: Props) {
   const { exit } = useApp();
+  const { setRawMode } = useStdin();
 
   const [mode, setMode] = useState<Mode>("list");
   const [templates, setTemplates] = useState<TemplateConfig[]>([]);
@@ -95,12 +97,19 @@ export function TemplatePanel({ paths, onBack }: Props) {
     const sourcePath = join(paths.wtDir, tmpl.source);
 
     setMode("editing");
-    const child = spawn(editor, [sourcePath], { stdio: "inherit" });
+    // Release stdin so the external editor owns the terminal
+    setRawMode(false);
+    const child = spawn(editor, [sourcePath], {
+      stdio: "inherit",
+      cwd: dirname(sourcePath),
+    });
     child.on("exit", () => {
+      setRawMode(true);
       setEditedTemplate(tmpl);
       setMode("confirm_regen");
     });
     child.on("error", (err) => {
+      setRawMode(true);
       process.stderr.write(`wt: failed to launch editor: ${err.message}\n`);
       setMode("list");
     });
@@ -168,6 +177,8 @@ export function TemplatePanel({ paths, onBack }: Props) {
           setMode("new_target");
           setNewTarget("");
         }
+      } else if (handleTextEditingKeys(input, key, setNewSource)) {
+        // Option+Backspace, Ctrl+W, Ctrl+U handled
       } else if (key.backspace || key.delete) {
         setNewSource((s) => s.slice(0, -1));
       } else if (input && !key.ctrl && !key.meta && input.length === 1) {
@@ -188,6 +199,8 @@ export function TemplatePanel({ paths, onBack }: Props) {
           setNewTarget("");
           void doCreateTemplate(source, target);
         }
+      } else if (handleTextEditingKeys(input, key, setNewTarget)) {
+        // Option+Backspace, Ctrl+W, Ctrl+U handled
       } else if (key.backspace || key.delete) {
         setNewTarget((t) => t.slice(0, -1));
       } else if (input && !key.ctrl && !key.meta && input.length === 1) {
@@ -222,9 +235,9 @@ export function TemplatePanel({ paths, onBack }: Props) {
       onBack();
     } else if (input === "q") {
       exit();
-    } else if (key.upArrow || input === "k") {
+    } else if (key.upArrow || input === "k" || (key.ctrl && input === "p")) {
       setSelectedIdx((i) => Math.max(0, i - 1));
-    } else if (key.downArrow || input === "j") {
+    } else if (key.downArrow || input === "j" || (key.ctrl && input === "n")) {
       setSelectedIdx((i) => Math.min(listLen - 1, i + 1));
     } else if (key.return) {
       if (selectedIdx < templates.length) {
@@ -242,7 +255,7 @@ export function TemplatePanel({ paths, onBack }: Props) {
         setDeleteTarget(tmpl);
         setMode("confirm_delete");
       }
-    } else if (input === "r") {
+    } else if (input === "r" && !key.ctrl) {
       if (templates.length > 0) doRegenAll();
     } else if (statusMsg !== null) {
       setStatusMsg(null);

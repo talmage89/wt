@@ -11,6 +11,7 @@ import * as git from "../core/git.js";
 import { StatusDot } from "./components/StatusDot.js";
 import { RelativeTime } from "./components/RelativeTime.js";
 import { runCheckout } from "../commands/checkout.js";
+import { handleTextEditingKeys } from "./input-helpers.js";
 
 interface BranchEntry {
   branch: string;
@@ -287,6 +288,8 @@ export function WorktreePanel({ paths, onBack }: Props) {
       } else if (key.return) {
         const name = newBranchName.trim();
         if (name) doCreateBranch(name);
+      } else if (handleTextEditingKeys(input, key, setNewBranchName)) {
+        // Option+Backspace, Ctrl+W, Ctrl+U handled
       } else if (key.backspace || key.delete) {
         setNewBranchName((n) => n.slice(0, -1));
       } else if (input && !key.ctrl && !key.meta && input.length === 1) {
@@ -318,14 +321,16 @@ export function WorktreePanel({ paths, onBack }: Props) {
       } else if (key.return) {
         const branch = filteredBranches[searchIdx];
         if (branch) doCheckout(branch);
-      } else if (key.upArrow) {
+      } else if (key.upArrow || (key.ctrl && input === "p")) {
         setSearchIdx((i) => Math.max(0, i - 1));
-      } else if (key.downArrow) {
+      } else if (key.downArrow || (key.ctrl && input === "n")) {
         setSearchIdx((i) =>
           filteredBranches.length === 0
             ? 0
             : Math.min(filteredBranches.length - 1, i + 1)
         );
+      } else if (handleTextEditingKeys(input, key, setSearchQuery)) {
+        // Option+Backspace, Ctrl+W, Ctrl+U handled
       } else if (key.backspace || key.delete) {
         setSearchQuery((q) => q.slice(0, -1));
       } else if (input && !key.ctrl && !key.meta && input.length === 1) {
@@ -360,19 +365,19 @@ export function WorktreePanel({ paths, onBack }: Props) {
           .catch(() => setAllBranches([]))
           .finally(() => setLoadingBranches(false));
       }
-    } else if (input === "n") {
+    } else if (input === "n" && !key.ctrl) {
       setMode("new_branch");
       setNewBranchName("");
-    } else if (key.upArrow || input === "k") {
+    } else if (key.upArrow || input === "k" || (key.ctrl && input === "p")) {
       setSelectedIdx((i) => Math.max(0, i - 1));
-    } else if (key.downArrow || input === "j") {
+    } else if (key.downArrow || input === "j" || (key.ctrl && input === "n")) {
       setSelectedIdx((i) =>
         entries.length === 0 ? 0 : Math.min(entries.length - 1, i + 1)
       );
     } else if (key.return) {
       const entry = entries[selectedIdx];
       if (entry) doCheckout(entry.branch);
-    } else if (input === "p") {
+    } else if (input === "p" && !key.ctrl) {
       const entry = entries[selectedIdx];
       if (
         entry &&
@@ -503,7 +508,7 @@ export function WorktreePanel({ paths, onBack }: Props) {
         </Box>
         <Box marginTop={1}>
           <Text dimColor>
-            ↑/↓: navigate  Enter: checkout  Esc: close
+            ↑/↓/^n/^p: navigate  Enter: checkout  Esc: close
           </Text>
         </Box>
       </Box>

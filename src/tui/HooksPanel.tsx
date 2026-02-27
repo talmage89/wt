@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { Box, Text, useApp, useInput } from "ink";
+import { Box, Text, useApp, useInput, useStdin } from "ink";
 import { spawn, execFile } from "child_process";
 import { readdir, writeFile, access, unlink } from "fs/promises";
 import { constants } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
 import type { ContainerPaths } from "../core/container.js";
 
 const POST_CHECKOUT_TEMPLATE = `#!/usr/bin/env bash
@@ -41,6 +41,7 @@ async function checkExecutable(filePath: string): Promise<boolean> {
 
 export function HooksPanel({ paths, onBack }: Props) {
   const { exit } = useApp();
+  const { setRawMode } = useStdin();
   const hooksDir = join(paths.wtDir, "hooks");
 
   const [mode, setMode] = useState<Mode>("list");
@@ -81,8 +82,14 @@ export function HooksPanel({ paths, onBack }: Props) {
   const openEditor = (hook: HookFile): void => {
     const editor = process.env["EDITOR"] ?? "vi";
     setMode("editing");
-    const child = spawn(editor, [hook.path], { stdio: "inherit" });
+    // Release stdin so the external editor owns the terminal
+    setRawMode(false);
+    const child = spawn(editor, [hook.path], {
+      stdio: "inherit",
+      cwd: dirname(hook.path),
+    });
     child.on("exit", () => {
+      setRawMode(true);
       void checkExecutable(hook.path).then((executable) => {
         const updated: HookFile = { ...hook, executable };
         void loadHooks().then(() => {
@@ -97,6 +104,7 @@ export function HooksPanel({ paths, onBack }: Props) {
       });
     });
     child.on("error", (err) => {
+      setRawMode(true);
       process.stderr.write(`wt: failed to launch editor: ${err.message}\n`);
       setMode("list");
     });
@@ -183,9 +191,9 @@ export function HooksPanel({ paths, onBack }: Props) {
       onBack();
     } else if (input === "q") {
       exit();
-    } else if (key.upArrow || input === "k") {
+    } else if (key.upArrow || input === "k" || (key.ctrl && input === "p")) {
       setSelectedIdx((i) => Math.max(0, i - 1));
-    } else if (key.downArrow || input === "j") {
+    } else if (key.downArrow || input === "j" || (key.ctrl && input === "n")) {
       setSelectedIdx((i) => Math.min(listLen - 1, i + 1));
     } else if (key.return) {
       if (selectedIdx < hooks.length) {
