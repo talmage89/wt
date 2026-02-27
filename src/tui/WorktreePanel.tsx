@@ -472,6 +472,16 @@ export function WorktreePanel({ paths, onBack }: Props) {
   }
 
   if (mode === "search") {
+    const SEARCH_VISIBLE = 20;
+    let searchViewStart = 0;
+    if (filteredBranches.length > SEARCH_VISIBLE) {
+      searchViewStart = Math.min(
+        Math.max(0, searchIdx - Math.floor(SEARCH_VISIBLE / 2)),
+        filteredBranches.length - SEARCH_VISIBLE,
+      );
+    }
+    const searchViewEnd = Math.min(searchViewStart + SEARCH_VISIBLE, filteredBranches.length);
+
     return (
       <Box flexDirection="column" padding={1}>
         <Text bold>Branch Search</Text>
@@ -493,17 +503,25 @@ export function WorktreePanel({ paths, onBack }: Props) {
               No branches match &quot;{searchQuery}&quot;
             </Text>
           ) : (
-            filteredBranches.slice(0, 20).map((branch, i) => (
-              <Box key={branch}>
-                <Text color={i === searchIdx ? "cyan" : undefined} bold={i === searchIdx}>
-                  {i === searchIdx ? "› " : "  "}
-                  {branch}
-                </Text>
-              </Box>
-            ))
-          )}
-          {filteredBranches.length > 20 && (
-            <Text dimColor>...and {filteredBranches.length - 20} more</Text>
+            <>
+              {searchViewStart > 0 && (
+                <Text dimColor>  ↑ {searchViewStart} more</Text>
+              )}
+              {filteredBranches.slice(searchViewStart, searchViewEnd).map((branch, vi) => {
+                const i = searchViewStart + vi;
+                return (
+                  <Box key={branch}>
+                    <Text color={i === searchIdx ? "cyan" : undefined} bold={i === searchIdx}>
+                      {i === searchIdx ? "› " : "  "}
+                      {branch}
+                    </Text>
+                  </Box>
+                );
+              })}
+              {searchViewEnd < filteredBranches.length && (
+                <Text dimColor>  ↓ {filteredBranches.length - searchViewEnd} more</Text>
+              )}
+            </>
           )}
         </Box>
         <Box marginTop={1}>
