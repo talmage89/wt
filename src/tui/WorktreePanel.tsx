@@ -532,6 +532,19 @@ export function WorktreePanel({ paths, onBack }: Props) {
   // List mode
   const currentEntry = entries[selectedIdx];
 
+  // Viewport: show at most MAX_VISIBLE rows, sliding window around selectedIdx
+  const MAX_VISIBLE = 25;
+  let viewStart = 0;
+  if (entries.length > MAX_VISIBLE) {
+    // Keep selected item roughly centered, clamped to bounds
+    viewStart = Math.min(
+      Math.max(0, selectedIdx - Math.floor(MAX_VISIBLE / 2)),
+      entries.length - MAX_VISIBLE
+    );
+  }
+  const viewEnd = Math.min(viewStart + MAX_VISIBLE, entries.length);
+  const visibleEntries = entries.slice(viewStart, viewEnd);
+
   return (
     <Box flexDirection="column" padding={1}>
       <Text bold>Manage Worktrees</Text>
@@ -541,47 +554,56 @@ export function WorktreePanel({ paths, onBack }: Props) {
             No worktrees. Use &quot;wt checkout &lt;branch&gt;&quot; to get started.
           </Text>
         ) : (
-          entries.map((entry, i) => {
-            const isSelected = i === selectedIdx;
-            return (
-              <Box key={entry.branch}>
-                <Text color={isSelected ? "cyan" : undefined}>
-                  {isSelected ? "› " : "  "}
-                </Text>
-                {entry.isCurrent && <Text color="green">* </Text>}
-                {entry.tier === "pinned" && <Text>📌 </Text>}
-                {(entry.tier === "pinned" || entry.tier === "active") && (
-                  <StatusDot dirty={entry.dirty ?? false} />
-                )}
-                <Text
-                  bold={isSelected}
-                  color={
-                    isSelected
-                      ? "cyan"
-                      : entry.tier === "inactive"
-                      ? undefined
-                      : "white"
-                  }
-                  dimColor={entry.tier === "inactive" && !isSelected}
-                >
-                  {" "}
-                  {entry.branch}
-                </Text>
-                {entry.slotName && (
-                  <Text dimColor>  {entry.slotName}</Text>
-                )}
-                {entry.lastUsedAt && (
-                  <>
-                    <Text dimColor>  </Text>
-                    <RelativeTime isoDate={entry.lastUsedAt} dimColor />
-                  </>
-                )}
-                {entry.hasStash && (
-                  <Text color="yellow">  [stash]</Text>
-                )}
-              </Box>
-            );
-          })
+          <>
+            {viewStart > 0 && (
+              <Text dimColor>  ↑ {viewStart} more</Text>
+            )}
+            {visibleEntries.map((entry, vi) => {
+              const i = viewStart + vi;
+              const isSelected = i === selectedIdx;
+              return (
+                <Box key={entry.branch}>
+                  <Text color={isSelected ? "cyan" : undefined}>
+                    {isSelected ? "› " : "  "}
+                  </Text>
+                  {entry.isCurrent && <Text color="green">* </Text>}
+                  {entry.tier === "pinned" && <Text>📌 </Text>}
+                  {(entry.tier === "pinned" || entry.tier === "active") && (
+                    <StatusDot dirty={entry.dirty ?? false} />
+                  )}
+                  <Text
+                    bold={isSelected}
+                    color={
+                      isSelected
+                        ? "cyan"
+                        : entry.tier === "inactive"
+                        ? undefined
+                        : "white"
+                    }
+                    dimColor={entry.tier === "inactive" && !isSelected}
+                  >
+                    {" "}
+                    {entry.branch}
+                  </Text>
+                  {entry.slotName && (
+                    <Text dimColor>  {entry.slotName}</Text>
+                  )}
+                  {entry.lastUsedAt && (
+                    <>
+                      <Text dimColor>  </Text>
+                      <RelativeTime isoDate={entry.lastUsedAt} dimColor />
+                    </>
+                  )}
+                  {entry.hasStash && (
+                    <Text color="yellow">  [stash]</Text>
+                  )}
+                </Box>
+              );
+            })}
+            {viewEnd < entries.length && (
+              <Text dimColor>  ↓ {entries.length - viewEnd} more</Text>
+            )}
+          </>
         )}
       </Box>
       <Box marginTop={1}>

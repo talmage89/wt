@@ -461,28 +461,54 @@ export function StashPanel({ paths, onBack }: Props) {
         <Box marginTop={1}>
           <Text dimColor>No stashes.</Text>
         </Box>
-      ) : (
-        <Box marginTop={1} flexDirection="column">
-          {groups.active.length > 0 && (
-            <Box flexDirection="column">
-              <Text bold dimColor>
-                Active Stashes:
-              </Text>
-              {groups.active.map((entry, i) => renderStashEntry(entry, i))}
-            </Box>
-          )}
-          {groups.archived.length > 0 && (
-            <Box flexDirection="column" marginTop={groups.active.length > 0 ? 1 : 0}>
-              <Text bold dimColor>
-                Archived Stashes:
-              </Text>
-              {groups.archived.map((entry, i) =>
-                renderStashEntry(entry, groups.active.length + i)
-              )}
-            </Box>
-          )}
-        </Box>
-      )}
+      ) : (() => {
+        // Viewport: show at most MAX_VISIBLE rows, sliding around selectedIdx
+        const MAX_VISIBLE = 25;
+        let viewStart = 0;
+        if (allEntries.length > MAX_VISIBLE) {
+          viewStart = Math.min(
+            Math.max(0, selectedIdx - Math.floor(MAX_VISIBLE / 2)),
+            allEntries.length - MAX_VISIBLE
+          );
+        }
+        const viewEnd = Math.min(viewStart + MAX_VISIBLE, allEntries.length);
+
+        // Determine which group headers fall within the visible range
+        const activeEnd = groups.active.length;
+
+        return (
+          <Box marginTop={1} flexDirection="column">
+            {viewStart > 0 && (
+              <Text dimColor>  ↑ {viewStart} more</Text>
+            )}
+            {viewStart < activeEnd && (
+              <Box flexDirection="column">
+                {viewStart === 0 && groups.active.length > 0 && (
+                  <Text bold dimColor>Active Stashes:</Text>
+                )}
+                {groups.active
+                  .map((entry, i) => ({ entry, globalIdx: i }))
+                  .filter(({ globalIdx }) => globalIdx >= viewStart && globalIdx < viewEnd)
+                  .map(({ entry, globalIdx }) => renderStashEntry(entry, globalIdx))}
+              </Box>
+            )}
+            {viewEnd > activeEnd && groups.archived.length > 0 && (
+              <Box flexDirection="column" marginTop={viewStart < activeEnd ? 1 : 0}>
+                {activeEnd >= viewStart && (
+                  <Text bold dimColor>Archived Stashes:</Text>
+                )}
+                {groups.archived
+                  .map((entry, i) => ({ entry, globalIdx: activeEnd + i }))
+                  .filter(({ globalIdx }) => globalIdx >= viewStart && globalIdx < viewEnd)
+                  .map(({ entry, globalIdx }) => renderStashEntry(entry, globalIdx))}
+              </Box>
+            )}
+            {viewEnd < allEntries.length && (
+              <Text dimColor>  ↓ {allEntries.length - viewEnd} more</Text>
+            )}
+          </Box>
+        );
+      })()}
 
       <Box marginTop={1}>
         {isBulk ? (
