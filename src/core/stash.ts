@@ -279,7 +279,8 @@ export async function isZstdAvailable(): Promise<boolean> {
 export async function archiveStash(
   wtDir: string,
   repoDir: string,
-  branch: string
+  branch: string,
+  opts?: { useZstd?: boolean }
 ): Promise<void> {
   const meta = await getStash(wtDir, branch);
   if (!meta || meta.status !== "active") return;
@@ -322,7 +323,8 @@ export async function archiveStash(
   }
 
   let archivePath: string;
-  if (await isZstdAvailable()) {
+  const useZstd = opts?.useZstd ?? (await isZstdAvailable());
+  if (useZstd) {
     archivePath = join(archiveDir, `${encoded}.patch.zst`);
     await execa("zstd", ["-f", "-o", archivePath], {
       input: patch,

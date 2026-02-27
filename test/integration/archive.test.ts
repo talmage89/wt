@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { PassThrough } from "node:stream";
 import path from "node:path";
 import fs from "node:fs/promises";
@@ -381,13 +381,8 @@ describe("archiveStash captures untracked files", () => {
     );
     expect(thirdParent.exitCode).toBe(0);
 
-    // Archive the stash (mock zstd unavailable for easy patch reading)
-    vi.spyOn(
-      await import("../../src/core/stash.js"),
-      "isZstdAvailable"
-    ).mockResolvedValueOnce(false);
-
-    await archiveStash(wtDir, repoDir, "feature-branch");
+    // Archive the stash with zstd disabled for easy patch reading
+    await archiveStash(wtDir, repoDir, "feature-branch", { useZstd: false });
 
     const archivedMeta = await getStash(wtDir, "feature-branch");
     expect(archivedMeta!.status).toBe("archived");
@@ -412,13 +407,8 @@ describe("archiveStash zstd fallback", () => {
 
     await createStashForFeatureBranch(containerDir, wtDir, repoDir);
 
-    // Mock isZstdAvailable to return false
-    vi.spyOn(
-      await import("../../src/core/stash.js"),
-      "isZstdAvailable"
-    ).mockResolvedValueOnce(false);
-
-    await archiveStash(wtDir, repoDir, "feature-branch");
+    // Force zstd off to test uncompressed fallback
+    await archiveStash(wtDir, repoDir, "feature-branch", { useZstd: false });
 
     const meta = await getStash(wtDir, "feature-branch");
     expect(meta!.status).toBe("archived");
@@ -672,13 +662,8 @@ describe("wt stash show for archived stash", () => {
 
     await createStashForFeatureBranch(containerDir, wtDir, repoDir);
 
-    // Mock zstd unavailable for easy patch reading
-    vi.spyOn(
-      await import("../../src/core/stash.js"),
-      "isZstdAvailable"
-    ).mockResolvedValueOnce(false);
-
-    await archiveStash(wtDir, repoDir, "feature-branch");
+    // Archive with zstd disabled for easy patch reading
+    await archiveStash(wtDir, repoDir, "feature-branch", { useZstd: false });
 
     const meta = await getStash(wtDir, "feature-branch");
     expect(meta!.status).toBe("archived");
