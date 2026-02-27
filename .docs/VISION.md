@@ -25,16 +25,16 @@ container/
     hooks/                       # user-defined hook scripts
       post-checkout              # runs after navigating to a new worktree
     state.toml                   # internal state (slot assignments, LRU timestamps, pins)
-  crimson-maple-river/           # worktree slot 1
-  gentle-autumn-spark/           # worktree slot 2
-  bright-coral-dawn/             # worktree slot 3
-  silver-frost-meadow/           # worktree slot 4
-  hollow-pine-creek/             # worktree slot 5
+  a3f2/                          # worktree slot 1
+  k7mz/                          # worktree slot 2
+  p4qx/                          # worktree slot 3
+  r9bn/                          # worktree slot 4
+  w2jd/                          # worktree slot 5
 ```
 
 ### 1.1 Worktree Slot Naming
 
-Each worktree directory is named with **three random memorable words** separated by hyphens. The word list must be curated: short, memorable, and free of offensive words. Once assigned at initialization, a slot's directory name is permanent for the lifetime of that slot.
+Each worktree directory is named with a **random 4-character alphanumeric ID** (lowercase `a-z0-9`). Once assigned at initialization, a slot's directory name is permanent for the lifetime of that slot.
 
 ### 1.2 Original Repository
 
@@ -84,11 +84,11 @@ After `wt init` completes, the following summary is printed to stderr:
 
 ```
 wt: Initialized with 5 worktree slots.
-wt:   crimson-maple-river  (active, branch: main)
-wt:   gentle-autumn-spark  (vacant)
-wt:   bright-coral-dawn    (vacant)
-wt:   silver-frost-meadow  (vacant)
-wt:   hollow-pine-creek    (vacant)
+wt:   a3f2  (active, branch: main)
+wt:   k7mz  (vacant)
+wt:   p4qx  (vacant)
+wt:   r9bn  (vacant)
+wt:   w2jd  (vacant)
 wt:
 wt: To enable shell navigation (cd on checkout), add to your shell config:
 wt:   eval "$(wt shell-init bash)"    # bash
@@ -144,11 +144,11 @@ This mirrors `git checkout -b` semantics.
 After checkout completes, `wt` prints a brief summary to stderr. Only lines that apply are shown:
 
 ```
-wt: Checked out feature/my-branch in crimson-maple-river
-wt: Evicted main from crimson-maple-river (dirty state stashed)
+wt: Checked out feature/my-branch in a3f2
+wt: Evicted main from a3f2 (dirty state stashed)
 wt: Restored stash from 2d ago
 wt: Created local branch feature/new from origin/main
-wt: Navigating to /path/to/crimson-maple-river
+wt: Navigating to /path/to/a3f2
 ```
 
 - The "Checked out" line always appears.
@@ -318,8 +318,8 @@ Shared files live in `.wt/shared/<directory>/`. For example, if `.claude` is con
 Each worktree slot gets:
 
 ```
-crimson-maple-river/.claude/settings.json  -> ../../.wt/shared/.claude/settings.json
-crimson-maple-river/.claude/CLAUDE.md      -> ../../.wt/shared/.claude/CLAUDE.md
+a3f2/.claude/settings.json  -> ../../.wt/shared/.claude/settings.json
+a3f2/.claude/CLAUDE.md      -> ../../.wt/shared/.claude/CLAUDE.md
 ```
 
 Editing the file in any worktree edits the single canonical copy.
@@ -369,7 +369,7 @@ Templates support the following variables, using `{{VARIABLE}}` syntax:
 
 | Variable | Value | Example |
 |---|---|---|
-| `{{WORKTREE_DIR}}` | The three-random-words directory name of the worktree | `crimson-maple-river` |
+| `{{WORKTREE_DIR}}` | The 4-character alphanumeric directory name of the worktree | `a3f2` |
 | `{{BRANCH_NAME}}` | The branch currently checked out in the worktree | `feature/my-branch` |
 
 Example template (`.wt/templates/.env.development`):
@@ -380,11 +380,11 @@ REDIS_PREFIX={{WORKTREE_DIR}}
 BRANCH={{BRANCH_NAME}}
 ```
 
-Generated output in `crimson-maple-river/.env.development`:
+Generated output in `a3f2/.env.development`:
 
 ```
-DATABASE_URL=postgres://localhost:5432/myapp_crimson-maple-river
-REDIS_PREFIX=crimson-maple-river
+DATABASE_URL=postgres://localhost:5432/myapp_a3f2
+REDIS_PREFIX=a3f2
 BRANCH=feature/my-branch
 ```
 
@@ -451,7 +451,7 @@ Active branches (those occupying a worktree slot) display a colored dot:
 
 Additional metadata shown per entry:
 
-- Worktree slot name (three random words) — shown as secondary text for active branches.
+- Worktree slot name (4-char ID) — shown as secondary text for active branches.
 - Time since last used — relative timestamp (e.g., "2h ago", "3d ago").
 - Stash indicator — if a saved stash exists for an inactive branch, show a marker.
 

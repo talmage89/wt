@@ -22,7 +22,7 @@ This file provides guidance to Claude Code when working in this repository.
 
 - Container directory holds `.wt/` (metadata) and worktree slots as siblings.
 - Original repo lives in `.wt/repo/` (bare clone or moved repo). Never modified directly.
-- Worktree slots are named with three random memorable words (permanent names).
+- Worktree slots are named with random 4-character alphanumeric IDs (permanent names).
 - Slots are reused via LRU eviction, not torn down and recreated.
 - All worktrees share one git object store; fetch is centralized.
 

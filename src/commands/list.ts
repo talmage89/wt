@@ -52,7 +52,7 @@ export async function runList(options: ListOptions = {}): Promise<void> {
     await writeState(paths.wtDir, state);
 
     // Collect info for each slot
-    const slotW = 22;
+    const slotW = 10;
     const branchW = 22;
     const statusW = 8;
     const pinnedW = 8;

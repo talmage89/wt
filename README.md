@@ -52,16 +52,16 @@ my-project/
   .wt/                        # metadata, config, stashes
     repo/                      # bare clone of the original repository
     config.toml
-  crimson-maple-river/         # worktree slot 1 (checked out to main)
-  gentle-autumn-spark/         # worktree slot 2 (vacant)
-  bright-coral-dawn/           # worktree slot 3 (vacant)
-  silver-frost-meadow/         # worktree slot 4 (vacant)
-  hollow-pine-creek/           # worktree slot 5 (vacant)
+  a3f2/                        # worktree slot 1 (checked out to main)
+  k7mz/                        # worktree slot 2 (vacant)
+  p4qx/                        # worktree slot 3 (vacant)
+  r9bn/                        # worktree slot 4 (vacant)
+  w2jd/                        # worktree slot 5 (vacant)
 ```
 
 Key ideas:
 
-- **Slots** are permanent directories with random three-word names. They are reused, never torn down.
+- **Slots** are permanent directories with random 4-character alphanumeric IDs. They are reused, never torn down.
 - **LRU eviction** — when all slots are occupied, the least recently used one is freed up for the new branch.
 - **Auto-stashing** — dirty state (staged, unstaged, untracked) is saved on eviction and restored on checkout.
 - **Pinning** — pin a slot to protect it from eviction.

@@ -77,7 +77,7 @@ describe("WorktreePanel", () => {
   it("displays active branch entries with slot names", async () => {
     const stateWithSlot = {
       slots: {
-        "crimson-maple-river": {
+        "a3f2": {
           branch: "main",
           last_used_at: "2026-02-22T12:00:00.000Z",
           pinned: false,
@@ -96,7 +96,7 @@ describe("WorktreePanel", () => {
     await waitForEffects();
     const frame = lastFrame() ?? "";
     expect(frame).toContain("main");
-    expect(frame).toContain("crimson-maple-river");
+    expect(frame).toContain("a3f2");
   });
 
   it("shows pinned indicator for pinned branches", async () => {
