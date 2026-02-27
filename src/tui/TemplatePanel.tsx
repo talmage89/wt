@@ -97,8 +97,9 @@ export function TemplatePanel({ paths, onBack }: Props) {
     const sourcePath = join(paths.wtDir, tmpl.source);
 
     setMode("editing");
-    // Release stdin so the external editor owns the terminal
+    // Release stdin and clear screen so the editor gets a clean terminal
     setRawMode(false);
+    process.stdout.write("\x1b[2J\x1b[H");
     const child = spawn(editor, [sourcePath], {
       stdio: "inherit",
       cwd: dirname(sourcePath),
@@ -263,6 +264,10 @@ export function TemplatePanel({ paths, onBack }: Props) {
   });
 
   // --- Render ---
+
+  if (mode === "editing") {
+    return <Box />;
+  }
 
   if (loading) {
     return (

@@ -82,8 +82,9 @@ export function HooksPanel({ paths, onBack }: Props) {
   const openEditor = (hook: HookFile): void => {
     const editor = process.env["EDITOR"] ?? "vi";
     setMode("editing");
-    // Release stdin so the external editor owns the terminal
+    // Release stdin and clear screen so the editor gets a clean terminal
     setRawMode(false);
+    process.stdout.write("\x1b[2J\x1b[H");
     const child = spawn(editor, [hook.path], {
       stdio: "inherit",
       cwd: dirname(hook.path),
@@ -212,6 +213,10 @@ export function HooksPanel({ paths, onBack }: Props) {
       setStatusMsg(null);
     }
   });
+
+  if (mode === "editing" || mode === "creating") {
+    return <Box />;
+  }
 
   if (loading) {
     return (
