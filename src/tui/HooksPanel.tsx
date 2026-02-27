@@ -79,10 +79,23 @@ export function HooksPanel({ paths, onBack }: Props) {
     void loadHooks();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Hook queued for editing — the actual spawn is deferred to useEffect
+  // so Ink commits the empty <Box /> render before we clear and launch.
+  const [pendingEditHook, setPendingEditHook] = useState<HookFile | null>(null);
+
   const openEditor = (hook: HookFile): void => {
-    const editor = process.env["EDITOR"] ?? "vi";
+    setPendingEditHook(hook);
     setMode("editing");
-    // Release stdin and clear screen so the editor gets a clean terminal
+  };
+
+  // Spawn the editor AFTER React has committed the empty <Box /> render,
+  // preventing Ink's re-render escape sequences from corrupting the editor.
+  useEffect(() => {
+    if (mode !== "editing" || !pendingEditHook) return;
+    const hook = pendingEditHook;
+    setPendingEditHook(null);
+
+    const editor = process.env["EDITOR"] ?? "vi";
     setRawMode(false);
     process.stdout.write("\x1b[2J\x1b[H");
     const child = spawn(editor, [hook.path], {
@@ -109,7 +122,7 @@ export function HooksPanel({ paths, onBack }: Props) {
       process.stderr.write(`wt: failed to launch editor: ${err.message}\n`);
       setMode("list");
     });
-  };
+  }, [mode, pendingEditHook]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const createAndEdit = (name: string, content: string): void => {
     const hookPath = join(hooksDir, name);

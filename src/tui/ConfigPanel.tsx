@@ -67,6 +67,7 @@ export function ConfigPanel({ paths, onBack }: Props) {
       // Without this, Ink intercepts keystrokes meant for the editor, causing
       // double-registration of each key press.
       setRawMode(false);
+      process.stdout.write("\x1b[2J\x1b[H");
       const child = spawn(editor, [configPath], { stdio: "inherit" });
       child.on("exit", () => {
         setRawMode(true);
@@ -180,11 +181,7 @@ export function ConfigPanel({ paths, onBack }: Props) {
   });
 
   if (phase === "editing") {
-    return (
-      <Box padding={1}>
-        <Text>Opening editor...</Text>
-      </Box>
-    );
+    return <Box />;
   }
 
   if (phase === "slot-prompt") {

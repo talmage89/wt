@@ -92,12 +92,25 @@ export function TemplatePanel({ paths, onBack }: Props) {
       });
   };
 
+  // Template queued for editing — the actual spawn is deferred to useEffect
+  // so Ink commits the empty <Box /> render before we clear and launch.
+  const [pendingEdit, setPendingEdit] = useState<TemplateConfig | null>(null);
+
   const doEditTemplate = (tmpl: TemplateConfig) => {
+    setPendingEdit(tmpl);
+    setMode("editing");
+  };
+
+  // Spawn the editor AFTER React has committed the empty <Box /> render,
+  // preventing Ink's re-render escape sequences from corrupting the editor.
+  useEffect(() => {
+    if (mode !== "editing" || !pendingEdit) return;
+    const tmpl = pendingEdit;
+    setPendingEdit(null);
+
     const editor = process.env["EDITOR"] ?? "vi";
     const sourcePath = join(paths.wtDir, tmpl.source);
 
-    setMode("editing");
-    // Release stdin and clear screen so the editor gets a clean terminal
     setRawMode(false);
     process.stdout.write("\x1b[2J\x1b[H");
     const child = spawn(editor, [sourcePath], {
@@ -114,7 +127,7 @@ export function TemplatePanel({ paths, onBack }: Props) {
       process.stderr.write(`wt: failed to launch editor: ${err.message}\n`);
       setMode("list");
     });
-  };
+  }, [mode, pendingEdit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const doCreateTemplate = async (source: string, target: string) => {
     try {
