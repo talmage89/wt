@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from "react";
+import { execFile, spawn } from "node:child_process";
+import { constants } from "node:fs";
+import { access, readdir, unlink, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { Box, Text, useApp, useInput, useStdin } from "ink";
-import { spawn, execFile } from "child_process";
-import { readdir, writeFile, access, unlink } from "fs/promises";
-import { constants } from "fs";
-import { join, dirname } from "path";
+import { useEffect, useState } from "react";
 import type { ContainerPaths } from "../core/container.js";
 
 const POST_CHECKOUT_TEMPLATE = `#!/usr/bin/env bash
@@ -62,7 +62,7 @@ export function HooksPanel({ paths, onBack }: Props) {
             const p = join(hooksDir, name);
             const executable = await checkExecutable(p);
             return { name, path: p, executable };
-          })
+          }),
         );
       })
       .then((hookFiles) => {
@@ -95,7 +95,7 @@ export function HooksPanel({ paths, onBack }: Props) {
     const hook = pendingEditHook;
     setPendingEditHook(null);
 
-    const editor = process.env["EDITOR"] ?? "vi";
+    const editor = process.env.EDITOR ?? "vi";
     setRawMode(false);
     process.stdout.write("\x1b[2J\x1b[H");
     const child = spawn(editor, [hook.path], {
@@ -269,7 +269,7 @@ export function HooksPanel({ paths, onBack }: Props) {
           </Text>
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>y: yes  any other key: skip</Text>
+          <Text dimColor>y: yes any other key: skip</Text>
         </Box>
       </Box>
     );
@@ -289,7 +289,7 @@ export function HooksPanel({ paths, onBack }: Props) {
           </Text>
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>y: yes  any other key: cancel</Text>
+          <Text dimColor>y: yes any other key: cancel</Text>
         </Box>
       </Box>
     );
@@ -303,9 +303,7 @@ export function HooksPanel({ paths, onBack }: Props) {
           const isSelected = i === selectedIdx;
           return (
             <Box key={hook.name}>
-              <Text color={isSelected ? "cyan" : undefined}>
-                {isSelected ? "› " : "  "}
-              </Text>
+              <Text color={isSelected ? "cyan" : undefined}>{isSelected ? "› " : "  "}</Text>
               <Text bold={isSelected} color={isSelected ? "cyan" : undefined}>
                 {hook.name}
               </Text>
@@ -316,22 +314,18 @@ export function HooksPanel({ paths, onBack }: Props) {
             </Box>
           );
         })}
-        {!hasPostCheckout && (() => {
-          const isSelected = selectedIdx === hooks.length;
-          return (
-            <Box>
-              <Text color={isSelected ? "cyan" : undefined}>
-                {isSelected ? "› " : "  "}
-              </Text>
-              <Text
-                dimColor={!isSelected}
-                color={isSelected ? "cyan" : undefined}
-              >
-                + Create post-checkout hook
-              </Text>
-            </Box>
-          );
-        })()}
+        {!hasPostCheckout &&
+          (() => {
+            const isSelected = selectedIdx === hooks.length;
+            return (
+              <Box>
+                <Text color={isSelected ? "cyan" : undefined}>{isSelected ? "› " : "  "}</Text>
+                <Text dimColor={!isSelected} color={isSelected ? "cyan" : undefined}>
+                  + Create post-checkout hook
+                </Text>
+              </Box>
+            );
+          })()}
       </Box>
       {statusMsg && (
         <Box marginTop={1}>
@@ -339,7 +333,7 @@ export function HooksPanel({ paths, onBack }: Props) {
         </Box>
       )}
       <Box marginTop={1}>
-        <Text dimColor>Enter: edit  x: delete  Esc: back  q: quit</Text>
+        <Text dimColor>Enter: edit x: delete Esc: back q: quit</Text>
       </Box>
     </Box>
   );

@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
-import { Box, Text, useInput, useApp, useStdin } from "ink";
-import { spawn } from "child_process";
-import { join, dirname } from "path";
-import { writeFile, mkdir } from "fs/promises";
-import type { ContainerPaths } from "../core/container.js";
+import { spawn } from "node:child_process";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { Box, Text, useApp, useInput, useStdin } from "ink";
+import { useEffect, useState } from "react";
 import type { TemplateConfig } from "../core/config.js";
 import { readConfig, writeConfig } from "../core/config.js";
+import type { ContainerPaths } from "../core/container.js";
 import { readState } from "../core/state.js";
 import { generateAllTemplates } from "../core/templates.js";
 import { handleTextEditingKeys } from "./input-helpers.js";
@@ -73,12 +73,7 @@ export function TemplatePanel({ paths, onBack }: Props) {
     setStatusMsg(null);
     Promise.all([readConfig(paths.wtDir), readState(paths.wtDir)])
       .then(([config, state]) =>
-        generateAllTemplates(
-          paths.wtDir,
-          paths.container,
-          state.slots,
-          config.templates
-        )
+        generateAllTemplates(paths.wtDir, paths.container, state.slots, config.templates),
       )
       .then(() => {
         setStatusMsg("Templates regenerated across all worktrees.");
@@ -108,7 +103,7 @@ export function TemplatePanel({ paths, onBack }: Props) {
     const tmpl = pendingEdit;
     setPendingEdit(null);
 
-    const editor = process.env["EDITOR"] ?? "vi";
+    const editor = process.env.EDITOR ?? "vi";
     const sourcePath = join(paths.wtDir, tmpl.source);
 
     setRawMode(false);
@@ -156,7 +151,7 @@ export function TemplatePanel({ paths, onBack }: Props) {
     try {
       const config = await readConfig(paths.wtDir);
       config.templates = config.templates.filter(
-        (t) => t.source !== tmpl.source || t.target !== tmpl.target
+        (t) => t.source !== tmpl.source || t.target !== tmpl.target,
       );
       await writeConfig(paths.wtDir, config);
       setDeleteTarget(null);
@@ -332,7 +327,7 @@ export function TemplatePanel({ paths, onBack }: Props) {
           </Text>
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>y: yes  any other key: no</Text>
+          <Text dimColor>y: yes any other key: no</Text>
         </Box>
       </Box>
     );
@@ -352,7 +347,7 @@ export function TemplatePanel({ paths, onBack }: Props) {
           </Text>
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>y: yes  any other key: cancel</Text>
+          <Text dimColor>y: yes any other key: cancel</Text>
         </Box>
       </Box>
     );
@@ -363,12 +358,14 @@ export function TemplatePanel({ paths, onBack }: Props) {
       <Box flexDirection="column" padding={1}>
         <Text bold>New Template</Text>
         <Box marginTop={1}>
-          <Text bold color="green">source (relative to .wt/): </Text>
+          <Text bold color="green">
+            source (relative to .wt/):{" "}
+          </Text>
           <Text>{newSource}</Text>
           <Text color="cyan">█</Text>
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>Enter: next  Esc: cancel</Text>
+          <Text dimColor>Enter: next Esc: cancel</Text>
         </Box>
       </Box>
     );
@@ -382,12 +379,14 @@ export function TemplatePanel({ paths, onBack }: Props) {
           <Text dimColor>source: {newSource}</Text>
         </Box>
         <Box marginTop={1}>
-          <Text bold color="green">target (relative to worktree): </Text>
+          <Text bold color="green">
+            target (relative to worktree):{" "}
+          </Text>
           <Text>{newTarget}</Text>
           <Text color="cyan">█</Text>
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>Enter: create  Esc: back</Text>
+          <Text dimColor>Enter: create Esc: back</Text>
         </Box>
       </Box>
     );
@@ -401,13 +400,11 @@ export function TemplatePanel({ paths, onBack }: Props) {
           const isSelected = i === selectedIdx;
           return (
             <Box key={`${tmpl.source}→${tmpl.target}`}>
-              <Text color={isSelected ? "cyan" : undefined}>
-                {isSelected ? "› " : "  "}
-              </Text>
+              <Text color={isSelected ? "cyan" : undefined}>{isSelected ? "› " : "  "}</Text>
               <Text bold={isSelected} color={isSelected ? "cyan" : undefined}>
                 {tmpl.source}
               </Text>
-              <Text dimColor>  →  {tmpl.target}</Text>
+              <Text dimColor> → {tmpl.target}</Text>
             </Box>
           );
         })}
@@ -415,13 +412,8 @@ export function TemplatePanel({ paths, onBack }: Props) {
           const isSelected = selectedIdx === templates.length;
           return (
             <Box>
-              <Text color={isSelected ? "cyan" : undefined}>
-                {isSelected ? "› " : "  "}
-              </Text>
-              <Text
-                dimColor={!isSelected}
-                color={isSelected ? "cyan" : undefined}
-              >
+              <Text color={isSelected ? "cyan" : undefined}>{isSelected ? "› " : "  "}</Text>
+              <Text dimColor={!isSelected} color={isSelected ? "cyan" : undefined}>
                 + Create template
               </Text>
             </Box>
@@ -434,7 +426,7 @@ export function TemplatePanel({ paths, onBack }: Props) {
         </Box>
       )}
       <Box marginTop={1}>
-        <Text dimColor>Enter: edit  x: delete  r: regenerate all  Esc: back  q: quit</Text>
+        <Text dimColor>Enter: edit x: delete r: regenerate all Esc: back q: quit</Text>
       </Box>
     </Box>
   );

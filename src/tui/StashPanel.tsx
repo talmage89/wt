@@ -1,26 +1,15 @@
-import React, { useState, useEffect } from "react";
-import { Box, Text, useInput, useApp } from "ink";
-import { stat } from "fs/promises";
-import { join } from "path";
+import { stat } from "node:fs/promises";
+import { join } from "node:path";
+import { Box, Text, useApp, useInput } from "ink";
+import { useEffect, useState } from "react";
+import { runCheckout } from "../commands/checkout.js";
 import type { ContainerPaths } from "../core/container.js";
 import type { StashMetadata } from "../core/stash.js";
-import {
-  listStashes,
-  dropStash,
-  showStash,
-  restoreStash,
-} from "../core/stash.js";
+import { dropStash, listStashes, restoreStash, showStash } from "../core/stash.js";
 import { readState } from "../core/state.js";
-import { runCheckout } from "../commands/checkout.js";
 import { RelativeTime } from "./components/RelativeTime.js";
 
-type Mode =
-  | "list"
-  | "diff"
-  | "confirm_delete"
-  | "bulk_delete"
-  | "applying"
-  | "confirm_checkout";
+type Mode = "list" | "diff" | "confirm_delete" | "bulk_delete" | "applying" | "confirm_checkout";
 
 interface StashEntry {
   meta: StashMetadata;
@@ -33,7 +22,7 @@ interface Props {
 }
 
 async function loadStashData(
-  paths: ContainerPaths
+  paths: ContainerPaths,
 ): Promise<{ active: StashEntry[]; archived: StashEntry[] }> {
   const stashes = await listStashes(paths.wtDir);
 
@@ -59,8 +48,7 @@ async function loadStashData(
 
   // Sort each group by last_used_at descending (most recent first)
   const byRecency = (a: StashEntry, b: StashEntry) =>
-    new Date(b.meta.last_used_at).getTime() -
-    new Date(a.meta.last_used_at).getTime();
+    new Date(b.meta.last_used_at).getTime() - new Date(a.meta.last_used_at).getTime();
   active.sort(byRecency);
   archived.sort(byRecency);
 
@@ -68,10 +56,7 @@ async function loadStashData(
 }
 
 /** Flat list of all entries in display order: active first, then archived. */
-function flattenEntries(groups: {
-  active: StashEntry[];
-  archived: StashEntry[];
-}): StashEntry[] {
+function flattenEntries(groups: { active: StashEntry[]; archived: StashEntry[] }): StashEntry[] {
   return [...groups.active, ...groups.archived];
 }
 
@@ -128,7 +113,7 @@ export function StashPanel({ paths, onBack }: Props) {
       loadStashData(paths)
         .then((newGroups) => {
           setGroups((prev) =>
-            JSON.stringify(prev) !== JSON.stringify(newGroups) ? newGroups : prev
+            JSON.stringify(prev) !== JSON.stringify(newGroups) ? newGroups : prev,
           );
         })
         .catch(() => {
@@ -144,9 +129,7 @@ export function StashPanel({ paths, onBack }: Props) {
   const doApply = async (branch: string) => {
     // Check if branch is in an active slot
     const state = await readState(paths.wtDir);
-    const slotForBranch = Object.entries(state.slots).find(
-      ([, s]) => s.branch === branch
-    );
+    const slotForBranch = Object.entries(state.slots).find(([, s]) => s.branch === branch);
 
     if (slotForBranch) {
       // Branch is in an active slot — apply directly
@@ -240,7 +223,7 @@ export function StashPanel({ paths, onBack }: Props) {
         setSelectedIdx((i) => Math.max(0, i - 1));
       } else if (key.downArrow || input === "j" || (key.ctrl && input === "n")) {
         setSelectedIdx((i) =>
-          allEntries.length === 0 ? 0 : Math.min(allEntries.length - 1, i + 1)
+          allEntries.length === 0 ? 0 : Math.min(allEntries.length - 1, i + 1),
         );
       } else if (input === " ") {
         // Toggle selection
@@ -261,9 +244,7 @@ export function StashPanel({ paths, onBack }: Props) {
           setBulkSelected(new Set());
           return;
         }
-        Promise.all(
-          branches.map((b) => dropStash(paths.wtDir, paths.repoDir, b))
-        )
+        Promise.all(branches.map((b) => dropStash(paths.wtDir, paths.repoDir, b)))
           .then(() => {
             setBulkSelected(new Set());
             setMode("list");
@@ -286,9 +267,7 @@ export function StashPanel({ paths, onBack }: Props) {
     } else if (key.upArrow || input === "k" || (key.ctrl && input === "p")) {
       setSelectedIdx((i) => Math.max(0, i - 1));
     } else if (key.downArrow || input === "j" || (key.ctrl && input === "n")) {
-      setSelectedIdx((i) =>
-        allEntries.length === 0 ? 0 : Math.min(allEntries.length - 1, i + 1)
-      );
+      setSelectedIdx((i) => (allEntries.length === 0 ? 0 : Math.min(allEntries.length - 1, i + 1)));
     } else if (input === "a") {
       // Apply stash
       if (currentEntry) {
@@ -358,7 +337,7 @@ export function StashPanel({ paths, onBack }: Props) {
           <Text>{diffContent}</Text>
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>Esc: back  q: quit</Text>
+          <Text dimColor>Esc: back q: quit</Text>
         </Box>
       </Box>
     );
@@ -389,7 +368,7 @@ export function StashPanel({ paths, onBack }: Props) {
           </Text>
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>y: yes  any other key: cancel</Text>
+          <Text dimColor>y: yes any other key: cancel</Text>
         </Box>
       </Box>
     );
@@ -409,7 +388,7 @@ export function StashPanel({ paths, onBack }: Props) {
           </Text>
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>y: yes (will navigate to branch)  any other key: cancel</Text>
+          <Text dimColor>y: yes (will navigate to branch) any other key: cancel</Text>
         </Box>
       </Box>
     );
@@ -424,31 +403,20 @@ export function StashPanel({ paths, onBack }: Props) {
 
     return (
       <Box key={entry.meta.branch}>
-        <Text color={isSelected ? "cyan" : undefined}>
-          {isSelected ? "› " : "  "}
-        </Text>
+        <Text color={isSelected ? "cyan" : undefined}>{isSelected ? "› " : "  "}</Text>
         {isBulk && (
-          <Text color={isChecked ? "yellow" : "white"}>
-            {isChecked ? "[✓] " : "[ ] "}
-          </Text>
+          <Text color={isChecked ? "yellow" : "white"}>{isChecked ? "[✓] " : "[ ] "}</Text>
         )}
-        <Text
-          bold={isSelected}
-          color={isSelected ? "cyan" : undefined}
-        >
+        <Text bold={isSelected} color={isSelected ? "cyan" : undefined}>
           {entry.meta.branch}
         </Text>
-        <Text dimColor>  </Text>
+        <Text dimColor> </Text>
         <RelativeTime isoDate={entry.meta.last_used_at} dimColor />
         {entry.meta.status === "archived" && entry.archiveSizeKb !== undefined && (
-          <Text dimColor>  {entry.archiveSizeKb} KB</Text>
+          <Text dimColor> {entry.archiveSizeKb} KB</Text>
         )}
-        {entry.meta.status === "archived" && (
-          <Text color="yellow">  [archived]</Text>
-        )}
-        {entry.meta.commit && (
-          <Text dimColor>  {entry.meta.commit.slice(0, 7)}</Text>
-        )}
+        {entry.meta.status === "archived" && <Text color="yellow"> [archived]</Text>}
+        {entry.meta.commit && <Text dimColor> {entry.meta.commit.slice(0, 7)}</Text>}
       </Box>
     );
   };
@@ -461,64 +429,64 @@ export function StashPanel({ paths, onBack }: Props) {
         <Box marginTop={1}>
           <Text dimColor>No stashes.</Text>
         </Box>
-      ) : (() => {
-        // Viewport: show at most MAX_VISIBLE rows, sliding around selectedIdx
-        const MAX_VISIBLE = 25;
-        let viewStart = 0;
-        if (allEntries.length > MAX_VISIBLE) {
-          viewStart = Math.min(
-            Math.max(0, selectedIdx - Math.floor(MAX_VISIBLE / 2)),
-            allEntries.length - MAX_VISIBLE
+      ) : (
+        (() => {
+          // Viewport: show at most MAX_VISIBLE rows, sliding around selectedIdx
+          const MAX_VISIBLE = 25;
+          let viewStart = 0;
+          if (allEntries.length > MAX_VISIBLE) {
+            viewStart = Math.min(
+              Math.max(0, selectedIdx - Math.floor(MAX_VISIBLE / 2)),
+              allEntries.length - MAX_VISIBLE,
+            );
+          }
+          const viewEnd = Math.min(viewStart + MAX_VISIBLE, allEntries.length);
+
+          // Determine which group headers fall within the visible range
+          const activeEnd = groups.active.length;
+
+          return (
+            <Box marginTop={1} flexDirection="column">
+              {viewStart > 0 && <Text dimColor> ↑ {viewStart} more</Text>}
+              {viewStart < activeEnd && (
+                <Box flexDirection="column">
+                  {viewStart === 0 && groups.active.length > 0 && (
+                    <Text bold dimColor>
+                      Active Stashes:
+                    </Text>
+                  )}
+                  {groups.active
+                    .map((entry, i) => ({ entry, globalIdx: i }))
+                    .filter(({ globalIdx }) => globalIdx >= viewStart && globalIdx < viewEnd)
+                    .map(({ entry, globalIdx }) => renderStashEntry(entry, globalIdx))}
+                </Box>
+              )}
+              {viewEnd > activeEnd && groups.archived.length > 0 && (
+                <Box flexDirection="column" marginTop={viewStart < activeEnd ? 1 : 0}>
+                  {activeEnd >= viewStart && (
+                    <Text bold dimColor>
+                      Archived Stashes:
+                    </Text>
+                  )}
+                  {groups.archived
+                    .map((entry, i) => ({ entry, globalIdx: activeEnd + i }))
+                    .filter(({ globalIdx }) => globalIdx >= viewStart && globalIdx < viewEnd)
+                    .map(({ entry, globalIdx }) => renderStashEntry(entry, globalIdx))}
+                </Box>
+              )}
+              {viewEnd < allEntries.length && (
+                <Text dimColor> ↓ {allEntries.length - viewEnd} more</Text>
+              )}
+            </Box>
           );
-        }
-        const viewEnd = Math.min(viewStart + MAX_VISIBLE, allEntries.length);
-
-        // Determine which group headers fall within the visible range
-        const activeEnd = groups.active.length;
-
-        return (
-          <Box marginTop={1} flexDirection="column">
-            {viewStart > 0 && (
-              <Text dimColor>  ↑ {viewStart} more</Text>
-            )}
-            {viewStart < activeEnd && (
-              <Box flexDirection="column">
-                {viewStart === 0 && groups.active.length > 0 && (
-                  <Text bold dimColor>Active Stashes:</Text>
-                )}
-                {groups.active
-                  .map((entry, i) => ({ entry, globalIdx: i }))
-                  .filter(({ globalIdx }) => globalIdx >= viewStart && globalIdx < viewEnd)
-                  .map(({ entry, globalIdx }) => renderStashEntry(entry, globalIdx))}
-              </Box>
-            )}
-            {viewEnd > activeEnd && groups.archived.length > 0 && (
-              <Box flexDirection="column" marginTop={viewStart < activeEnd ? 1 : 0}>
-                {activeEnd >= viewStart && (
-                  <Text bold dimColor>Archived Stashes:</Text>
-                )}
-                {groups.archived
-                  .map((entry, i) => ({ entry, globalIdx: activeEnd + i }))
-                  .filter(({ globalIdx }) => globalIdx >= viewStart && globalIdx < viewEnd)
-                  .map(({ entry, globalIdx }) => renderStashEntry(entry, globalIdx))}
-              </Box>
-            )}
-            {viewEnd < allEntries.length && (
-              <Text dimColor>  ↓ {allEntries.length - viewEnd} more</Text>
-            )}
-          </Box>
-        );
-      })()}
+        })()
+      )}
 
       <Box marginTop={1}>
         {isBulk ? (
-          <Text dimColor>
-            Space: toggle  Enter: delete selected  Esc: cancel  q: quit
-          </Text>
+          <Text dimColor>Space: toggle Enter: delete selected Esc: cancel q: quit</Text>
         ) : (
-          <Text dimColor>
-            a: apply  d: diff  x: delete  X: bulk delete  Esc: back  q: quit
-          </Text>
+          <Text dimColor>a: apply d: diff x: delete X: bulk delete Esc: back q: quit</Text>
         )}
       </Box>
     </Box>

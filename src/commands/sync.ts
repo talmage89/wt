@@ -1,8 +1,8 @@
-import { findContainer, validateContainer } from "../core/container.js";
-import { readState, writeState } from "../core/state.js";
 import { readConfig } from "../core/config.js";
-import { reconcile } from "../core/reconcile.js";
+import { findContainer, validateContainer } from "../core/container.js";
 import { acquireLock } from "../core/lock.js";
+import { reconcile } from "../core/reconcile.js";
+import { readState, writeState } from "../core/state.js";
 import { syncAllSymlinks } from "../core/symlinks.js";
 import { generateAllTemplates } from "../core/templates.js";
 
@@ -39,20 +39,10 @@ export async function runSync(options: SyncOptions = {}): Promise<void> {
     await writeState(paths.wtDir, state);
 
     // 4. SYNC ALL SYMLINKS
-    await syncAllSymlinks(
-      paths.wtDir,
-      paths.container,
-      state.slots,
-      config.shared.directories
-    );
+    await syncAllSymlinks(paths.wtDir, paths.container, state.slots, config.shared.directories);
 
     // 5. REGENERATE ALL TEMPLATES
-    await generateAllTemplates(
-      paths.wtDir,
-      paths.container,
-      state.slots,
-      config.templates
-    );
+    await generateAllTemplates(paths.wtDir, paths.container, state.slots, config.templates);
   } finally {
     await release();
   }

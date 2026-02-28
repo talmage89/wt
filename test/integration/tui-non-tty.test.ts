@@ -1,9 +1,9 @@
-import { describe, it, expect, afterEach } from "vitest";
-import path from "node:path";
 import fs from "node:fs/promises";
+import path from "node:path";
 import { execa } from "execa";
-import { createTempDir, createBareRemote, cleanup } from "./helpers.js";
+import { afterEach, describe, expect, it } from "vitest";
 import { runInit } from "../../src/commands/init.js";
+import { cleanup, createBareRemote, createTempDir } from "./helpers.js";
 
 const temps: string[] = [];
 
@@ -33,9 +33,7 @@ describe("wt (no args) with non-TTY stdin — BUG-011", () => {
 
     // Find the first slot directory to run wt from inside a worktree
     const entries = await fs.readdir(containerDir, { withFileTypes: true });
-    const slotDir = entries.find(
-      (e) => e.isDirectory() && e.name !== ".wt"
-    );
+    const slotDir = entries.find((e) => e.isDirectory() && e.name !== ".wt");
     expect(slotDir).toBeDefined();
     const slotPath = path.join(containerDir, slotDir!.name);
 
@@ -50,9 +48,7 @@ describe("wt (no args) with non-TTY stdin — BUG-011", () => {
     expect(result.exitCode).toBe(1);
 
     // Should print the clean error message
-    expect(result.stderr).toContain(
-      "wt: TUI requires an interactive terminal"
-    );
+    expect(result.stderr).toContain("wt: TUI requires an interactive terminal");
 
     // Should NOT contain Ink's raw mode error or Node stack traces
     expect(result.stderr).not.toContain("Raw mode is not supported");

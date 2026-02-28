@@ -1,7 +1,7 @@
-import { findContainer, validateContainer, currentSlotName } from "../core/container.js";
-import { readState, writeState } from "../core/state.js";
-import { reconcile } from "../core/reconcile.js";
+import { currentSlotName, findContainer, validateContainer } from "../core/container.js";
 import { acquireLock } from "../core/lock.js";
+import { reconcile } from "../core/reconcile.js";
+import { readState, writeState } from "../core/state.js";
 
 export interface PinOptions {
   cwd?: string;
@@ -10,10 +10,7 @@ export interface PinOptions {
 /**
  * `wt pin [slot]` — pin a worktree slot to prevent LRU eviction.
  */
-export async function runPin(
-  slotName?: string,
-  options: PinOptions = {}
-): Promise<void> {
+export async function runPin(slotName?: string, options: PinOptions = {}): Promise<void> {
   const cwd = options.cwd ?? process.cwd();
 
   const paths = await findContainer(cwd);
@@ -46,9 +43,7 @@ export async function runPin(
     await writeState(paths.wtDir, state);
 
     const branch = state.slots[resolvedSlot].branch ?? "(vacant)";
-    process.stdout.write(
-      `Pinned '${resolvedSlot}' (branch: ${branch}). It will not be evicted.\n`
-    );
+    process.stdout.write(`Pinned '${resolvedSlot}' (branch: ${branch}). It will not be evicted.\n`);
   } finally {
     await release();
   }
@@ -57,10 +52,7 @@ export async function runPin(
 /**
  * `wt unpin [slot]` — unpin a worktree slot.
  */
-export async function runUnpin(
-  slotName?: string,
-  options: PinOptions = {}
-): Promise<void> {
+export async function runUnpin(slotName?: string, options: PinOptions = {}): Promise<void> {
   const cwd = options.cwd ?? process.cwd();
 
   const paths = await findContainer(cwd);
@@ -94,7 +86,7 @@ export async function runUnpin(
 
     const branch = state.slots[resolvedSlot].branch ?? "(vacant)";
     process.stdout.write(
-      `Unpinned '${resolvedSlot}' (branch: ${branch}). It can now be evicted via LRU.\n`
+      `Unpinned '${resolvedSlot}' (branch: ${branch}). It can now be evicted via LRU.\n`,
     );
   } finally {
     await release();

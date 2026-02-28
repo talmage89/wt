@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile } from "fs/promises";
-import { tmpdir } from "os";
-import { join } from "path";
-import { readState, writeState, defaultState } from "../../src/core/state.js";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { defaultState, readState, writeState } from "../../src/core/state.js";
 
 let tmpDir: string;
 
@@ -104,11 +104,7 @@ last_checkout_at = "2024-01-03T00:00:00.000Z"
 `;
     await writeFile(join(tmpDir, "state.toml"), toml, "utf8");
     const s = await readState(tmpDir);
-    expect(s.branch_history.map((e) => e.branch)).toEqual([
-      "first",
-      "second",
-      "third",
-    ]);
+    expect(s.branch_history.map((e) => e.branch)).toEqual(["first", "second", "third"]);
   });
 });
 
@@ -123,7 +119,7 @@ describe("readState — corrupted TOML", () => {
       return true;
     };
 
-    let result;
+    let result: Awaited<ReturnType<typeof readState>> | undefined;
     try {
       result = await readState(tmpDir);
     } finally {
@@ -150,9 +146,7 @@ describe("writeState / round-trip", () => {
           pinned: false,
         },
       },
-      branch_history: [
-        { branch: "main", last_checkout_at: "2024-06-01T12:00:00.000Z" },
-      ],
+      branch_history: [{ branch: "main", last_checkout_at: "2024-06-01T12:00:00.000Z" }],
     };
     await writeState(tmpDir, state);
     const loaded = await readState(tmpDir);

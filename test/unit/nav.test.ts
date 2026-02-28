@@ -1,11 +1,6 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { existsSync } from "fs";
-import {
-  writeNavFile,
-  readNavFile,
-  cleanNavFile,
-  navFilePath,
-} from "../../src/core/nav.js";
+import { existsSync } from "node:fs";
+import { afterEach, describe, expect, it } from "vitest";
+import { cleanNavFile, navFilePath, readNavFile, writeNavFile } from "../../src/core/nav.js";
 
 const TEST_NAV_PATH = `/tmp/wt-nav-test-${process.pid}`;
 
@@ -27,14 +22,14 @@ describe("writeNavFile / readNavFile", () => {
     await writeNavFile.call(null, targetDir);
     // The actual navFilePath uses ppid, but we test with a custom path for isolation
     // Instead, let's test by writing to a known path directly
-    const { writeFile, readFile } = await import("fs/promises");
-    await writeFile(TEST_NAV_PATH, targetDir + "\n", "utf8");
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(TEST_NAV_PATH, `${targetDir}\n`, "utf8");
     const result = await readNavFile(TEST_NAV_PATH);
     expect(result).toBe(targetDir);
   });
 
   it("readNavFile trims newline", async () => {
-    const { writeFile } = await import("fs/promises");
+    const { writeFile } = await import("node:fs/promises");
     await writeFile(TEST_NAV_PATH, "/some/dir\n", "utf8");
     const result = await readNavFile(TEST_NAV_PATH);
     expect(result).toBe("/some/dir");
@@ -43,7 +38,7 @@ describe("writeNavFile / readNavFile", () => {
 
 describe("cleanNavFile", () => {
   it("removes the file", async () => {
-    const { writeFile } = await import("fs/promises");
+    const { writeFile } = await import("node:fs/promises");
     await writeFile(TEST_NAV_PATH, "/test\n", "utf8");
     expect(existsSync(TEST_NAV_PATH)).toBe(true);
     await cleanNavFile(TEST_NAV_PATH);
@@ -51,8 +46,6 @@ describe("cleanNavFile", () => {
   });
 
   it("does not throw on non-existent file", async () => {
-    await expect(
-      cleanNavFile("/tmp/wt-nav-nonexistent-file-99999")
-    ).resolves.not.toThrow();
+    await expect(cleanNavFile("/tmp/wt-nav-nonexistent-file-99999")).resolves.not.toThrow();
   });
 });

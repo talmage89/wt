@@ -1,21 +1,21 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { PassThrough } from "node:stream";
-import path from "node:path";
 import fs from "node:fs/promises";
+import path from "node:path";
+import { PassThrough } from "node:stream";
 import { execa } from "execa";
-import { runInit } from "../../src/commands/init.js";
+import { afterEach, describe, expect, it } from "vitest";
 import { runCheckout } from "../../src/commands/checkout.js";
+import { runInit } from "../../src/commands/init.js";
 import {
-  runStashList,
   runStashApply,
   runStashDrop,
+  runStashList,
   runStashShow,
 } from "../../src/commands/stash.js";
-import { readState, writeState } from "../../src/core/state.js";
 import { readConfig, writeConfig } from "../../src/core/config.js";
-import { getStash, archiveStash } from "../../src/core/stash.js";
+import { archiveStash, getStash } from "../../src/core/stash.js";
+import { readState, writeState } from "../../src/core/state.js";
 import { establishSymlinks } from "../../src/core/symlinks.js";
-import { createTempDir, createTestRepo, cleanup } from "./helpers.js";
+import { cleanup, createTempDir, createTestRepo } from "./helpers.js";
 
 const temps: string[] = [];
 
@@ -49,13 +49,11 @@ async function setupContainer(dir: string) {
 async function createStashViaEviction(
   containerDir: string,
   wtDir: string,
-  repoDir: string
+  repoDir: string,
 ): Promise<{ mainSlotName: string }> {
-  let state = await readState(wtDir);
+  const state = await readState(wtDir);
   const slotNames = Object.keys(state.slots);
-  const mainSlotName = Object.entries(state.slots).find(
-    ([, s]) => s.branch === "main"
-  )?.[0];
+  const mainSlotName = Object.entries(state.slots).find(([, s]) => s.branch === "main")?.[0];
   expect(mainSlotName).toBeDefined();
 
   // Modify a tracked file in the main slot to create dirty state
@@ -143,9 +141,7 @@ describe("wt stash apply", () => {
     // Checkout main again so it's in a slot (with --no-restore to keep stash)
     // Make fill-0 LRU — it's clean, so main will be checked out into a clean working tree
     let state = await readState(wtDir);
-    const fill0Slot = Object.entries(state.slots).find(
-      ([, s]) => s.branch === "fill-0"
-    )?.[0]!;
+    const fill0Slot = Object.entries(state.slots).find(([, s]) => s.branch === "fill-0")![0];
     state.slots[fill0Slot].last_used_at = new Date(0).toISOString();
     await writeState(wtDir, state);
 
@@ -160,13 +156,8 @@ describe("wt stash apply", () => {
 
     // README.md should have the modified content
     state = await readState(wtDir);
-    const mainSlotNew = Object.entries(state.slots).find(
-      ([, s]) => s.branch === "main"
-    )?.[0]!;
-    const content = await fs.readFile(
-      path.join(dir, mainSlotNew, "README.md"),
-      "utf8"
-    );
+    const mainSlotNew = Object.entries(state.slots).find(([, s]) => s.branch === "main")![0];
+    const content = await fs.readFile(path.join(dir, mainSlotNew, "README.md"), "utf8");
     expect(content).toBe("# Modified for stash test\n");
   });
 
@@ -177,9 +168,7 @@ describe("wt stash apply", () => {
     await createStashViaEviction(dir, wtDir, repoDir);
 
     // 'main' has a stash but is NOT in any slot currently
-    await expect(runStashApply("main", { cwd: dir })).rejects.toThrow(
-      "not checked out"
-    );
+    await expect(runStashApply("main", { cwd: dir })).rejects.toThrow("not checked out");
   });
 
   it("succeeds when slot has managed shared symlinks at apply time (BUG-007)", async () => {
@@ -203,26 +192,19 @@ describe("wt stash apply", () => {
     }
 
     // Find the main slot and verify its symlink exists
-    const mainSlot = Object.entries(state.slots).find(
-      ([, s]) => s.branch === "main"
-    )?.[0]!;
+    const mainSlot = Object.entries(state.slots).find(([, s]) => s.branch === "main")![0];
     const symlinkPath = path.join(dir, mainSlot, ".config", "app.json");
     expect((await fs.lstat(symlinkPath)).isSymbolicLink()).toBe(true);
 
     // Create dirty state (modify a tracked file) in the main slot
-    await fs.writeFile(
-      path.join(dir, mainSlot, "README.md"),
-      "# BUG-007 dirty state\n"
-    );
+    await fs.writeFile(path.join(dir, mainSlot, "README.md"), "# BUG-007 dirty state\n");
 
     // Make main LRU so it will be evicted first
     state.slots[mainSlot].last_used_at = new Date(0).toISOString();
     await writeState(wtDir, state);
 
     // Fill all vacant slots
-    const vacantCount = Object.values(state.slots).filter(
-      (s) => s.branch === null
-    ).length;
+    const vacantCount = Object.values(state.slots).filter((s) => s.branch === null).length;
     for (let i = 0; i < vacantCount; i++) {
       await execa("git", ["branch", `bug007-fill-${i}`], { cwd: repoDir });
       await runCheckout({ branch: `bug007-fill-${i}`, cwd: dir });
@@ -240,8 +222,8 @@ describe("wt stash apply", () => {
     // establishSymlinks in checkout, but stash is NOT auto-applied)
     const stateAfterEvict = await readState(wtDir);
     const fill0Slot = Object.entries(stateAfterEvict.slots).find(
-      ([, s]) => s.branch === "bug007-fill-0"
-    )?.[0]!;
+      ([, s]) => s.branch === "bug007-fill-0",
+    )![0];
     stateAfterEvict.slots[fill0Slot].last_used_at = new Date(0).toISOString();
     await writeState(wtDir, stateAfterEvict);
 
@@ -250,8 +232,8 @@ describe("wt stash apply", () => {
     // Verify symlink was re-created by checkout
     const stateWithMain = await readState(wtDir);
     const mainSlotNew = Object.entries(stateWithMain.slots).find(
-      ([, s]) => s.branch === "main"
-    )?.[0]!;
+      ([, s]) => s.branch === "main",
+    )![0];
     const newSymlinkPath = path.join(dir, mainSlotNew, ".config", "app.json");
     expect((await fs.lstat(newSymlinkPath)).isSymbolicLink()).toBe(true);
 
@@ -262,10 +244,7 @@ describe("wt stash apply", () => {
     expect(await getStash(wtDir, "main")).toBeNull();
 
     // The dirty README.md content was restored
-    const content = await fs.readFile(
-      path.join(dir, mainSlotNew, "README.md"),
-      "utf8"
-    );
+    const content = await fs.readFile(path.join(dir, mainSlotNew, "README.md"), "utf8");
     expect(content).toBe("# BUG-007 dirty state\n");
   });
 });
@@ -289,7 +268,7 @@ describe("wt stash drop", () => {
     await setupContainer(dir);
 
     await expect(
-      runStashDrop("nonexistent-branch", { cwd: dir, confirmYes: true })
+      runStashDrop("nonexistent-branch", { cwd: dir, confirmYes: true }),
     ).rejects.toThrow("No stash found");
   });
 
@@ -412,9 +391,7 @@ describe("wt stash show", () => {
     const dir = await mktemp();
     await setupContainer(dir);
 
-    await expect(
-      runStashShow("no-such-branch", { cwd: dir })
-    ).rejects.toThrow("No stash found");
+    await expect(runStashShow("no-such-branch", { cwd: dir })).rejects.toThrow("No stash found");
   });
 
   it("emits actionable error when archived stash patch file is missing (BUG-033)", async () => {

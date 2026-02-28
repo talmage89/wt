@@ -1,13 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile, appendFile } from "fs/promises";
-import { writeFile } from "fs/promises";
-import { tmpdir } from "os";
-import { join } from "path";
-import {
-  readConfig,
-  writeConfig,
-  defaultConfig,
-} from "../../src/core/config.js";
+import { appendFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { defaultConfig, readConfig, writeConfig } from "../../src/core/config.js";
 
 let tmpDir: string;
 
@@ -124,13 +119,11 @@ describe("writeConfig / round-trip", () => {
     await appendFile(
       join(tmpDir, "config.toml"),
       `\n[[templates]]\nsource = "templates/env.test"\ntarget = ".env.test"\n`,
-      "utf8"
+      "utf8",
     );
 
     // readConfig must parse without error and return the template
     const cfg = await readConfig(tmpDir);
-    expect(cfg.templates).toEqual([
-      { source: "templates/env.test", target: ".env.test" },
-    ]);
+    expect(cfg.templates).toEqual([{ source: "templates/env.test", target: ".env.test" }]);
   });
 });

@@ -1,11 +1,11 @@
-import { describe, it, expect, afterEach } from "vitest";
 import path from "node:path";
 import { execa } from "execa";
-import { runInit } from "../../src/commands/init.js";
+import { afterEach, describe, expect, it } from "vitest";
 import { runCheckout } from "../../src/commands/checkout.js";
+import { runInit } from "../../src/commands/init.js";
 import { runList } from "../../src/commands/list.js";
 import { readState } from "../../src/core/state.js";
-import { createTempDir, createTestRepo, cleanup } from "./helpers.js";
+import { cleanup, createTempDir, createTestRepo } from "./helpers.js";
 
 const temps: string[] = [];
 

@@ -1,7 +1,7 @@
-import { execa } from "execa";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { execa } from "execa";
 import type { ContainerPaths } from "../../src/core/container.js";
 
 /**
@@ -60,7 +60,7 @@ export async function createBranch(
   repoDir: string,
   branch: string,
   file: string,
-  content: string
+  content: string,
 ): Promise<void> {
   const currentBranch = (
     await execa("git", ["symbolic-ref", "--short", "HEAD"], { cwd: repoDir })

@@ -1,6 +1,5 @@
-import React from "react";
 import { render } from "ink-testing-library";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock all I/O dependencies before importing the component
 vi.mock("../../src/core/state.js", () => ({
@@ -24,11 +23,11 @@ vi.mock("../../src/commands/checkout.js", () => ({
   runCheckout: vi.fn(),
 }));
 
-import { WorktreePanel } from "../../src/tui/WorktreePanel.js";
-import { readState, readStateSync } from "../../src/core/state.js";
+import * as gitMod from "../../src/core/git.js";
 import { reconcile } from "../../src/core/reconcile.js";
 import { getStash } from "../../src/core/stash.js";
-import * as gitMod from "../../src/core/git.js";
+import { readState, readStateSync } from "../../src/core/state.js";
+import { WorktreePanel } from "../../src/tui/WorktreePanel.js";
 
 const mockPaths = {
   container: "/fake/container",
@@ -54,9 +53,7 @@ describe("WorktreePanel", () => {
   });
 
   it("renders the list immediately without a loading flash", () => {
-    const { lastFrame } = render(
-      <WorktreePanel paths={mockPaths} onBack={() => {}} />
-    );
+    const { lastFrame } = render(<WorktreePanel paths={mockPaths} onBack={() => {}} />);
     const frame = lastFrame() ?? "";
     expect(frame).toContain("Manage Worktrees");
     // Must never show a loading placeholder — the list is available on first render
@@ -64,9 +61,7 @@ describe("WorktreePanel", () => {
   });
 
   it("shows empty state after loading completes with no data", async () => {
-    const { lastFrame } = render(
-      <WorktreePanel paths={mockPaths} onBack={() => {}} />
-    );
+    const { lastFrame } = render(<WorktreePanel paths={mockPaths} onBack={() => {}} />);
     await waitForEffects();
     const frame = lastFrame() ?? "";
     expect(frame).toContain("Manage Worktrees");
@@ -77,22 +72,18 @@ describe("WorktreePanel", () => {
   it("displays active branch entries with slot names", async () => {
     const stateWithSlot = {
       slots: {
-        "a3f2": {
+        a3f2: {
           branch: "main",
           last_used_at: "2026-02-22T12:00:00.000Z",
           pinned: false,
         },
       },
-      branch_history: [
-        { branch: "main", last_checkout_at: "2026-02-22T12:00:00.000Z" },
-      ],
+      branch_history: [{ branch: "main", last_checkout_at: "2026-02-22T12:00:00.000Z" }],
     };
     vi.mocked(readState).mockResolvedValue(stateWithSlot);
     vi.mocked(reconcile).mockImplementation(async (_, __, state) => state);
 
-    const { lastFrame } = render(
-      <WorktreePanel paths={mockPaths} onBack={() => {}} />
-    );
+    const { lastFrame } = render(<WorktreePanel paths={mockPaths} onBack={() => {}} />);
     await waitForEffects();
     const frame = lastFrame() ?? "";
     expect(frame).toContain("main");
@@ -108,16 +99,12 @@ describe("WorktreePanel", () => {
           pinned: true,
         },
       },
-      branch_history: [
-        { branch: "feature/auth", last_checkout_at: "2026-02-22T12:00:00.000Z" },
-      ],
+      branch_history: [{ branch: "feature/auth", last_checkout_at: "2026-02-22T12:00:00.000Z" }],
     };
     vi.mocked(readState).mockResolvedValue(stateWithPinned);
     vi.mocked(reconcile).mockImplementation(async (_, __, state) => state);
 
-    const { lastFrame } = render(
-      <WorktreePanel paths={mockPaths} onBack={() => {}} />
-    );
+    const { lastFrame } = render(<WorktreePanel paths={mockPaths} onBack={() => {}} />);
     await waitForEffects();
     const frame = lastFrame() ?? "";
     expect(frame).toContain("feature/auth");
@@ -128,9 +115,7 @@ describe("WorktreePanel", () => {
   it("shows [stash] marker for inactive branches with active stash", async () => {
     const stateWithHistory = {
       slots: {},
-      branch_history: [
-        { branch: "fix/old-bug", last_checkout_at: "2026-02-15T10:00:00.000Z" },
-      ],
+      branch_history: [{ branch: "fix/old-bug", last_checkout_at: "2026-02-15T10:00:00.000Z" }],
     };
     vi.mocked(readState).mockResolvedValue(stateWithHistory);
     vi.mocked(reconcile).mockImplementation(async (_, __, state) => state);
@@ -143,9 +128,7 @@ describe("WorktreePanel", () => {
       status: "active" as const,
     });
 
-    const { lastFrame } = render(
-      <WorktreePanel paths={mockPaths} onBack={() => {}} />
-    );
+    const { lastFrame } = render(<WorktreePanel paths={mockPaths} onBack={() => {}} />);
     await waitForEffects();
     const frame = lastFrame() ?? "";
     expect(frame).toContain("fix/old-bug");

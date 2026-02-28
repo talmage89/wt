@@ -1,11 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile, writeFile, mkdir } from "fs/promises";
-import { tmpdir } from "os";
-import { join } from "path";
-import {
-  expandTemplate,
-  generateTemplates,
-} from "../../src/core/templates.js";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { expandTemplate, generateTemplates } from "../../src/core/templates.js";
 
 let tmpDir: string;
 
@@ -23,7 +20,7 @@ describe("expandTemplate", () => {
       expandTemplate("dir: {{WORKTREE_DIR}}", {
         WORKTREE_DIR: "amber-bay-creek",
         BRANCH_NAME: "main",
-      })
+      }),
     ).toBe("dir: amber-bay-creek");
   });
 
@@ -32,7 +29,7 @@ describe("expandTemplate", () => {
       expandTemplate("branch: {{BRANCH_NAME}}", {
         WORKTREE_DIR: "slot",
         BRANCH_NAME: "feature/foo",
-      })
+      }),
     ).toBe("branch: feature/foo");
   });
 
@@ -41,7 +38,7 @@ describe("expandTemplate", () => {
       expandTemplate("keep: {{UNKNOWN_VAR}}", {
         WORKTREE_DIR: "slot",
         BRANCH_NAME: "main",
-      })
+      }),
     ).toBe("keep: {{UNKNOWN_VAR}}");
   });
 
@@ -50,22 +47,20 @@ describe("expandTemplate", () => {
       expandTemplate("{{BRANCH_NAME}} is {{BRANCH_NAME}}", {
         WORKTREE_DIR: "slot",
         BRANCH_NAME: "dev",
-      })
+      }),
     ).toBe("dev is dev");
   });
 
   it("passes through content with no variables", () => {
     const content = "no variables here\njust plain text";
-    expect(
-      expandTemplate(content, { WORKTREE_DIR: "slot", BRANCH_NAME: "main" })
-    ).toBe(content);
+    expect(expandTemplate(content, { WORKTREE_DIR: "slot", BRANCH_NAME: "main" })).toBe(content);
   });
 
   it("replaces both variables in the same content", () => {
-    const result = expandTemplate(
-      "slot={{WORKTREE_DIR}} branch={{BRANCH_NAME}}",
-      { WORKTREE_DIR: "my-slot", BRANCH_NAME: "my-branch" }
-    );
+    const result = expandTemplate("slot={{WORKTREE_DIR}} branch={{BRANCH_NAME}}", {
+      WORKTREE_DIR: "my-slot",
+      BRANCH_NAME: "my-branch",
+    });
     expect(result).toBe("slot=my-slot branch=my-branch");
   });
 });
@@ -99,10 +94,7 @@ describe("generateTemplates", () => {
       { source: "deep.tmpl", target: "config/deep/file.txt" },
     ]);
 
-    const content = await readFile(
-      join(worktreeDir, "config/deep/file.txt"),
-      "utf8"
-    );
+    const content = await readFile(join(worktreeDir, "config/deep/file.txt"), "utf8");
     expect(content).toBe("content");
   });
 
@@ -134,7 +126,7 @@ describe("generateTemplates", () => {
     await expect(
       generateTemplates(wtDir, worktreeDir, "slot", "main", [
         { source: "nonexistent.tmpl", target: ".env" },
-      ])
+      ]),
     ).resolves.not.toThrow();
   });
 });

@@ -1,5 +1,5 @@
-import { readFile, writeFile, mkdir } from "fs/promises";
-import { join, dirname } from "path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import type { TemplateConfig } from "./config.js";
 
 /**
@@ -10,7 +10,7 @@ import type { TemplateConfig } from "./config.js";
  */
 export function expandTemplate(
   content: string,
-  vars: { WORKTREE_DIR: string; BRANCH_NAME: string }
+  vars: { WORKTREE_DIR: string; BRANCH_NAME: string },
 ): string {
   return content
     .replace(/\{\{WORKTREE_DIR\}\}/g, vars.WORKTREE_DIR)
@@ -29,7 +29,7 @@ export async function generateTemplates(
   worktreeDir: string,
   slotName: string,
   branchName: string,
-  templates: TemplateConfig[]
+  templates: TemplateConfig[],
 ): Promise<void> {
   const vars = { WORKTREE_DIR: slotName, BRANCH_NAME: branchName };
 
@@ -40,9 +40,7 @@ export async function generateTemplates(
       sourceContent = await readFile(sourcePath, "utf8");
     } catch (err: unknown) {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-        process.stderr.write(
-          `wt: template source not found: ${sourcePath}\n`
-        );
+        process.stderr.write(`wt: template source not found: ${sourcePath}\n`);
         continue;
       }
       throw err;
@@ -62,15 +60,13 @@ export async function generateAllTemplates(
   wtDir: string,
   containerDir: string,
   slots: Record<string, { branch: string | null }>,
-  templates: TemplateConfig[]
+  templates: TemplateConfig[],
 ): Promise<void> {
   const promises: Promise<void>[] = [];
   for (const [slotName, slot] of Object.entries(slots)) {
     const worktreeDir = join(containerDir, slotName);
     const branchName = slot.branch ?? "";
-    promises.push(
-      generateTemplates(wtDir, worktreeDir, slotName, branchName, templates)
-    );
+    promises.push(generateTemplates(wtDir, worktreeDir, slotName, branchName, templates));
   }
   await Promise.all(promises);
 }

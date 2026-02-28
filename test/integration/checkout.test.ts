@@ -1,14 +1,14 @@
-import { describe, it, expect, afterEach } from "vitest";
-import path from "node:path";
 import fs from "node:fs/promises";
+import path from "node:path";
 import { execa } from "execa";
-import { runInit } from "../../src/commands/init.js";
+import { afterEach, describe, expect, it } from "vitest";
 import { runCheckout } from "../../src/commands/checkout.js";
-import { readState, writeState } from "../../src/core/state.js";
-import { getStash } from "../../src/core/stash.js";
+import { runInit } from "../../src/commands/init.js";
 import { readConfig, writeConfig } from "../../src/core/config.js";
+import { getStash } from "../../src/core/stash.js";
+import { readState, writeState } from "../../src/core/state.js";
 import { syncAllSymlinks } from "../../src/core/symlinks.js";
-import { createTempDir, createTestRepo, cleanup, exists } from "./helpers.js";
+import { cleanup, createTempDir, createTestRepo, exists } from "./helpers.js";
 
 const temps: string[] = [];
 
@@ -41,10 +41,7 @@ async function setupContainer(dir: string) {
 /**
  * Find the slot name whose branch matches the given branch name.
  */
-async function findSlotWithBranch(
-  containerDir: string,
-  branch: string
-): Promise<string | null> {
+async function findSlotWithBranch(containerDir: string, branch: string): Promise<string | null> {
   const state = await readState(path.join(containerDir, ".wt"));
   for (const [name, slot] of Object.entries(state.slots)) {
     if (slot.branch === branch) return name;
@@ -65,7 +62,7 @@ async function createLocalBranch(repoDir: string, name: string): Promise<void> {
 async function fillVacantSlots(
   containerDir: string,
   repoDir: string,
-  branches: string[]
+  branches: string[],
 ): Promise<void> {
   for (const b of branches) {
     await createLocalBranch(repoDir, b);
@@ -156,9 +153,7 @@ describe("wt checkout — LRU eviction", () => {
     expect(Object.values(state.slots).every((s) => s.branch !== null)).toBe(true);
 
     // Force main's slot to be the LRU
-    const mainSlot = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch === "main"
-    )!;
+    const mainSlot = Object.keys(state.slots).find((n) => state.slots[n].branch === "main")!;
     state.slots[mainSlot].last_used_at = new Date(0).toISOString();
     await writeState(wtDir, state);
 
@@ -170,9 +165,7 @@ describe("wt checkout — LRU eviction", () => {
     expect(state.slots[mainSlot].branch).toBe("b5");
 
     // main should no longer be in any slot
-    const mainStillInSlot = Object.values(state.slots).some(
-      (s) => s.branch === "main"
-    );
+    const mainStillInSlot = Object.values(state.slots).some((s) => s.branch === "main");
     expect(mainStillInSlot).toBe(false);
   });
 });
@@ -188,25 +181,23 @@ describe("wt checkout — nonexistent branch pre-check (BUG-028)", () => {
     // Record slot assignments before the failed checkout attempt
     const stateBefore = await readState(wtDir);
     const slotsBefore = Object.fromEntries(
-      Object.entries(stateBefore.slots).map(([k, v]) => [k, v.branch])
+      Object.entries(stateBefore.slots).map(([k, v]) => [k, v.branch]),
     );
 
     // Attempt to checkout a branch that doesn't exist anywhere
     await expect(
-      runCheckout({ branch: "feature/does-not-exist-anywhere", cwd: containerDir })
+      runCheckout({ branch: "feature/does-not-exist-anywhere", cwd: containerDir }),
     ).rejects.toThrow("not found locally or on remote");
 
     // Slot assignments must be unchanged — no eviction should have occurred
     const stateAfter = await readState(wtDir);
     const slotsAfter = Object.fromEntries(
-      Object.entries(stateAfter.slots).map(([k, v]) => [k, v.branch])
+      Object.entries(stateAfter.slots).map(([k, v]) => [k, v.branch]),
     );
     expect(slotsAfter).toEqual(slotsBefore);
 
     // No slot should be vacant
-    const hasVacant = Object.values(stateAfter.slots).some(
-      (s) => s.branch === null
-    );
+    const hasVacant = Object.values(stateAfter.slots).some((s) => s.branch === null);
     expect(hasVacant).toBe(false);
   });
 
@@ -228,9 +219,7 @@ describe("wt checkout — nonexistent branch pre-check (BUG-028)", () => {
     await createLocalBranch(repoDir, "remote-only");
 
     // Should succeed without error
-    await expect(
-      runCheckout({ branch: "remote-only", cwd: containerDir })
-    ).resolves.toBeTruthy();
+    await expect(runCheckout({ branch: "remote-only", cwd: containerDir })).resolves.toBeTruthy();
   });
 });
 
@@ -249,10 +238,8 @@ describe("wt checkout — stash save/restore", () => {
     await fillVacantSlots(containerDir, repoDir, ["b1", "b2", "b3", "b4"]);
 
     // Force main's slot to be LRU
-    let state = await readState(wtDir);
-    const mSlot = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch === "main"
-    )!;
+    const state = await readState(wtDir);
+    const mSlot = Object.keys(state.slots).find((n) => state.slots[n].branch === "main")!;
     state.slots[mSlot].last_used_at = new Date(0).toISOString();
     await writeState(wtDir, state);
 
@@ -275,10 +262,8 @@ describe("wt checkout — stash save/restore", () => {
     await fillVacantSlots(containerDir, repoDir, ["b1", "b2", "b3", "b4"]);
 
     // Force main's slot to be LRU (main slot is clean)
-    let state = await readState(wtDir);
-    const mSlot = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch === "main"
-    )!;
+    const state = await readState(wtDir);
+    const mSlot = Object.keys(state.slots).find((n) => state.slots[n].branch === "main")!;
     state.slots[mSlot].last_used_at = new Date(0).toISOString();
     await writeState(wtDir, state);
 
@@ -305,9 +290,7 @@ describe("wt checkout — stash save/restore", () => {
 
     // Evict main (LRU)
     let state = await readState(wtDir);
-    const mSlot = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch === "main"
-    )!;
+    const mSlot = Object.keys(state.slots).find((n) => state.slots[n].branch === "main")!;
     state.slots[mSlot].last_used_at = new Date(0).toISOString();
     await writeState(wtDir, state);
 
@@ -319,9 +302,7 @@ describe("wt checkout — stash save/restore", () => {
 
     // Now make b1's slot LRU so it gets evicted when we checkout main
     state = await readState(wtDir);
-    const b1Slot = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch === "b1"
-    )!;
+    const b1Slot = Object.keys(state.slots).find((n) => state.slots[n].branch === "b1")!;
     state.slots[b1Slot].last_used_at = new Date(0).toISOString();
     await writeState(wtDir, state);
 
@@ -357,9 +338,7 @@ describe("wt checkout — stash save/restore", () => {
 
     // Force main's slot to be LRU so it gets evicted next
     let state = await readState(wtDir);
-    const mSlot = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch === "main"
-    )!;
+    const mSlot = Object.keys(state.slots).find((n) => state.slots[n].branch === "main")!;
     state.slots[mSlot].last_used_at = new Date(0).toISOString();
     await writeState(wtDir, state);
 
@@ -373,9 +352,7 @@ describe("wt checkout — stash save/restore", () => {
 
     // Make b1's slot LRU so it gets evicted when we restore main
     state = await readState(wtDir);
-    const b1Slot = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch === "b1"
-    )!;
+    const b1Slot = Object.keys(state.slots).find((n) => state.slots[n].branch === "b1")!;
     state.slots[b1Slot].last_used_at = new Date(0).toISOString();
     await writeState(wtDir, state);
 
@@ -388,14 +365,14 @@ describe("wt checkout — stash save/restore", () => {
 
     // Untracked file must have been restored
     expect(await exists(path.join(restoredDir, "untracked.txt"))).toBe(true);
-    expect(
-      await fs.readFile(path.join(restoredDir, "untracked.txt"), "utf8")
-    ).toBe("untracked content\n");
+    expect(await fs.readFile(path.join(restoredDir, "untracked.txt"), "utf8")).toBe(
+      "untracked content\n",
+    );
 
     // Tracked file modification should also be restored
-    expect(
-      await fs.readFile(path.join(restoredDir, "README.md"), "utf8")
-    ).toBe("# Dirty Modified\n");
+    expect(await fs.readFile(path.join(restoredDir, "README.md"), "utf8")).toBe(
+      "# Dirty Modified\n",
+    );
 
     // Stash cleaned up after successful restore
     expect(await getStash(wtDir, "main")).toBeNull();
@@ -416,9 +393,7 @@ describe("wt checkout — stash save/restore", () => {
 
     // Evict main
     let state = await readState(wtDir);
-    const mSlot = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch === "main"
-    )!;
+    const mSlot = Object.keys(state.slots).find((n) => state.slots[n].branch === "main")!;
     state.slots[mSlot].last_used_at = new Date(0).toISOString();
     await writeState(wtDir, state);
 
@@ -428,9 +403,7 @@ describe("wt checkout — stash save/restore", () => {
 
     // Make b1's slot LRU
     state = await readState(wtDir);
-    const b1Slot = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch === "b1"
-    )!;
+    const b1Slot = Object.keys(state.slots).find((n) => state.slots[n].branch === "b1")!;
     state.slots[b1Slot].last_used_at = new Date(0).toISOString();
     await writeState(wtDir, state);
 
@@ -447,7 +420,7 @@ describe("wt checkout — stash save/restore", () => {
     // README.md should NOT have the dirty content (stash was not applied)
     const readmeContent = await fs.readFile(
       path.join(containerDir, mainSlotNow!, "README.md"),
-      "utf8"
+      "utf8",
     );
     expect(readmeContent).not.toBe("# No Restore\n");
   });
@@ -470,9 +443,9 @@ describe("wt checkout — pinned slots", () => {
 
     // Attempt checkout of a new branch → should error
     await createLocalBranch(repoDir, "b6");
-    await expect(
-      runCheckout({ branch: "b6", cwd: containerDir })
-    ).rejects.toThrow("All worktree slots are pinned");
+    await expect(runCheckout({ branch: "b6", cwd: containerDir })).rejects.toThrow(
+      "All worktree slots are pinned",
+    );
   });
 
   it("should use a vacant slot even when other slots are pinned", async () => {
@@ -498,9 +471,7 @@ describe("wt checkout — pinned slots", () => {
     expect(targetDir).toBeTruthy();
 
     state = await readState(wtDir);
-    const b2Slot = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch === "b2"
-    );
+    const b2Slot = Object.keys(state.slots).find((n) => state.slots[n].branch === "b2");
     expect(b2Slot).toBeDefined();
   });
 });
@@ -536,14 +507,12 @@ describe("wt checkout — remote branch", () => {
     await runCheckout({ branch: "feature-remote", cwd: containerDir });
 
     const state = await readState(path.join(containerDir, ".wt"));
-    const slotWithFeature = Object.values(state.slots).find(
-      (s) => s.branch === "feature-remote"
-    );
+    const slotWithFeature = Object.values(state.slots).find((s) => s.branch === "feature-remote");
     expect(slotWithFeature).toBeDefined();
 
     // Verify the slot actually has feature-remote checked out
     const featureSlotName = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch === "feature-remote"
+      (n) => state.slots[n].branch === "feature-remote",
     )!;
     const actual = (
       await execa("git", ["symbolic-ref", "--short", "HEAD"], {
@@ -558,9 +527,9 @@ describe("wt checkout — error handling", () => {
   it("should throw when run outside a managed container", async () => {
     const dir = await mktemp();
     // Not a wt container — just a plain directory
-    await expect(
-      runCheckout({ branch: "main", cwd: dir })
-    ).rejects.toThrow("Not inside a wt-managed container");
+    await expect(runCheckout({ branch: "main", cwd: dir })).rejects.toThrow(
+      "Not inside a wt-managed container",
+    );
   });
 
   it("should throw when branch does not exist locally or on remote", async () => {
@@ -568,7 +537,7 @@ describe("wt checkout — error handling", () => {
     const { containerDir } = await setupContainer(dir);
 
     await expect(
-      runCheckout({ branch: "nonexistent-branch-xyz", cwd: containerDir })
+      runCheckout({ branch: "nonexistent-branch-xyz", cwd: containerDir }),
     ).rejects.toBeDefined();
   });
 });
@@ -579,7 +548,7 @@ describe("wt checkout — BUG-016: eviction of slot with unresolved merge confli
 
     // Create repo with a file we'll conflict on
     await createTestRepo(dir);
-    const mainSlotPre = await (() => {
+    const _mainSlotPre = await (() => {
       // We need to set up the conflict scenario:
       // 1. Checkout main, create dirty state (modify a tracked file)
       // 2. Evict main
@@ -595,9 +564,7 @@ describe("wt checkout — BUG-016: eviction of slot with unresolved merge confli
 
     // Find and populate main slot
     let state = await readState(wtDir);
-    const mainSlot = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch === "main"
-    )!;
+    const mainSlot = Object.keys(state.slots).find((n) => state.slots[n].branch === "main")!;
     const mainSlotDir = path.join(dir, mainSlot);
 
     // Create dirty state in main slot: modify README.md
@@ -635,9 +602,7 @@ describe("wt checkout — BUG-016: eviction of slot with unresolved merge confli
 
     // Now make a slot LRU so it gets evicted when we checkout main
     state = await readState(wtDir);
-    const b1Slot = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch === "b1"
-    )!;
+    const b1Slot = Object.keys(state.slots).find((n) => state.slots[n].branch === "b1")!;
     state.slots[b1Slot].last_used_at = new Date(0).toISOString();
     await writeState(wtDir, state);
 
@@ -645,15 +610,12 @@ describe("wt checkout — BUG-016: eviction of slot with unresolved merge confli
 
     // main should now be in a slot, but with merge conflicts
     state = await readState(wtDir);
-    const mainSlotNow = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch === "main"
-    )!;
+    const mainSlotNow = Object.keys(state.slots).find((n) => state.slots[n].branch === "main")!;
     const mainSlotDirNow = path.join(dir, mainSlotNow);
 
     // Verify there are unmerged entries (conflict markers in README.md)
-    const statusOut = (
-      await execa("git", ["status", "--porcelain"], { cwd: mainSlotDirNow })
-    ).stdout;
+    const statusOut = (await execa("git", ["status", "--porcelain"], { cwd: mainSlotDirNow }))
+      .stdout;
     // UU or AA or similar conflict marker should be present
     expect(statusOut).toContain("README.md");
 
@@ -666,15 +628,11 @@ describe("wt checkout — BUG-016: eviction of slot with unresolved merge confli
     await createLocalBranch(repoDir, "b6");
 
     // This must not throw — the fix resolves unmerged entries before stashing
-    await expect(
-      runCheckout({ branch: "b6", cwd: dir })
-    ).resolves.toBeDefined();
+    await expect(runCheckout({ branch: "b6", cwd: dir })).resolves.toBeDefined();
 
     // Verify b6 is now checked out in a slot
     state = await readState(wtDir);
-    const b6Slot = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch === "b6"
-    );
+    const b6Slot = Object.keys(state.slots).find((n) => state.slots[n].branch === "b6");
     expect(b6Slot).toBeDefined();
 
     // A stash should have been created for main (preserving the conflict markers as content)
@@ -738,9 +696,7 @@ describe("wt checkout — -b flag: branch creation", () => {
 
     // Branch should appear in state
     const state = await readState(wtDir);
-    const slot = Object.entries(state.slots).find(
-      ([, s]) => s.branch === "feature/new"
-    )?.[0];
+    const slot = Object.entries(state.slots).find(([, s]) => s.branch === "feature/new")?.[0];
     expect(slot).toBeDefined();
 
     // Verify git agrees
@@ -764,7 +720,7 @@ describe("wt checkout — -b flag: branch creation", () => {
 
     const state = await readState(wtDir);
     const slot = Object.entries(state.slots).find(
-      ([, s]) => s.branch === "feature/from-develop"
+      ([, s]) => s.branch === "feature/from-develop",
     )?.[0];
     expect(slot).toBeDefined();
 
@@ -789,9 +745,7 @@ describe("wt checkout — -b flag: branch creation", () => {
 
     // Force main's slot to be LRU
     let state = await readState(wtDir);
-    const mainSlot = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch === "main"
-    )!;
+    const mainSlot = Object.keys(state.slots).find((n) => state.slots[n].branch === "main")!;
     state.slots[mainSlot].last_used_at = new Date(0).toISOString();
     await writeState(wtDir, state);
 
@@ -804,9 +758,7 @@ describe("wt checkout — -b flag: branch creation", () => {
 
     state = await readState(wtDir);
     // main should no longer be in any slot
-    const mainStillInSlot = Object.values(state.slots).some(
-      (s) => s.branch === "main"
-    );
+    const mainStillInSlot = Object.values(state.slots).some((s) => s.branch === "main");
     expect(mainStillInSlot).toBe(false);
 
     // feature/evict-test should be in the evicted slot
@@ -820,28 +772,26 @@ describe("wt checkout — -b flag: branch creation", () => {
     await fillVacantSlots(containerDir, repoDir, ["b1", "b2", "b3", "b4"]);
 
     // Force main's slot to be LRU so it would be the eviction candidate
-    let state = await readState(wtDir);
-    const mainSlot = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch === "main"
-    )!;
+    const state = await readState(wtDir);
+    const mainSlot = Object.keys(state.slots).find((n) => state.slots[n].branch === "main")!;
     state.slots[mainSlot].last_used_at = new Date(0).toISOString();
     await writeState(wtDir, state);
 
     // Record slot assignments before the failed attempt
     const stateBefore = await readState(wtDir);
     const slotsBefore = Object.fromEntries(
-      Object.entries(stateBefore.slots).map(([k, v]) => [k, v.branch])
+      Object.entries(stateBefore.slots).map(([k, v]) => [k, v.branch]),
     );
 
     // 'main' already exists locally — should fail with a clear error
-    await expect(
-      runCheckout({ branch: "main", create: true, cwd: containerDir })
-    ).rejects.toThrow("already exists");
+    await expect(runCheckout({ branch: "main", create: true, cwd: containerDir })).rejects.toThrow(
+      "already exists",
+    );
 
     // No eviction should have occurred — all slot assignments unchanged
     const stateAfter = await readState(wtDir);
     const slotsAfter = Object.fromEntries(
-      Object.entries(stateAfter.slots).map(([k, v]) => [k, v.branch])
+      Object.entries(stateAfter.slots).map(([k, v]) => [k, v.branch]),
     );
     expect(slotsAfter).toEqual(slotsBefore);
   });
@@ -853,17 +803,15 @@ describe("wt checkout — -b flag: branch creation", () => {
     await fillVacantSlots(containerDir, repoDir, ["b1", "b2", "b3", "b4"]);
 
     // Force main's slot to be LRU so it would be the eviction candidate
-    let state = await readState(wtDir);
-    const mainSlot = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch === "main"
-    )!;
+    const state = await readState(wtDir);
+    const mainSlot = Object.keys(state.slots).find((n) => state.slots[n].branch === "main")!;
     state.slots[mainSlot].last_used_at = new Date(0).toISOString();
     await writeState(wtDir, state);
 
     // Record slot assignments before the failed attempt
     const stateBefore = await readState(wtDir);
     const slotsBefore = Object.fromEntries(
-      Object.entries(stateBefore.slots).map(([k, v]) => [k, v.branch])
+      Object.entries(stateBefore.slots).map(([k, v]) => [k, v.branch]),
     );
 
     // Bad start-point — should fail before evicting
@@ -873,13 +821,13 @@ describe("wt checkout — -b flag: branch creation", () => {
         create: true,
         startPoint: "origin/nonexistent-bad-start",
         cwd: containerDir,
-      })
+      }),
     ).rejects.toBeDefined();
 
     // No eviction should have occurred
     const stateAfter = await readState(wtDir);
     const slotsAfter = Object.fromEntries(
-      Object.entries(stateAfter.slots).map(([k, v]) => [k, v.branch])
+      Object.entries(stateAfter.slots).map(([k, v]) => [k, v.branch]),
     );
     expect(slotsAfter).toEqual(slotsBefore);
   });
@@ -922,7 +870,7 @@ describe("wt checkout — BUG-009: symlinks removed before git checkout", () => 
           const p = path.join(dir, slotName, ".config", "app.json");
           const st = await fs.lstat(p).catch(() => null);
           return st?.isSymbolicLink() ?? false;
-        })
+        }),
       )
     ).some(Boolean);
     expect(hasSymlink).toBe(true);
@@ -930,13 +878,13 @@ describe("wt checkout — BUG-009: symlinks removed before git checkout", () => 
     // Checkout the branch that tracks .config/app.json — must not throw
     // (without the fix, git fails with "untracked working tree files would be overwritten")
     await expect(
-      runCheckout({ branch: "feature/tracked-config", cwd: dir })
+      runCheckout({ branch: "feature/tracked-config", cwd: dir }),
     ).resolves.toBeDefined();
 
     // The slot should have the branch checked out
     const newState = await readState(wtDir);
     const trackedSlot = Object.entries(newState.slots).find(
-      ([, s]) => s.branch === "feature/tracked-config"
+      ([, s]) => s.branch === "feature/tracked-config",
     )?.[0];
     expect(trackedSlot).toBeDefined();
 

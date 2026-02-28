@@ -1,6 +1,5 @@
-import React from "react";
 import { render } from "ink-testing-library";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/core/config.js", () => ({
   readConfig: vi.fn(),
@@ -13,8 +12,8 @@ vi.mock("../../src/core/templates.js", () => ({
   generateAllTemplates: vi.fn(),
 }));
 
-import { TemplatePanel } from "../../src/tui/TemplatePanel.js";
 import { readConfig } from "../../src/core/config.js";
+import { TemplatePanel } from "../../src/tui/TemplatePanel.js";
 
 const mockPaths = {
   container: "/fake/container",
@@ -38,9 +37,7 @@ describe("TemplatePanel", () => {
       shared: { directories: [] },
       templates: [],
     });
-    const { lastFrame } = render(
-      <TemplatePanel paths={mockPaths} onBack={() => {}} />
-    );
+    const { lastFrame } = render(<TemplatePanel paths={mockPaths} onBack={() => {}} />);
     expect(lastFrame()).toContain("Edit Templates");
     expect(lastFrame()).toContain("Loading...");
   });
@@ -53,9 +50,7 @@ describe("TemplatePanel", () => {
       shared: { directories: [] },
       templates: [],
     });
-    const { lastFrame } = render(
-      <TemplatePanel paths={mockPaths} onBack={() => {}} />
-    );
+    const { lastFrame } = render(<TemplatePanel paths={mockPaths} onBack={() => {}} />);
     // Wait for the config promise to resolve and component to re-render
     await new Promise((resolve) => setTimeout(resolve, 50));
     const frame = lastFrame() ?? "";
@@ -80,9 +75,7 @@ describe("TemplatePanel", () => {
         },
       ],
     });
-    const { lastFrame } = render(
-      <TemplatePanel paths={mockPaths} onBack={() => {}} />
-    );
+    const { lastFrame } = render(<TemplatePanel paths={mockPaths} onBack={() => {}} />);
     await waitForEffects();
     const frame = lastFrame() ?? "";
     expect(frame).toContain("templates/.env.development");
@@ -98,9 +91,7 @@ describe("TemplatePanel", () => {
       shared: { directories: [] },
       templates: [],
     });
-    const { lastFrame } = render(
-      <TemplatePanel paths={mockPaths} onBack={() => {}} />
-    );
+    const { lastFrame } = render(<TemplatePanel paths={mockPaths} onBack={() => {}} />);
     await waitForEffects();
     const frame = lastFrame() ?? "";
     expect(frame).toContain("Enter: edit");
@@ -115,9 +106,7 @@ describe("TemplatePanel", () => {
       shared: { directories: [] },
       templates: [],
     });
-    const { lastFrame } = render(
-      <TemplatePanel paths={mockPaths} onBack={() => {}} />
-    );
+    const { lastFrame } = render(<TemplatePanel paths={mockPaths} onBack={() => {}} />);
     await waitForEffects();
     expect(lastFrame()).toContain("Edit Templates");
   });

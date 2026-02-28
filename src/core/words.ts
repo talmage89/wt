@@ -1,4 +1,4 @@
-import { randomInt } from "crypto";
+import { randomInt } from "node:crypto";
 
 const CHARSET = "abcdefghijklmnopqrstuvwxyz0123456789";
 

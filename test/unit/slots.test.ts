@@ -1,18 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   findSlotForBranch,
-  selectSlotForCheckout,
   isVacant,
   markSlotUsed,
   markSlotVacant,
+  selectSlotForCheckout,
 } from "../../src/core/slots.js";
-import type { State, SlotState } from "../../src/core/state.js";
+import type { SlotState, State } from "../../src/core/state.js";
 
-function makeSlot(
-  branch: string | null,
-  last_used_at: string,
-  pinned = false
-): SlotState {
+function makeSlot(branch: string | null, last_used_at: string, pinned = false): SlotState {
   return { branch, last_used_at, pinned };
 }
 
@@ -87,9 +83,7 @@ describe("selectSlotForCheckout", () => {
       "slot-a": makeSlot("main", "2024-01-01T00:00:00.000Z", true),
       "slot-b": makeSlot("dev", "2024-01-02T00:00:00.000Z", true),
     });
-    expect(() => selectSlotForCheckout(state)).toThrow(
-      "All worktree slots are pinned"
-    );
+    expect(() => selectSlotForCheckout(state)).toThrow("All worktree slots are pinned");
   });
 });
 
@@ -110,9 +104,7 @@ describe("markSlotUsed", () => {
 
   it("throws for unknown slot", () => {
     const state = makeState({});
-    expect(() => markSlotUsed(state, "nonexistent", "main")).toThrow(
-      "Slot not found"
-    );
+    expect(() => markSlotUsed(state, "nonexistent", "main")).toThrow("Slot not found");
   });
 });
 

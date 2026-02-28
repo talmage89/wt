@@ -1,14 +1,5 @@
-import {
-  readdir,
-  lstat,
-  mkdir,
-  symlink,
-  readlink,
-  rm,
-  rename,
-  access,
-} from "fs/promises";
-import { join, dirname, relative } from "path";
+import { access, lstat, mkdir, readdir, readlink, rename, rm, symlink } from "node:fs/promises";
+import { dirname, join, relative } from "node:path";
 import * as git from "./git.js";
 
 /**
@@ -28,7 +19,7 @@ async function* walkFiles(rootDir: string, subDir = ""): AsyncGenerator<string> 
   for (const entry of entries) {
     const rel = subDir ? join(subDir, entry) : entry;
     const full = join(rootDir, rel);
-    let st;
+    let st: Awaited<ReturnType<typeof lstat>> | undefined;
     try {
       st = await lstat(full);
     } catch {
@@ -45,10 +36,7 @@ async function* walkFiles(rootDir: string, subDir = ""): AsyncGenerator<string> 
 /**
  * Check if a file path is tracked by git in the given worktree.
  */
-export async function isGitTracked(
-  worktreeDir: string,
-  relativePath: string
-): Promise<boolean> {
+export async function isGitTracked(worktreeDir: string, relativePath: string): Promise<boolean> {
   return git.isTracked(worktreeDir, relativePath);
 }
 
@@ -65,7 +53,7 @@ export async function establishSymlinks(
   wtDir: string,
   worktreeDir: string,
   sharedDirs: string[],
-  branch: string
+  branch: string,
 ): Promise<void> {
   for (const sharedDir of sharedDirs) {
     const canonicalDir = join(wtDir, "shared", sharedDir);
@@ -86,7 +74,7 @@ export async function establishSymlinks(
       const relativeToWorktree = join(sharedDir, file);
       if (await isGitTracked(worktreeDir, relativeToWorktree)) {
         process.stderr.write(
-          `wt: Skipping symlink for ${relativeToWorktree}: file is tracked by git in branch ${branch}.\n`
+          `wt: Skipping symlink for ${relativeToWorktree}: file is tracked by git in branch ${branch}.\n`,
         );
         continue;
       }
@@ -112,8 +100,6 @@ export async function establishSymlinks(
         }
         // else: already correct, skip
       } else {
-        // Real file exists — don't touch it (sync will handle migration)
-        continue;
       }
     }
   }
@@ -132,7 +118,7 @@ export async function syncAllSymlinks(
   wtDir: string,
   containerDir: string,
   slots: Record<string, { branch: string | null }>,
-  sharedDirs: string[]
+  sharedDirs: string[],
 ): Promise<void> {
   for (const sharedDir of sharedDirs) {
     const canonicalDir = join(wtDir, "shared", sharedDir);
@@ -154,7 +140,7 @@ export async function syncAllSymlinks(
 
       for await (const file of walkFiles(worktreeSharedDir)) {
         const fullPath = join(worktreeSharedDir, file);
-        let st;
+        let st: Awaited<ReturnType<typeof lstat>> | undefined;
         try {
           st = await lstat(fullPath);
         } catch {
@@ -216,7 +202,7 @@ export async function syncAllSymlinks(
 
       for await (const file of walkFiles(worktreeSharedDir)) {
         const fullPath = join(worktreeSharedDir, file);
-        let st;
+        let st: Awaited<ReturnType<typeof lstat>> | undefined;
         try {
           st = await lstat(fullPath);
         } catch {
@@ -241,7 +227,7 @@ export async function syncAllSymlinks(
 export async function removeSymlinks(
   wtDir: string,
   worktreeDir: string,
-  sharedDirs: string[]
+  sharedDirs: string[],
 ): Promise<void> {
   for (const sharedDir of sharedDirs) {
     const worktreeSharedDir = join(worktreeDir, sharedDir);
@@ -254,7 +240,7 @@ export async function removeSymlinks(
 
     for await (const file of walkFiles(worktreeSharedDir)) {
       const fullPath = join(worktreeSharedDir, file);
-      let st;
+      let st: Awaited<ReturnType<typeof lstat>> | undefined;
       try {
         st = await lstat(fullPath);
       } catch {

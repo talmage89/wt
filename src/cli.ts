@@ -7,22 +7,17 @@ process.on("exit", () => {
 
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import { runInit } from "./commands/init.js";
-import { runShellInit, type ShellType } from "./commands/shell-init.js";
 import { runCheckout } from "./commands/checkout.js";
-import { runSync } from "./commands/sync.js";
+import { runClean } from "./commands/clean.js";
 import { runFetch } from "./commands/fetch.js";
-import {
-  runStashList,
-  runStashApply,
-  runStashDrop,
-  runStashShow,
-} from "./commands/stash.js";
+import { runHooksShow } from "./commands/hooks.js";
+import { runInit } from "./commands/init.js";
 import { runList } from "./commands/list.js";
 import { runPin, runUnpin } from "./commands/pin.js";
-import { runClean } from "./commands/clean.js";
-import { runHooksShow } from "./commands/hooks.js";
 import { runResume } from "./commands/resume.js";
+import { runShellInit, type ShellType } from "./commands/shell-init.js";
+import { runStashApply, runStashDrop, runStashList, runStashShow } from "./commands/stash.js";
+import { runSync } from "./commands/sync.js";
 import { findContainer } from "./core/container.js";
 
 // `wt -` is a shorthand for `wt resume`. Handle before yargs parses it,
@@ -44,16 +39,14 @@ if (process.argv.length <= 2) {
   if (paths) {
     if (!process.stdin.isTTY) {
       process.stderr.write(
-        "wt: TUI requires an interactive terminal. Use 'wt <command>' for CLI usage.\n"
+        "wt: TUI requires an interactive terminal. Use 'wt <command>' for CLI usage.\n",
       );
       process.exit(1);
     }
     const { render } = await import("ink");
     const React = await import("react");
     const { App } = await import("./tui/App.js");
-    const { waitUntilExit } = render(
-      React.createElement(App, { containerPaths: paths })
-    );
+    const { waitUntilExit } = render(React.createElement(App, { containerPaths: paths }));
     await waitUntilExit();
     process.exit(0);
   } else {
@@ -93,7 +86,7 @@ const cli = yargs(hideBin(process.argv))
       } catch (err: unknown) {
         handleCliError(err);
       }
-    }
+    },
   )
   .command(
     "shell-init <shell>",
@@ -106,8 +99,8 @@ const cli = yargs(hideBin(process.argv))
         describe: "Shell type (bash, zsh, or fish)",
       }),
     (argv) => {
-      process.stdout.write(runShellInit(argv.shell as ShellType) + "\n");
-    }
+      process.stdout.write(`${runShellInit(argv.shell as ShellType)}\n`);
+    },
   )
   .command(
     ["checkout <branch> [start-point]", "co <branch> [start-point]"],
@@ -139,7 +132,7 @@ const cli = yargs(hideBin(process.argv))
       } catch (err: unknown) {
         handleCliError(err);
       }
-    }
+    },
   )
   .command(
     "fetch",
@@ -151,7 +144,7 @@ const cli = yargs(hideBin(process.argv))
       } catch (err: unknown) {
         handleCliError(err);
       }
-    }
+    },
   )
   .command(
     "stash <action> [branch]",
@@ -187,7 +180,7 @@ const cli = yargs(hideBin(process.argv))
       } catch (err: unknown) {
         handleCliError(err);
       }
-    }
+    },
   )
   .command(
     "sync",
@@ -199,7 +192,7 @@ const cli = yargs(hideBin(process.argv))
       } catch (err: unknown) {
         handleCliError(err);
       }
-    }
+    },
   )
   .command(
     "clean",
@@ -211,7 +204,7 @@ const cli = yargs(hideBin(process.argv))
       } catch (err: unknown) {
         handleCliError(err);
       }
-    }
+    },
   )
   .command(
     ["list", "ls"],
@@ -223,7 +216,7 @@ const cli = yargs(hideBin(process.argv))
       } catch (err: unknown) {
         handleCliError(err);
       }
-    }
+    },
   )
   .command(
     "pin [slot]",
@@ -239,7 +232,7 @@ const cli = yargs(hideBin(process.argv))
       } catch (err: unknown) {
         handleCliError(err);
       }
-    }
+    },
   )
   .command(
     "unpin [slot]",
@@ -255,7 +248,7 @@ const cli = yargs(hideBin(process.argv))
       } catch (err: unknown) {
         handleCliError(err);
       }
-    }
+    },
   )
   .command(
     "resume",
@@ -267,7 +260,7 @@ const cli = yargs(hideBin(process.argv))
       } catch (err: unknown) {
         handleCliError(err);
       }
-    }
+    },
   )
   .command(
     "hooks <action> [integration]",
@@ -288,13 +281,13 @@ const cli = yargs(hideBin(process.argv))
       if (argv.action === "show") {
         if (!argv.integration) {
           process.stderr.write(
-            "wt: 'hooks show' requires an integration name (e.g., claude-code)\n"
+            "wt: 'hooks show' requires an integration name (e.g., claude-code)\n",
           );
           process.exit(1);
         }
         runHooksShow(argv.integration as string);
       }
-    }
+    },
   )
   .demandCommand(1, "Run 'wt --help' for usage information")
   .strict()

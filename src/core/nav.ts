@@ -1,4 +1,4 @@
-import { writeFile, readFile, unlink } from "fs/promises";
+import { readFile, unlink, writeFile } from "node:fs/promises";
 
 /**
  * Get the nav file path for the current process (uses parent PID).
@@ -13,7 +13,7 @@ export function navFilePath(): string {
  */
 export async function writeNavFile(targetDir: string): Promise<string> {
   const path = navFilePath();
-  await writeFile(path, targetDir + "\n", "utf8");
+  await writeFile(path, `${targetDir}\n`, "utf8");
   return path;
 }
 

@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { encodeBranch, decodeBranch } from "../../src/core/branch-encode.js";
+import { describe, expect, it } from "vitest";
+import { decodeBranch, encodeBranch } from "../../src/core/branch-encode.js";
 
 describe("encodeBranch", () => {
   it("leaves simple branch names unchanged", () => {

@@ -1,11 +1,11 @@
 import path from "node:path";
-import { findContainer, validateContainer } from "../core/container.js";
-import { readState, writeState } from "../core/state.js";
 import { readConfig } from "../core/config.js";
+import { findContainer, validateContainer } from "../core/container.js";
+import * as git from "../core/git.js";
+import { acquireLock } from "../core/lock.js";
 import { reconcile } from "../core/reconcile.js";
 import { adjustSlotCount } from "../core/slots.js";
-import { acquireLock } from "../core/lock.js";
-import * as git from "../core/git.js";
+import { readState, writeState } from "../core/state.js";
 
 export interface ListOptions {
   cwd?: string;
@@ -74,8 +74,8 @@ export async function runList(options: ListOptions = {}): Promise<void> {
       "  " +
       "─".repeat(10);
 
-    process.stdout.write(header + "\n");
-    process.stdout.write(divider + "\n");
+    process.stdout.write(`${header}\n`);
+    process.stdout.write(`${divider}\n`);
 
     for (const [slotName, slot] of Object.entries(state.slots)) {
       const worktreeDir = path.join(paths.container, slotName);
@@ -96,12 +96,10 @@ export async function runList(options: ListOptions = {}): Promise<void> {
       const lastUsed = relativeTime(slot.last_used_at);
 
       const slotDisplay =
-        slotName.length > slotW - 2
-          ? slotName.slice(0, slotW - 5) + "..."
-          : slotName;
+        slotName.length > slotW - 2 ? `${slotName.slice(0, slotW - 5)}...` : slotName;
       const branchTrunc =
         branchDisplay.length > branchW - 2
-          ? branchDisplay.slice(0, branchW - 5) + "..."
+          ? `${branchDisplay.slice(0, branchW - 5)}...`
           : branchDisplay;
 
       const line =
@@ -111,7 +109,7 @@ export async function runList(options: ListOptions = {}): Promise<void> {
         pinnedDisplay.padEnd(pinnedW) +
         lastUsed;
 
-      process.stdout.write(line + "\n");
+      process.stdout.write(`${line}\n`);
     }
   } finally {
     await release();

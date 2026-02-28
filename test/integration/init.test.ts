@@ -1,19 +1,13 @@
-import { describe, it, expect, afterEach } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { runInit } from "../../src/commands/init.js";
-import { readState } from "../../src/core/state.js";
-import { readConfig } from "../../src/core/config.js";
-import { adjustSlotCount } from "../../src/core/slots.js";
-import * as git from "../../src/core/git.js";
 import { execa } from "execa";
-import {
-  createTempDir,
-  createTestRepo,
-  createBareRemote,
-  cleanup,
-  exists,
-} from "./helpers.js";
+import { afterEach, describe, expect, it } from "vitest";
+import { runInit } from "../../src/commands/init.js";
+import { readConfig } from "../../src/core/config.js";
+import * as git from "../../src/core/git.js";
+import { adjustSlotCount } from "../../src/core/slots.js";
+import { readState } from "../../src/core/state.js";
+import { cleanup, createBareRemote, createTempDir, createTestRepo, exists } from "./helpers.js";
 
 const temps: string[] = [];
 
@@ -100,10 +94,7 @@ describe("wt init (from existing repo)", () => {
 
     await runInit({ cwd: dir });
 
-    const configContent = await fs.readFile(
-      path.join(dir, ".wt", "config.toml"),
-      "utf8"
-    );
+    const configContent = await fs.readFile(path.join(dir, ".wt", "config.toml"), "utf8");
     expect(configContent).toContain("# [[templates]]");
     expect(configContent).toContain('# source = ".env.template"');
     expect(configContent).toContain('# target = ".env"');
@@ -132,9 +123,7 @@ describe("wt init (from existing repo)", () => {
     await runInit({ cwd: dir });
 
     const state = await readState(path.join(dir, ".wt"));
-    const activeSlot = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch !== null
-    )!;
+    const activeSlot = Object.keys(state.slots).find((n) => state.slots[n].branch !== null)!;
 
     const readmePath = path.join(dir, activeSlot, "README.md");
     expect(await exists(readmePath)).toBe(true);
@@ -155,9 +144,7 @@ describe("wt init (from existing repo)", () => {
     expect(await exists(path.join(dir, "README.md"))).toBe(false);
     // But it should exist in the active slot
     const state = await readState(path.join(dir, ".wt"));
-    const activeSlot = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch !== null
-    )!;
+    const activeSlot = Object.keys(state.slots).find((n) => state.slots[n].branch !== null)!;
     expect(await exists(path.join(dir, activeSlot, "README.md"))).toBe(true);
   });
 
@@ -166,18 +153,14 @@ describe("wt init (from existing repo)", () => {
     await createTestRepo(dir);
 
     await runInit({ cwd: dir });
-    await expect(runInit({ cwd: dir })).rejects.toThrow(
-      "already a wt-managed container"
-    );
+    await expect(runInit({ cwd: dir })).rejects.toThrow("already a wt-managed container");
   });
 
   it("should error if not a git repository", async () => {
     const dir = await mktemp();
     // No git init — plain empty directory
 
-    await expect(runInit({ cwd: dir })).rejects.toThrow(
-      "Not at the root of a git repository"
-    );
+    await expect(runInit({ cwd: dir })).rejects.toThrow("Not at the root of a git repository");
   });
 
   it("should reject a repo with no commits without corrupting it (BUG-023)", async () => {
@@ -188,9 +171,7 @@ describe("wt init (from existing repo)", () => {
     await execa("git", ["config", "user.name", "WT Test"], { cwd: dir });
 
     // Must throw a clear error
-    await expect(runInit({ cwd: dir })).rejects.toThrow(
-      "Repository has no commits"
-    );
+    await expect(runInit({ cwd: dir })).rejects.toThrow("Repository has no commits");
 
     // .wt/ must NOT have been created — no state changes
     expect(await exists(path.join(dir, ".wt"))).toBe(false);
@@ -207,9 +188,7 @@ describe("wt init (from existing repo)", () => {
     const subdir = path.join(dir, "src");
     await fs.mkdir(subdir, { recursive: true });
 
-    await expect(runInit({ cwd: subdir })).rejects.toThrow(
-      "Not at the root of a git repository"
-    );
+    await expect(runInit({ cwd: subdir })).rejects.toThrow("Not at the root of a git repository");
   });
 
   it("should error (not corrupt) when run from inside a worktree slot (BUG-017)", async () => {
@@ -228,9 +207,7 @@ describe("wt init (from existing repo)", () => {
     expect(gitStat.isFile()).toBe(true);
 
     // Running wt init from inside a slot must throw a clear error
-    await expect(runInit({ cwd: slotDir })).rejects.toThrow(
-      "not inside a worktree slot"
-    );
+    await expect(runInit({ cwd: slotDir })).rejects.toThrow("not inside a worktree slot");
 
     // The slot must not be corrupted: .git file still present and is a file
     const gitStatAfter = await fs.stat(gitFile);
@@ -279,9 +256,7 @@ describe("wt init <url> (from URL)", () => {
     await runInit({ url: remoteDir, cwd: dir });
 
     const state = await readState(path.join(dir, ".wt"));
-    const activeSlots = Object.values(state.slots).filter(
-      (s) => s.branch !== null
-    );
+    const activeSlots = Object.values(state.slots).filter((s) => s.branch !== null);
     expect(activeSlots.length).toBe(1);
     expect(activeSlots[0].branch).toBe("main");
   });
@@ -291,9 +266,7 @@ describe("wt init <url> (from URL)", () => {
     // Put a file in the directory
     await fs.writeFile(path.join(dir, "existing.txt"), "content");
 
-    await expect(
-      runInit({ url: "file:///nonexistent", cwd: dir })
-    ).rejects.toThrow("not empty");
+    await expect(runInit({ url: "file:///nonexistent", cwd: dir })).rejects.toThrow("not empty");
   });
 
   it("should detect non-main/master default branch (BUG-012)", async () => {
@@ -316,9 +289,7 @@ describe("wt init <url> (from URL)", () => {
     await runInit({ url: remoteDir, cwd: dir });
 
     const state = await readState(path.join(dir, ".wt"));
-    const activeSlots = Object.values(state.slots).filter(
-      (s) => s.branch !== null
-    );
+    const activeSlots = Object.values(state.slots).filter((s) => s.branch !== null);
     expect(activeSlots.length).toBe(1);
     expect(activeSlots[0].branch).toBe("develop");
   });

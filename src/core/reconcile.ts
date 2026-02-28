@@ -1,8 +1,8 @@
-import { readdir, stat, rm } from "fs/promises";
-import { join } from "path";
+import { readdir, rm, stat } from "node:fs/promises";
+import { join } from "node:path";
+import * as git from "./git.js";
 import type { State } from "./state.js";
 import { writeState } from "./state.js";
-import * as git from "./git.js";
 
 /**
  * Reconcile internal state with actual git state.
@@ -23,11 +23,7 @@ import * as git from "./git.js";
  *
  * This function is silent except for orphaned-directory warnings.
  */
-export async function reconcile(
-  wtDir: string,
-  containerDir: string,
-  state: State
-): Promise<State> {
+export async function reconcile(wtDir: string, containerDir: string, state: State): Promise<State> {
   const repoDir = join(wtDir, "repo");
 
   // Step 1: Get all registered worktrees from git
@@ -82,7 +78,7 @@ export async function reconcile(
     if (gitWorktreeAvailable && !registeredPaths.has(slotPath)) {
       // Case b: dir exists but NOT in git worktree list → orphaned directory
       process.stderr.write(
-        `wt: warning: slot "${slotName}" exists on disk but is not registered as a git worktree. Removing from state.\n`
+        `wt: warning: slot "${slotName}" exists on disk but is not registered as a git worktree. Removing from state.\n`,
       );
       delete state.slots[slotName];
       continue;

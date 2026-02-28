@@ -1,10 +1,10 @@
-import { findContainer, validateContainer } from "../core/container.js";
-import { readState, writeState } from "../core/state.js";
 import { readConfig } from "../core/config.js";
-import { reconcile } from "../core/reconcile.js";
-import { acquireLock } from "../core/lock.js";
+import { findContainer, validateContainer } from "../core/container.js";
 import * as git from "../core/git.js";
+import { acquireLock } from "../core/lock.js";
+import { reconcile } from "../core/reconcile.js";
 import { archiveScan } from "../core/stash.js";
+import { readState, writeState } from "../core/state.js";
 
 export interface FetchOptions {
   cwd?: string;
@@ -38,15 +38,9 @@ export async function runFetch(options: FetchOptions = {}): Promise<void> {
     process.stdout.write("Fetched latest from remote.\n");
 
     const config = await readConfig(paths.wtDir);
-    const { archived } = await archiveScan(
-      paths.wtDir,
-      paths.repoDir,
-      config.archive_after_days
-    );
+    const { archived } = await archiveScan(paths.wtDir, paths.repoDir, config.archive_after_days);
     if (archived.length > 0) {
-      process.stderr.write(
-        `Archived ${archived.length} stash(es): ${archived.join(", ")}\n`
-      );
+      process.stderr.write(`Archived ${archived.length} stash(es): ${archived.join(", ")}\n`);
     }
   } finally {
     await release();

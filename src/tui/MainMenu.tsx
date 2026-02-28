@@ -1,5 +1,4 @@
-import React from "react";
-import { Box, Text, useInput, useApp } from "ink";
+import { Box, Text, useApp, useInput } from "ink";
 import SelectInput from "ink-select-input";
 
 type Screen = "worktrees" | "stashes" | "config" | "templates" | "hooks";
@@ -34,13 +33,10 @@ export function MainMenu({ onSelect }: Props) {
     <Box flexDirection="column" padding={1}>
       <Text bold>wt — Git Worktree Control Plane</Text>
       <Box marginTop={1}>
-        <SelectInput<Screen>
-          items={items}
-          onSelect={(item) => onSelect(item.value)}
-        />
+        <SelectInput<Screen> items={items} onSelect={(item) => onSelect(item.value)} />
       </Box>
       <Box marginTop={1}>
-        <Text dimColor>↑/↓ navigate  Enter select  q quit</Text>
+        <Text dimColor>↑/↓ navigate Enter select q quit</Text>
       </Box>
     </Box>
   );

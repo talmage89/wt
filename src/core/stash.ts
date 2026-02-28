@@ -1,20 +1,20 @@
-import { parse, stringify } from "smol-toml";
-import { readFile, writeFile, unlink, readdir, mkdir } from "fs/promises";
-import { join } from "path";
+import { mkdir, readdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { execa } from "execa";
+import { parse, stringify } from "smol-toml";
 import { encodeBranch } from "./branch-encode.js";
 import * as git from "./git.js";
 import { removeSymlinks } from "./symlinks.js";
 
 export interface StashMetadata {
-  branch: string;           // original branch name
-  commit: string;           // commit hash the branch was on at eviction
-  stash_ref: string;        // the stash commit hash
-  created_at: string;       // ISO 8601
-  last_used_at: string;     // ISO 8601 — reset on each `wt` checkout of this branch
+  branch: string; // original branch name
+  commit: string; // commit hash the branch was on at eviction
+  stash_ref: string; // the stash commit hash
+  created_at: string; // ISO 8601
+  last_used_at: string; // ISO 8601 — reset on each `wt` checkout of this branch
   status: "active" | "archived";
-  archived_at?: string;     // ISO 8601, set when archived
-  archive_path?: string;    // path to .patch.zst file, set when archived
+  archived_at?: string; // ISO 8601, set when archived
+  archive_path?: string; // path to .patch.zst file, set when archived
 }
 
 function stashFilePath(wtDir: string, branch: string): string {
@@ -31,32 +31,26 @@ function serializeMetadata(meta: StashMetadata): Record<string, unknown> {
     status: meta.status,
   };
   if (meta.archived_at !== undefined) {
-    data["archived_at"] = meta.archived_at;
+    data.archived_at = meta.archived_at;
   }
   if (meta.archive_path !== undefined) {
-    data["archive_path"] = meta.archive_path;
+    data.archive_path = meta.archive_path;
   }
   return data;
 }
 
 function parseMetadata(parsed: Record<string, unknown>): StashMetadata {
   return {
-    branch: typeof parsed["branch"] === "string" ? parsed["branch"] : "",
-    commit: typeof parsed["commit"] === "string" ? parsed["commit"] : "",
-    stash_ref: typeof parsed["stash_ref"] === "string" ? parsed["stash_ref"] : "",
+    branch: typeof parsed.branch === "string" ? parsed.branch : "",
+    commit: typeof parsed.commit === "string" ? parsed.commit : "",
+    stash_ref: typeof parsed.stash_ref === "string" ? parsed.stash_ref : "",
     created_at:
-      typeof parsed["created_at"] === "string"
-        ? parsed["created_at"]
-        : new Date(0).toISOString(),
+      typeof parsed.created_at === "string" ? parsed.created_at : new Date(0).toISOString(),
     last_used_at:
-      typeof parsed["last_used_at"] === "string"
-        ? parsed["last_used_at"]
-        : new Date(0).toISOString(),
-    status: parsed["status"] === "archived" ? "archived" : "active",
-    archived_at:
-      typeof parsed["archived_at"] === "string" ? parsed["archived_at"] : undefined,
-    archive_path:
-      typeof parsed["archive_path"] === "string" ? parsed["archive_path"] : undefined,
+      typeof parsed.last_used_at === "string" ? parsed.last_used_at : new Date(0).toISOString(),
+    status: parsed.status === "archived" ? "archived" : "active",
+    archived_at: typeof parsed.archived_at === "string" ? parsed.archived_at : undefined,
+    archive_path: typeof parsed.archive_path === "string" ? parsed.archive_path : undefined,
   };
 }
 
@@ -74,7 +68,7 @@ export async function saveStash(
   repoDir: string,
   branch: string,
   worktreeDir: string,
-  sharedDirs: string[] = []
+  sharedDirs: string[] = [],
 ): Promise<boolean> {
   // Remove managed shared symlinks before stashing — they are wt infrastructure,
   // not user state, and are always recreated on checkout. Including them in the
@@ -103,11 +97,7 @@ export async function saveStash(
 
   // BUG-032: ensure .wt/stashes/ exists in case it was deleted after init
   await mkdir(join(wtDir, "stashes"), { recursive: true });
-  await writeFile(
-    stashFilePath(wtDir, branch),
-    stringify(serializeMetadata(meta)),
-    "utf8"
-  );
+  await writeFile(stashFilePath(wtDir, branch), stringify(serializeMetadata(meta)), "utf8");
   return true;
 }
 
@@ -123,7 +113,7 @@ export async function restoreStash(
   wtDir: string,
   repoDir: string,
   branch: string,
-  worktreeDir: string
+  worktreeDir: string,
 ): Promise<"restored" | "conflict" | "none"> {
   const meta = await getStash(wtDir, branch);
   if (!meta || meta.status === "archived") return "none";
@@ -141,11 +131,9 @@ export async function restoreStash(
   }
 
   if (result.conflicted) {
+    process.stderr.write(`wt: Stash for ${branch} produced conflicts. Resolve manually.\n`);
     process.stderr.write(
-      `wt: Stash for ${branch} produced conflicts. Resolve manually.\n`
-    );
-    process.stderr.write(
-      `wt: Run 'wt stash drop ${branch}' after resolution, or 'wt stash show ${branch}' to inspect.\n`
+      `wt: Run 'wt stash drop ${branch}' after resolution, or 'wt stash show ${branch}' to inspect.\n`,
     );
     return "conflict";
   }
@@ -183,10 +171,7 @@ export async function listStashes(wtDir: string): Promise<StashMetadata[]> {
 /**
  * Read stash metadata for a specific branch.
  */
-export async function getStash(
-  wtDir: string,
-  branch: string
-): Promise<StashMetadata | null> {
+export async function getStash(wtDir: string, branch: string): Promise<StashMetadata | null> {
   try {
     const raw = await readFile(stashFilePath(wtDir, branch), "utf8");
     const parsed = parse(raw) as Record<string, unknown>;
@@ -200,11 +185,7 @@ export async function getStash(
 /**
  * Delete a stash (ref + metadata + archive file if present).
  */
-export async function dropStash(
-  wtDir: string,
-  repoDir: string,
-  branch: string
-): Promise<void> {
+export async function dropStash(wtDir: string, repoDir: string, branch: string): Promise<void> {
   const meta = await getStash(wtDir, branch);
   if (!meta) return;
 
@@ -235,10 +216,7 @@ export async function dropStash(
 /**
  * Show stash diff contents.
  */
-export async function showStash(
-  repoDir: string,
-  stashRef: string
-): Promise<string> {
+export async function showStash(repoDir: string, stashRef: string): Promise<string> {
   return git.stashShow(repoDir, stashRef);
 }
 
@@ -250,11 +228,7 @@ export async function touchStash(wtDir: string, branch: string): Promise<void> {
   if (!meta) return;
 
   meta.last_used_at = new Date().toISOString();
-  await writeFile(
-    stashFilePath(wtDir, branch),
-    stringify(serializeMetadata(meta)),
-    "utf8"
-  );
+  await writeFile(stashFilePath(wtDir, branch), stringify(serializeMetadata(meta)), "utf8");
 }
 
 /**
@@ -280,7 +254,7 @@ export async function archiveStash(
   wtDir: string,
   repoDir: string,
   branch: string,
-  opts?: { useZstd?: boolean }
+  opts?: { useZstd?: boolean },
 ): Promise<void> {
   const meta = await getStash(wtDir, branch);
   if (!meta || meta.status !== "active") return;
@@ -291,32 +265,30 @@ export async function archiveStash(
 
   // Export patch via git diff --binary (works in bare repos).
   // git stash show requires a work tree and always fails on bare repos (BUG-008).
-  const diffResult = await execa(
-    "git",
-    ["diff", "--binary", meta.commit, meta.stash_ref],
-    { cwd: repoDir, stdio: ["ignore", "pipe", "pipe"] }
-  );
+  const diffResult = await execa("git", ["diff", "--binary", meta.commit, meta.stash_ref], {
+    cwd: repoDir,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
   let patch = diffResult.stdout;
 
   // BUG-014: Stashes created with `git stash push --include-untracked` store
   // untracked files in a third parent. `git diff` above only captures tracked
   // file changes. Check for a third parent and append its contents.
   try {
-    await execa(
-      "git",
-      ["rev-parse", "--verify", `${meta.stash_ref}^3`],
-      { cwd: repoDir, stdio: ["ignore", "pipe", "pipe"] }
-    );
+    await execa("git", ["rev-parse", "--verify", `${meta.stash_ref}^3`], {
+      cwd: repoDir,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     // Third parent exists — export untracked files.
     // The third parent is a root commit (no parents), so --root is required
     // to produce a diff against the empty tree showing all files as additions.
     const untrackedResult = await execa(
       "git",
       ["diff-tree", "--root", "-r", "-p", "--binary", "--no-commit-id", `${meta.stash_ref}^3`],
-      { cwd: repoDir, stdio: ["ignore", "pipe", "pipe"] }
+      { cwd: repoDir, stdio: ["ignore", "pipe", "pipe"] },
     );
     if (untrackedResult.stdout) {
-      patch += "\n# --- untracked files ---\n" + untrackedResult.stdout;
+      patch += `\n# --- untracked files ---\n${untrackedResult.stdout}`;
     }
   } catch {
     // No third parent — stash has no untracked files, nothing to append
@@ -333,9 +305,7 @@ export async function archiveStash(
   } else {
     archivePath = join(archiveDir, `${encoded}.patch`);
     await writeFile(archivePath, patch, "utf8");
-    process.stderr.write(
-      "Warning: zstd not found. Archived stash stored uncompressed.\n"
-    );
+    process.stderr.write("Warning: zstd not found. Archived stash stored uncompressed.\n");
   }
 
   // Delete git ref (ignore if already gone)
@@ -349,11 +319,7 @@ export async function archiveStash(
   meta.status = "archived";
   meta.archived_at = new Date().toISOString();
   meta.archive_path = archivePath;
-  await writeFile(
-    stashFilePath(wtDir, branch),
-    stringify(serializeMetadata(meta)),
-    "utf8"
-  );
+  await writeFile(stashFilePath(wtDir, branch), stringify(serializeMetadata(meta)), "utf8");
 }
 
 /**
@@ -370,7 +336,7 @@ export async function archiveScan(
   wtDir: string,
   repoDir: string,
   archiveAfterDays: number,
-  excludeBranch?: string
+  excludeBranch?: string,
 ): Promise<{ archived: string[]; skipped: string[] }> {
   const stashes = await listStashes(wtDir);
   const activeStashes = stashes.filter((s) => s.status === "active");
@@ -388,8 +354,7 @@ export async function archiveScan(
 
     // Check age: governed by last_used_at (not created_at)
     const lastUsed = new Date(stash.last_used_at);
-    const daysSinceUse =
-      (Date.now() - lastUsed.getTime()) / (1000 * 60 * 60 * 24);
+    const daysSinceUse = (Date.now() - lastUsed.getTime()) / (1000 * 60 * 60 * 24);
     if (daysSinceUse < archiveAfterDays) {
       skipped.push(stash.branch);
       continue;

@@ -56,7 +56,7 @@ export function encodeBranch(name: string): string {
 
   // Handle edge case: leading `.` (e.g. `.hidden` branches).
   if (result.startsWith(".")) {
-    result = "%2E" + result.slice(1);
+    result = `%2E${result.slice(1)}`;
   }
 
   return result;

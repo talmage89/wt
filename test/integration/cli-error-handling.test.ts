@@ -4,11 +4,11 @@
 // stdio inherit. The CLI catch blocks must NOT print an additional
 // "wt: Command failed with exit code N: git ..." line on top of it.
 
-import { describe, it, expect, afterEach } from "vitest";
 import path from "node:path";
 import { execa } from "execa";
+import { afterEach, describe, expect, it } from "vitest";
 import { runInit } from "../../src/commands/init.js";
-import { createTempDir, createBareRemote, cleanup } from "./helpers.js";
+import { cleanup, createBareRemote, createTempDir } from "./helpers.js";
 
 const temps: string[] = [];
 
@@ -45,11 +45,10 @@ describe("CLI error handling — BUG-019", () => {
   it("does not print 'Command failed with exit code' after git error on checkout of nonexistent branch", async () => {
     const { slotDir } = await setupContainer();
 
-    const result = await execa(
-      "node",
-      [BIN, "checkout", "totally-nonexistent-branch-xyz"],
-      { cwd: slotDir, reject: false }
-    );
+    const result = await execa("node", [BIN, "checkout", "totally-nonexistent-branch-xyz"], {
+      cwd: slotDir,
+      reject: false,
+    });
 
     // Must exit non-zero
     expect(result.exitCode).not.toBe(0);
@@ -62,11 +61,10 @@ describe("CLI error handling — BUG-019", () => {
   it("does not print 'Command failed with exit code' when -b branch already exists", async () => {
     const { slotDir } = await setupContainer();
 
-    const result = await execa(
-      "node",
-      [BIN, "checkout", "-b", "main"],
-      { cwd: slotDir, reject: false }
-    );
+    const result = await execa("node", [BIN, "checkout", "-b", "main"], {
+      cwd: slotDir,
+      reject: false,
+    });
 
     // Must exit non-zero
     expect(result.exitCode).not.toBe(0);

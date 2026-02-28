@@ -1,16 +1,10 @@
 import path from "node:path";
-import { findContainer, validateContainer, currentSlotName } from "../core/container.js";
-import { readState, writeState } from "../core/state.js";
-import { reconcile } from "../core/reconcile.js";
+import { currentSlotName, findContainer, validateContainer } from "../core/container.js";
 import { acquireLock } from "../core/lock.js";
-import {
-  listStashes,
-  getStash,
-  restoreStash,
-  dropStash,
-  showStash,
-} from "../core/stash.js";
+import { reconcile } from "../core/reconcile.js";
 import { findSlotForBranch } from "../core/slots.js";
+import { dropStash, getStash, listStashes, restoreStash, showStash } from "../core/stash.js";
+import { readState, writeState } from "../core/state.js";
 
 export interface StashOptions {
   cwd?: string;
@@ -55,11 +49,7 @@ export async function runStashList(options: StashOptions = {}): Promise<void> {
   const statusW = 10;
   const commitW = 10;
 
-  const header =
-    "Branch".padEnd(branchW) +
-    "Age".padEnd(ageW) +
-    "Status".padEnd(statusW) +
-    "Base Commit";
+  const header = `${"Branch".padEnd(branchW) + "Age".padEnd(ageW) + "Status".padEnd(statusW)}Base Commit`;
   const divider =
     "─".repeat(branchW - 2) +
     "  " +
@@ -69,19 +59,16 @@ export async function runStashList(options: StashOptions = {}): Promise<void> {
     "  " +
     "─".repeat(commitW);
 
-  process.stdout.write(header + "\n");
-  process.stdout.write(divider + "\n");
+  process.stdout.write(`${header}\n`);
+  process.stdout.write(`${divider}\n`);
 
   for (const s of stashes) {
-    const branch = s.branch.length > branchW - 2 ? s.branch.slice(0, branchW - 5) + "..." : s.branch;
+    const branch =
+      s.branch.length > branchW - 2 ? `${s.branch.slice(0, branchW - 5)}...` : s.branch;
     const age = relativeTime(s.created_at);
     const commitShort = s.commit.slice(0, 7);
-    const line =
-      branch.padEnd(branchW) +
-      age.padEnd(ageW) +
-      s.status.padEnd(statusW) +
-      commitShort;
-    process.stdout.write(line + "\n");
+    const line = branch.padEnd(branchW) + age.padEnd(ageW) + s.status.padEnd(statusW) + commitShort;
+    process.stdout.write(`${line}\n`);
   }
 }
 
@@ -93,7 +80,7 @@ async function resolveBranch(
   branch: string | undefined,
   cwd: string,
   paths: { container: string; wtDir: string; repoDir: string },
-  state: Awaited<ReturnType<typeof readState>>
+  state: Awaited<ReturnType<typeof readState>>,
 ): Promise<string> {
   if (branch) return branch;
 
@@ -114,10 +101,7 @@ async function resolveBranch(
 /**
  * `wt stash apply [branch]` — apply a saved stash.
  */
-export async function runStashApply(
-  branch?: string,
-  options: StashOptions = {}
-): Promise<void> {
+export async function runStashApply(branch?: string, options: StashOptions = {}): Promise<void> {
   const cwd = options.cwd ?? process.cwd();
 
   const paths = await findContainer(cwd);
@@ -140,14 +124,14 @@ export async function runStashApply(
     }
     if (stash.status === "archived") {
       throw new Error(
-        `Stash for '${resolvedBranch}' is archived and cannot be restored. View diff with 'wt stash show ${resolvedBranch}'.`
+        `Stash for '${resolvedBranch}' is archived and cannot be restored. View diff with 'wt stash show ${resolvedBranch}'.`,
       );
     }
 
     const slot = findSlotForBranch(state, resolvedBranch);
     if (!slot) {
       throw new Error(
-        `Branch '${resolvedBranch}' is not checked out in any slot. Run 'wt checkout ${resolvedBranch}' first.`
+        `Branch '${resolvedBranch}' is not checked out in any slot. Run 'wt checkout ${resolvedBranch}' first.`,
       );
     }
 
@@ -160,7 +144,7 @@ export async function runStashApply(
         break;
       case "conflict":
         process.stdout.write(
-          `Stash applied with conflicts. Resolve manually, then run 'wt stash drop ${resolvedBranch}'.\n`
+          `Stash applied with conflicts. Resolve manually, then run 'wt stash drop ${resolvedBranch}'.\n`,
         );
         break;
       case "none":
@@ -178,7 +162,7 @@ export async function runStashApply(
  */
 export async function runStashDrop(
   branch?: string,
-  options: StashOptions & { confirmYes?: boolean } = {}
+  options: StashOptions & { confirmYes?: boolean } = {},
 ): Promise<void> {
   const cwd = options.cwd ?? process.cwd();
 
@@ -200,7 +184,7 @@ export async function runStashDrop(
 
     if (!options.confirmYes) {
       const confirmed = await promptConfirm(
-        `Drop stash for '${resolvedBranch}'? This cannot be undone. [y/N] `
+        `Drop stash for '${resolvedBranch}'? This cannot be undone. [y/N] `,
       );
       if (!confirmed) {
         process.stdout.write("Aborted.\n");
@@ -218,10 +202,7 @@ export async function runStashDrop(
 /**
  * `wt stash show [branch]` — display diff of a saved stash.
  */
-export async function runStashShow(
-  branch?: string,
-  options: StashOptions = {}
-): Promise<void> {
+export async function runStashShow(branch?: string, options: StashOptions = {}): Promise<void> {
   const cwd = options.cwd ?? process.cwd();
 
   const paths = await findContainer(cwd);
@@ -242,7 +223,7 @@ export async function runStashShow(
     if (!stash.archive_path) {
       throw new Error(`Stash is archived but no archive file found.`);
     }
-    const { readFile } = await import("fs/promises");
+    const { readFile } = await import("node:fs/promises");
     let content: string;
     try {
       if (stash.archive_path.endsWith(".zst")) {
@@ -263,17 +244,17 @@ export async function runStashShow(
           nodeErr.stderr.toLowerCase().includes("no such file"));
       if (isMissing) {
         process.stderr.write(
-          `wt: Archived stash for '${resolvedBranch}' patch file not found. The archive may have been deleted manually.\n`
+          `wt: Archived stash for '${resolvedBranch}' patch file not found. The archive may have been deleted manually.\n`,
         );
         process.stderr.write(
-          `wt: Run 'wt stash drop ${resolvedBranch}' to clean up the stash metadata.\n`
+          `wt: Run 'wt stash drop ${resolvedBranch}' to clean up the stash metadata.\n`,
         );
         // exitCode: 1 signals handleCliError to exit silently (we already printed)
         throw Object.assign(new Error(""), { exitCode: 1 });
       }
       throw err;
     }
-    process.stdout.write(content + "\n");
+    process.stdout.write(`${content}\n`);
     return;
   }
 
@@ -285,7 +266,7 @@ export async function runStashShow(
   const worktreeDir = path.join(paths.container, slotNames[0]);
 
   const diff = await showStash(worktreeDir, stash.stash_ref);
-  process.stdout.write(diff + "\n");
+  process.stdout.write(`${diff}\n`);
 }
 
 /**

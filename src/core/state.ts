@@ -1,11 +1,11 @@
+import { readFileSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { parse, stringify } from "smol-toml";
-import { readFile, writeFile } from "fs/promises";
-import { readFileSync } from "fs";
-import { join } from "path";
 
 export interface SlotState {
-  branch: string | null;   // null = vacant (detached HEAD)
-  last_used_at: string;    // ISO 8601 timestamp
+  branch: string | null; // null = vacant (detached HEAD)
+  last_used_at: string; // ISO 8601 timestamp
   pinned: boolean;
 }
 
@@ -15,9 +15,9 @@ export interface BranchHistoryEntry {
 }
 
 export interface State {
-  slots: Record<string, SlotState>;     // keyed by slot directory name
+  slots: Record<string, SlotState>; // keyed by slot directory name
   branch_history: BranchHistoryEntry[]; // ordered by recency (most recent first)
-  last_fetch_at?: string;               // ISO 8601 timestamp of last successful fetch
+  last_fetch_at?: string; // ISO 8601 timestamp of last successful fetch
 }
 
 /**
@@ -38,54 +38,41 @@ function parseStateRaw(raw: string): State {
   try {
     parsed = parse(raw) as Record<string, unknown>;
   } catch {
-    process.stderr.write(
-      "Warning: .wt/state.toml is corrupted. Regenerating from git state.\n"
-    );
+    process.stderr.write("Warning: .wt/state.toml is corrupted. Regenerating from git state.\n");
     return defaultState();
   }
 
   const slots: Record<string, SlotState> = {};
-  if (parsed["slots"] && typeof parsed["slots"] === "object") {
-    const slotsRaw = parsed["slots"] as Record<string, Record<string, unknown>>;
+  if (parsed.slots && typeof parsed.slots === "object") {
+    const slotsRaw = parsed.slots as Record<string, Record<string, unknown>>;
     for (const [name, slot] of Object.entries(slotsRaw)) {
       slots[name] = {
         branch:
-          slot["branch"] === null || slot["branch"] === undefined
+          slot.branch === null || slot.branch === undefined
             ? null
-            : typeof slot["branch"] === "string"
-            ? slot["branch"]
-            : null,
+            : typeof slot.branch === "string"
+              ? slot.branch
+              : null,
         last_used_at:
-          typeof slot["last_used_at"] === "string"
-            ? slot["last_used_at"]
-            : new Date(0).toISOString(),
-        pinned: typeof slot["pinned"] === "boolean" ? slot["pinned"] : false,
+          typeof slot.last_used_at === "string" ? slot.last_used_at : new Date(0).toISOString(),
+        pinned: typeof slot.pinned === "boolean" ? slot.pinned : false,
       };
     }
   }
 
   const branch_history: BranchHistoryEntry[] = [];
-  if (Array.isArray(parsed["branch_history"])) {
-    for (const entry of parsed["branch_history"] as Record<
-      string,
-      unknown
-    >[]) {
-      if (
-        typeof entry["branch"] === "string" &&
-        typeof entry["last_checkout_at"] === "string"
-      ) {
+  if (Array.isArray(parsed.branch_history)) {
+    for (const entry of parsed.branch_history as Record<string, unknown>[]) {
+      if (typeof entry.branch === "string" && typeof entry.last_checkout_at === "string") {
         branch_history.push({
-          branch: entry["branch"],
-          last_checkout_at: entry["last_checkout_at"],
+          branch: entry.branch,
+          last_checkout_at: entry.last_checkout_at,
         });
       }
     }
   }
 
-  const last_fetch_at =
-    typeof parsed["last_fetch_at"] === "string"
-      ? parsed["last_fetch_at"]
-      : undefined;
+  const last_fetch_at = typeof parsed.last_fetch_at === "string" ? parsed.last_fetch_at : undefined;
 
   return { slots, branch_history, last_fetch_at };
 }
@@ -148,7 +135,7 @@ export async function writeState(wtDir: string, state: State): Promise<void> {
       pinned: slot.pinned,
     };
     if (slot.branch !== null) {
-      slotData["branch"] = slot.branch;
+      slotData.branch = slot.branch;
     }
     // If branch is null, we omit the key; readState will interpret missing key as null
     slotsData[name] = slotData;
@@ -159,7 +146,7 @@ export async function writeState(wtDir: string, state: State): Promise<void> {
     branch_history: state.branch_history,
   };
   if (state.last_fetch_at !== undefined) {
-    data["last_fetch_at"] = state.last_fetch_at;
+    data.last_fetch_at = state.last_fetch_at;
   }
 
   await writeFile(statePath, stringify(data), "utf8");

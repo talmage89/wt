@@ -22,7 +22,7 @@ export async function fetch(repoDir: string): Promise<void> {
 export async function worktreeAdd(
   repoDir: string,
   worktreePath: string,
-  commit: string
+  commit: string,
 ): Promise<void> {
   await execa("git", ["worktree", "add", "--detach", worktreePath, commit], {
     cwd: repoDir,
@@ -33,10 +33,7 @@ export async function worktreeAdd(
 /**
  * Run `git checkout <branch>` in a worktree.
  */
-export async function checkout(
-  worktreeDir: string,
-  branch: string
-): Promise<void> {
+export async function checkout(worktreeDir: string, branch: string): Promise<void> {
   await execa("git", ["checkout", branch], {
     cwd: worktreeDir,
     stdio: ["ignore", "pipe", "inherit"],
@@ -109,7 +106,7 @@ export async function stashCreate(worktreeDir: string): Promise<string | null> {
  */
 export async function stashApply(
   worktreeDir: string,
-  ref: string
+  ref: string,
 ): Promise<{ success: boolean; conflicted: boolean }> {
   try {
     await execa("git", ["stash", "apply", ref], {
@@ -131,25 +128,17 @@ export async function stashApply(
  * Run `git stash show -p --include-untracked <ref>`.
  */
 export async function stashShow(repoDir: string, ref: string): Promise<string> {
-  const result = await execa(
-    "git",
-    ["stash", "show", "-p", "--include-untracked", ref],
-    {
-      cwd: repoDir,
-      stdio: ["ignore", "pipe", "inherit"],
-    }
-  );
+  const result = await execa("git", ["stash", "show", "-p", "--include-untracked", ref], {
+    cwd: repoDir,
+    stdio: ["ignore", "pipe", "inherit"],
+  });
   return result.stdout;
 }
 
 /**
  * Run `git update-ref <refName> <hash>`.
  */
-export async function updateRef(
-  repoDir: string,
-  refName: string,
-  hash: string
-): Promise<void> {
+export async function updateRef(repoDir: string, refName: string, hash: string): Promise<void> {
   await execa("git", ["update-ref", refName, hash], {
     cwd: repoDir,
     stdio: ["ignore", "pipe", "inherit"],
@@ -159,10 +148,7 @@ export async function updateRef(
 /**
  * Run `git update-ref -d <refName>`.
  */
-export async function deleteRef(
-  repoDir: string,
-  refName: string
-): Promise<void> {
+export async function deleteRef(repoDir: string, refName: string): Promise<void> {
   await execa("git", ["update-ref", "-d", refName], {
     cwd: repoDir,
     stdio: ["ignore", "pipe", "inherit"],
@@ -185,18 +171,12 @@ export async function status(worktreeDir: string): Promise<string> {
  * Detect the symbolic name of HEAD.
  * Returns branch name, or null if HEAD is detached.
  */
-export async function currentBranch(
-  worktreeDir: string
-): Promise<string | null> {
+export async function currentBranch(worktreeDir: string): Promise<string | null> {
   try {
-    const result = await execa(
-      "git",
-      ["symbolic-ref", "--short", "HEAD"],
-      {
-        cwd: worktreeDir,
-        stdio: ["ignore", "pipe", "pipe"],
-      }
-    );
+    const result = await execa("git", ["symbolic-ref", "--short", "HEAD"], {
+      cwd: worktreeDir,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     const branch = result.stdout.trim();
     return branch.length > 0 ? branch : null;
   } catch {
@@ -216,14 +196,10 @@ export async function currentBranch(
 export async function defaultBranch(repoDir: string): Promise<string> {
   // 1. Try symbolic-ref for origin/HEAD
   try {
-    const result = await execa(
-      "git",
-      ["symbolic-ref", "refs/remotes/origin/HEAD", "--short"],
-      {
-        cwd: repoDir,
-        stdio: ["ignore", "pipe", "pipe"],
-      }
-    );
+    const result = await execa("git", ["symbolic-ref", "refs/remotes/origin/HEAD", "--short"], {
+      cwd: repoDir,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     const ref = result.stdout.trim();
     if (ref) return ref.replace(/^origin\//, "");
   } catch {
@@ -260,7 +236,7 @@ export async function defaultBranch(repoDir: string): Promise<string> {
       {
         cwd: repoDir,
         stdio: ["ignore", "pipe", "pipe"],
-      }
+      },
     );
     const branches = result.stdout
       .split("\n")
@@ -273,27 +249,18 @@ export async function defaultBranch(repoDir: string): Promise<string> {
     // Fall through
   }
 
-  throw new Error(
-    "Could not detect remote default branch. No remote branches found."
-  );
+  throw new Error("Could not detect remote default branch. No remote branches found.");
 }
 
 /**
  * Check if a branch exists on the remote.
  */
-export async function remoteBranchExists(
-  repoDir: string,
-  branch: string
-): Promise<boolean> {
+export async function remoteBranchExists(repoDir: string, branch: string): Promise<boolean> {
   try {
-    await execa(
-      "git",
-      ["show-ref", "--verify", `refs/remotes/origin/${branch}`],
-      {
-        cwd: repoDir,
-        stdio: ["ignore", "pipe", "pipe"],
-      }
-    );
+    await execa("git", ["show-ref", "--verify", `refs/remotes/origin/${branch}`], {
+      cwd: repoDir,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     return true;
   } catch {
     return false;
@@ -304,14 +271,10 @@ export async function remoteBranchExists(
  * List all local branches.
  */
 export async function listLocalBranches(repoDir: string): Promise<string[]> {
-  const result = await execa(
-    "git",
-    ["branch", "--format=%(refname:short)"],
-    {
-      cwd: repoDir,
-      stdio: ["ignore", "pipe", "inherit"],
-    }
-  );
+  const result = await execa("git", ["branch", "--format=%(refname:short)"], {
+    cwd: repoDir,
+    stdio: ["ignore", "pipe", "inherit"],
+  });
   return result.stdout
     .split("\n")
     .map((l) => l.trim())
@@ -323,19 +286,15 @@ export async function listLocalBranches(repoDir: string): Promise<string[]> {
  * Uses for-each-ref which reads packed refs — same cost as listLocalBranches.
  */
 export async function listLocalBranchesWithDates(
-  repoDir: string
+  repoDir: string,
 ): Promise<{ branch: string; commitDate: string }[]> {
   const result = await execa(
     "git",
-    [
-      "for-each-ref",
-      "--format=%(refname:short)\t%(committerdate:iso-strict)",
-      "refs/heads/",
-    ],
+    ["for-each-ref", "--format=%(refname:short)\t%(committerdate:iso-strict)", "refs/heads/"],
     {
       cwd: repoDir,
       stdio: ["ignore", "pipe", "inherit"],
-    }
+    },
   );
   return result.stdout
     .split("\n")
@@ -353,14 +312,10 @@ export async function listLocalBranchesWithDates(
  * List all remote branches (without the "origin/" prefix).
  */
 export async function listRemoteBranches(repoDir: string): Promise<string[]> {
-  const result = await execa(
-    "git",
-    ["branch", "-r", "--format=%(refname:short)"],
-    {
-      cwd: repoDir,
-      stdio: ["ignore", "pipe", "inherit"],
-    }
-  );
+  const result = await execa("git", ["branch", "-r", "--format=%(refname:short)"], {
+    cwd: repoDir,
+    stdio: ["ignore", "pipe", "inherit"],
+  });
   return result.stdout
     .split("\n")
     .map((l) => l.trim())
@@ -371,7 +326,7 @@ export async function listRemoteBranches(repoDir: string): Promise<string[]> {
  * Run `git worktree list --porcelain`.
  */
 export async function worktreeList(
-  repoDir: string
+  repoDir: string,
 ): Promise<Array<{ path: string; head: string; branch: string | null }>> {
   const result = await execa("git", ["worktree", "list", "--porcelain"], {
     cwd: repoDir,
@@ -383,8 +338,7 @@ export async function worktreeList(
     head: string;
     branch: string | null;
   }> = [];
-  let current: Partial<{ path: string; head: string; branch: string | null }> =
-    {};
+  let current: Partial<{ path: string; head: string; branch: string | null }> = {};
 
   for (const line of result.stdout.split("\n")) {
     if (line.startsWith("worktree ")) {
@@ -430,10 +384,7 @@ export async function worktreeList(
 /**
  * Run `git ls-files <path>` to check if a file is tracked.
  */
-export async function isTracked(
-  worktreeDir: string,
-  filePath: string
-): Promise<boolean> {
+export async function isTracked(worktreeDir: string, filePath: string): Promise<boolean> {
   const result = await execa("git", ["ls-files", "--error-unmatch", filePath], {
     cwd: worktreeDir,
     stdio: ["ignore", "pipe", "pipe"],
@@ -472,11 +423,7 @@ export async function currentCommit(dir: string): Promise<string> {
 }
 
 /** Set a git config value in the repo. */
-export async function setConfig(
-  repoDir: string,
-  key: string,
-  value: string
-): Promise<void> {
+export async function setConfig(repoDir: string, key: string, value: string): Promise<void> {
   await execa("git", ["config", key, value], {
     cwd: repoDir,
     stdio: ["ignore", "pipe", "inherit"],
@@ -487,18 +434,11 @@ export async function setConfig(
  * Run `git checkout -b <branch> --track origin/<branch>` in a worktree.
  * Used to create a local tracking branch from a remote branch.
  */
-export async function checkoutTrack(
-  worktreeDir: string,
-  branch: string
-): Promise<void> {
-  await execa(
-    "git",
-    ["checkout", "-b", branch, "--track", `origin/${branch}`],
-    {
-      cwd: worktreeDir,
-      stdio: ["ignore", "pipe", "inherit"],
-    }
-  );
+export async function checkoutTrack(worktreeDir: string, branch: string): Promise<void> {
+  await execa("git", ["checkout", "-b", branch, "--track", `origin/${branch}`], {
+    cwd: worktreeDir,
+    stdio: ["ignore", "pipe", "inherit"],
+  });
 }
 
 /**
@@ -522,11 +462,7 @@ export async function cleanUntracked(worktreeDir: string): Promise<void> {
 }
 
 /** Add a named remote to the repo. */
-export async function addRemote(
-  repoDir: string,
-  name: string,
-  url: string
-): Promise<void> {
+export async function addRemote(repoDir: string, name: string, url: string): Promise<void> {
   await execa("git", ["remote", "add", name, url], {
     cwd: repoDir,
     stdio: ["ignore", "pipe", "inherit"],
@@ -538,10 +474,7 @@ export async function addRemote(
  * Removes the worktree directory and its git metadata.
  * Uses --force to handle any remaining state after stash+clean.
  */
-export async function worktreeRemove(
-  repoDir: string,
-  worktreePath: string
-): Promise<void> {
+export async function worktreeRemove(repoDir: string, worktreePath: string): Promise<void> {
   await execa("git", ["worktree", "remove", "--force", worktreePath], {
     cwd: repoDir,
     stdio: ["ignore", "pipe", "inherit"],
@@ -563,14 +496,10 @@ export async function worktreePrune(repoDir: string): Promise<void> {
  * Returns true if there are unresolved conflicts in the index.
  */
 export async function hasUnmergedEntries(worktreeDir: string): Promise<boolean> {
-  const result = await execa(
-    "git",
-    ["diff", "--name-only", "--diff-filter=U"],
-    {
-      cwd: worktreeDir,
-      stdio: ["ignore", "pipe", "pipe"],
-    }
-  );
+  const result = await execa("git", ["diff", "--name-only", "--diff-filter=U"], {
+    cwd: worktreeDir,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
   return result.stdout.trim().length > 0;
 }
 
@@ -591,7 +520,7 @@ export async function addAll(worktreeDir: string): Promise<void> {
 export async function checkoutCreate(
   worktreeDir: string,
   branch: string,
-  startPoint: string
+  startPoint: string,
 ): Promise<void> {
   await execa("git", ["checkout", "-b", branch, startPoint], {
     cwd: worktreeDir,

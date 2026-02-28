@@ -1,11 +1,11 @@
 import * as fs from "node:fs/promises";
 import * as readline from "node:readline";
-import { findContainer, validateContainer } from "../core/container.js";
-import { readState, writeState } from "../core/state.js";
 import { readConfig } from "../core/config.js";
-import { reconcile } from "../core/reconcile.js";
+import { findContainer, validateContainer } from "../core/container.js";
 import { acquireLock } from "../core/lock.js";
-import { listStashes, dropStash, archiveScan, StashMetadata } from "../core/stash.js";
+import { reconcile } from "../core/reconcile.js";
+import { archiveScan, dropStash, listStashes, type StashMetadata } from "../core/stash.js";
+import { readState, writeState } from "../core/state.js";
 
 export interface CleanOptions {
   cwd?: string;
@@ -129,7 +129,7 @@ export async function runClean(options: CleanOptions = {}): Promise<void> {
       const { ask, close } = makePrompter();
       try {
         const answer = await ask(
-          "Select stashes to delete (comma-separated numbers, 'all', or 'none'): "
+          "Select stashes to delete (comma-separated numbers, 'all', or 'none'): ",
         );
 
         if (answer === "none" || answer === "") {
@@ -143,7 +143,7 @@ export async function runClean(options: CleanOptions = {}): Promise<void> {
           const indices = answer
             .split(",")
             .map((s) => parseInt(s.trim(), 10))
-            .filter((n) => !isNaN(n) && n >= 1 && n <= archived.length)
+            .filter((n) => !Number.isNaN(n) && n >= 1 && n <= archived.length)
             .map((n) => n - 1);
 
           if (indices.length === 0) {
@@ -155,7 +155,7 @@ export async function runClean(options: CleanOptions = {}): Promise<void> {
         }
 
         const confirmAnswer = await ask(
-          `Delete ${selected.length} stash${selected.length === 1 ? "" : "es"}? [y/N] `
+          `Delete ${selected.length} stash${selected.length === 1 ? "" : "es"}? [y/N] `,
         );
 
         if (confirmAnswer.toLowerCase() !== "y" && confirmAnswer.toLowerCase() !== "yes") {
@@ -172,7 +172,7 @@ export async function runClean(options: CleanOptions = {}): Promise<void> {
     }
 
     process.stdout.write(
-      `Deleted ${selected.length} archived stash${selected.length === 1 ? "" : "es"}.\n`
+      `Deleted ${selected.length} archived stash${selected.length === 1 ? "" : "es"}.\n`,
     );
   } finally {
     await release();

@@ -1,8 +1,8 @@
-import path from "path";
-import { findContainer, currentSlotName } from "../core/container.js";
-import { readState } from "../core/state.js";
-import { reconcile } from "../core/reconcile.js";
+import path from "node:path";
+import { currentSlotName, findContainer } from "../core/container.js";
 import { writeNavFile } from "../core/nav.js";
+import { reconcile } from "../core/reconcile.js";
+import { readState } from "../core/state.js";
 
 /**
  * `wt -` / `wt resume`: navigate to the most recently used worktree slot.
@@ -47,7 +47,7 @@ export async function runResume(options?: { cwd?: string }): Promise<void> {
   if (currentSlot === mruSlot) {
     const branch = state.slots[mruSlot].branch!;
     process.stderr.write(
-      `wt: Already in the most recently used worktree (${branch} in ${mruSlot})\n`
+      `wt: Already in the most recently used worktree (${branch} in ${mruSlot})\n`,
     );
     return;
   }
@@ -56,7 +56,7 @@ export async function runResume(options?: { cwd?: string }): Promise<void> {
 
   const branch = state.slots[mruSlot].branch!;
   process.stderr.write(`wt: Resuming ${branch} in ${mruSlot}\n`);
-  if (process.env["WT_SHELL_INTEGRATION"]) {
+  if (process.env.WT_SHELL_INTEGRATION) {
     process.stderr.write(`wt: Navigating to ${targetDir}\n`);
   }
 }

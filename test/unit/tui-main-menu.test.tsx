@@ -1,6 +1,5 @@
-import React from "react";
 import { render } from "ink-testing-library";
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { MainMenu } from "../../src/tui/MainMenu.js";
 
 describe("MainMenu", () => {

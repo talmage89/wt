@@ -1,6 +1,6 @@
-import { open, unlink } from "fs/promises";
-import { join } from "path";
-import { constants } from "fs";
+import { constants } from "node:fs";
+import { open, unlink } from "node:fs/promises";
+import { join } from "node:path";
 
 /**
  * Acquire an advisory lock on .wt/lock using O_EXCL (atomic create).
@@ -11,23 +11,15 @@ import { constants } from "fs";
  *   const release = await acquireLock(paths.wtDir);
  *   try { ... } finally { await release(); }
  */
-export async function acquireLock(
-  wtDir: string
-): Promise<() => Promise<void>> {
+export async function acquireLock(wtDir: string): Promise<() => Promise<void>> {
   const lockPath = join(wtDir, "lock");
 
   let fd: Awaited<ReturnType<typeof open>>;
   try {
-    fd = await open(
-      lockPath,
-      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL,
-      0o600
-    );
+    fd = await open(lockPath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL, 0o600);
   } catch (err: unknown) {
     if ((err as NodeJS.ErrnoException).code === "EEXIST") {
-      throw new Error(
-        "Another wt operation is in progress. If this is stale, remove .wt/lock."
-      );
+      throw new Error("Another wt operation is in progress. If this is stale, remove .wt/lock.");
     }
     throw err;
   }

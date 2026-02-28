@@ -1,11 +1,11 @@
-import { describe, it, expect, afterEach } from "vitest";
 import path from "node:path";
 import { execa } from "execa";
-import { runInit } from "../../src/commands/init.js";
+import { afterEach, describe, expect, it } from "vitest";
 import { runCheckout } from "../../src/commands/checkout.js";
+import { runInit } from "../../src/commands/init.js";
 import { runPin, runUnpin } from "../../src/commands/pin.js";
 import { readState, writeState } from "../../src/core/state.js";
-import { createTempDir, createTestRepo, cleanup } from "./helpers.js";
+import { cleanup, createTempDir, createTestRepo } from "./helpers.js";
 
 const temps: string[] = [];
 
@@ -67,9 +67,7 @@ describe("wt pin", () => {
     const dir = await mktemp();
     await setupContainer(dir);
 
-    await expect(
-      runPin("nonexistent-slot-xyz", { cwd: dir })
-    ).rejects.toThrow("not found");
+    await expect(runPin("nonexistent-slot-xyz", { cwd: dir })).rejects.toThrow("not found");
   });
 
   it("pinned slot is not evicted when all slots are occupied", async () => {
@@ -82,9 +80,7 @@ describe("wt pin", () => {
     // Find the slot with 'main'
     const stateBefore = await readState(wtDir);
     const slotNames = Object.keys(stateBefore.slots);
-    const mainSlot = Object.entries(stateBefore.slots).find(
-      ([, s]) => s.branch === "main"
-    )?.[0];
+    const mainSlot = Object.entries(stateBefore.slots).find(([, s]) => s.branch === "main")?.[0];
     expect(mainSlot).toBeDefined();
 
     // Fill all remaining vacant slots so all 5 are occupied
@@ -105,9 +101,7 @@ describe("wt pin", () => {
     // main slot should still have 'main'
     expect(stateAfter.slots[mainSlot!].branch).toBe("main");
     // eviction-target should be in some slot
-    const targetSlot = Object.values(stateAfter.slots).find(
-      (s) => s.branch === "eviction-target"
-    );
+    const targetSlot = Object.values(stateAfter.slots).find((s) => s.branch === "eviction-target");
     expect(targetSlot).toBeDefined();
   });
 });

@@ -1,11 +1,11 @@
-import { describe, it, expect, afterEach } from "vitest";
-import path from "node:path";
 import fs from "node:fs/promises";
+import path from "node:path";
 import { execa } from "execa";
+import { afterEach, describe, expect, it } from "vitest";
 import { runInit } from "../../src/commands/init.js";
-import { readState, writeState } from "../../src/core/state.js";
 import { reconcile } from "../../src/core/reconcile.js";
-import { createTempDir, createTestRepo, cleanup } from "./helpers.js";
+import { readState, writeState } from "../../src/core/state.js";
+import { cleanup, createTempDir, createTestRepo } from "./helpers.js";
 
 const temps: string[] = [];
 
@@ -38,9 +38,7 @@ describe("reconcile — direct git checkout detected", () => {
 
     // Find a slot that has 'main' checked out
     const state = await readState(wtDir);
-    const slotName = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch === "main"
-    )!;
+    const slotName = Object.keys(state.slots).find((n) => state.slots[n].branch === "main")!;
     expect(slotName).toBeDefined();
 
     const slotPath = path.join(containerDir, slotName);
@@ -142,9 +140,7 @@ describe("reconcile — new slot directory discovered", () => {
 
     expect(updated.slots["discovered-slot"].pinned).toBe(false);
     // last_used_at should be epoch (oldest) so it gets LRU evicted first
-    expect(updated.slots["discovered-slot"].last_used_at).toBe(
-      new Date(0).toISOString()
-    );
+    expect(updated.slots["discovered-slot"].last_used_at).toBe(new Date(0).toISOString());
   });
 });
 
@@ -155,9 +151,7 @@ describe("reconcile — detached HEAD handling", () => {
 
     // Find the main slot and detach its HEAD directly
     const state = await readState(wtDir);
-    const slotName = Object.keys(state.slots).find(
-      (n) => state.slots[n].branch === "main"
-    )!;
+    const slotName = Object.keys(state.slots).find((n) => state.slots[n].branch === "main")!;
     const slotPath = path.join(containerDir, slotName);
 
     // Detach HEAD by checking out the current commit hash
@@ -222,7 +216,7 @@ describe("reconcile — orphaned directory (not in git worktree list)", () => {
 describe("reconcile — corrupted slot (directory emptied, .git missing)", () => {
   it("should repair a slot whose directory exists but has no .git file (BUG-015)", async () => {
     const dir = await mktemp();
-    const { containerDir, wtDir, repoDir } = await setupContainer(dir);
+    const { containerDir, wtDir } = await setupContainer(dir);
 
     const state = await readState(wtDir);
     const slotNames = Object.keys(state.slots);

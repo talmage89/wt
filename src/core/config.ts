@@ -1,6 +1,6 @@
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { parse, stringify } from "smol-toml";
-import { readFile, writeFile } from "fs/promises";
-import { join } from "path";
 
 export interface TemplateConfig {
   source: string; // relative to .wt/
@@ -12,9 +12,9 @@ export interface SharedConfig {
 }
 
 export interface Config {
-  slot_count: number;              // default: 5
-  archive_after_days: number;      // default: 7
-  fetch_cooldown_minutes: number;  // default: 10
+  slot_count: number; // default: 5
+  archive_after_days: number; // default: 7
+  fetch_cooldown_minutes: number; // default: 10
   shared: SharedConfig;
   templates: TemplateConfig[];
 }
@@ -52,33 +52,29 @@ export async function readConfig(wtDir: string): Promise<Config> {
   const defaults = defaultConfig();
 
   const slot_count =
-    typeof parsed["slot_count"] === "number"
-      ? parsed["slot_count"]
-      : defaults.slot_count;
+    typeof parsed.slot_count === "number" ? parsed.slot_count : defaults.slot_count;
   const archive_after_days =
-    typeof parsed["archive_after_days"] === "number"
-      ? parsed["archive_after_days"]
+    typeof parsed.archive_after_days === "number"
+      ? parsed.archive_after_days
       : defaults.archive_after_days;
   const fetch_cooldown_minutes =
-    typeof parsed["fetch_cooldown_minutes"] === "number"
-      ? parsed["fetch_cooldown_minutes"]
+    typeof parsed.fetch_cooldown_minutes === "number"
+      ? parsed.fetch_cooldown_minutes
       : defaults.fetch_cooldown_minutes;
 
   let shared: SharedConfig = defaults.shared;
-  if (parsed["shared"] && typeof parsed["shared"] === "object") {
-    const sharedRaw = parsed["shared"] as Record<string, unknown>;
+  if (parsed.shared && typeof parsed.shared === "object") {
+    const sharedRaw = parsed.shared as Record<string, unknown>;
     shared = {
-      directories: Array.isArray(sharedRaw["directories"])
-        ? (sharedRaw["directories"] as string[])
-        : [],
+      directories: Array.isArray(sharedRaw.directories) ? (sharedRaw.directories as string[]) : [],
     };
   }
 
   let templates: TemplateConfig[] = defaults.templates;
-  if (Array.isArray(parsed["templates"])) {
-    templates = (parsed["templates"] as Record<string, unknown>[]).map((t) => ({
-      source: typeof t["source"] === "string" ? t["source"] : "",
-      target: typeof t["target"] === "string" ? t["target"] : "",
+  if (Array.isArray(parsed.templates)) {
+    templates = (parsed.templates as Record<string, unknown>[]).map((t) => ({
+      source: typeof t.source === "string" ? t.source : "",
+      target: typeof t.target === "string" ? t.target : "",
     }));
   }
 

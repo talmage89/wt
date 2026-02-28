@@ -1,6 +1,5 @@
-import React from "react";
 import { render } from "ink-testing-library";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/core/stash.js", () => ({
   listStashes: vi.fn(),
@@ -18,8 +17,8 @@ vi.mock("fs/promises", () => ({
   stat: vi.fn().mockResolvedValue({ size: 2048 }),
 }));
 
-import { StashPanel } from "../../src/tui/StashPanel.js";
 import { listStashes } from "../../src/core/stash.js";
+import { StashPanel } from "../../src/tui/StashPanel.js";
 
 const mockPaths = {
   container: "/fake/container",
@@ -38,18 +37,14 @@ describe("StashPanel", () => {
 
   it("shows loading state on first render", () => {
     vi.mocked(listStashes).mockResolvedValue([]);
-    const { lastFrame } = render(
-      <StashPanel paths={mockPaths} onBack={() => {}} />
-    );
+    const { lastFrame } = render(<StashPanel paths={mockPaths} onBack={() => {}} />);
     expect(lastFrame()).toContain("Manage Stashes");
     expect(lastFrame()).toContain("Loading...");
   });
 
   it("shows empty state when no stashes exist", async () => {
     vi.mocked(listStashes).mockResolvedValue([]);
-    const { lastFrame } = render(
-      <StashPanel paths={mockPaths} onBack={() => {}} />
-    );
+    const { lastFrame } = render(<StashPanel paths={mockPaths} onBack={() => {}} />);
     await waitForEffects();
     const frame = lastFrame() ?? "";
     expect(frame).toContain("Manage Stashes");
@@ -68,9 +63,7 @@ describe("StashPanel", () => {
         status: "active",
       },
     ]);
-    const { lastFrame } = render(
-      <StashPanel paths={mockPaths} onBack={() => {}} />
-    );
+    const { lastFrame } = render(<StashPanel paths={mockPaths} onBack={() => {}} />);
     await waitForEffects();
     const frame = lastFrame() ?? "";
     expect(frame).toContain("feature/auth");
@@ -91,9 +84,7 @@ describe("StashPanel", () => {
         archive_path: "/fake/archive.patch.zst",
       },
     ]);
-    const { lastFrame } = render(
-      <StashPanel paths={mockPaths} onBack={() => {}} />
-    );
+    const { lastFrame } = render(<StashPanel paths={mockPaths} onBack={() => {}} />);
     await waitForEffects();
     const frame = lastFrame() ?? "";
     expect(frame).toContain("old/feature");
@@ -124,9 +115,7 @@ describe("StashPanel", () => {
         archive_path: "/fake/archive.patch.zst",
       },
     ]);
-    const { lastFrame } = render(
-      <StashPanel paths={mockPaths} onBack={() => {}} />
-    );
+    const { lastFrame } = render(<StashPanel paths={mockPaths} onBack={() => {}} />);
     await waitForEffects();
     const frame = lastFrame() ?? "";
     expect(frame).toContain("Active Stashes");
@@ -137,9 +126,7 @@ describe("StashPanel", () => {
 
   it("shows keybinding hints in list mode", async () => {
     vi.mocked(listStashes).mockResolvedValue([]);
-    const { lastFrame } = render(
-      <StashPanel paths={mockPaths} onBack={() => {}} />
-    );
+    const { lastFrame } = render(<StashPanel paths={mockPaths} onBack={() => {}} />);
     await waitForEffects();
     const frame = lastFrame() ?? "";
     expect(frame).toContain("Esc");

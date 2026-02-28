@@ -1,8 +1,8 @@
-import { describe, it, expect, afterEach } from "vitest";
-import path from "node:path";
 import fs from "node:fs/promises";
 import os from "node:os";
+import path from "node:path";
 import { execa } from "execa";
+import { afterEach, describe, expect, it } from "vitest";
 import { isTracked } from "../../src/core/git.js";
 
 const temps: string[] = [];
@@ -46,9 +46,7 @@ describe("isTracked (BUG-005 / BUG-006 regression)", () => {
     const stderrChunks: string[] = [];
     const originalWrite = process.stderr.write.bind(process.stderr);
     process.stderr.write = (chunk: string | Uint8Array): boolean => {
-      stderrChunks.push(
-        typeof chunk === "string" ? chunk : Buffer.from(chunk).toString()
-      );
+      stderrChunks.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
       return true;
     };
 

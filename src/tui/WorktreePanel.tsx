@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from "react";
-import { Box, Text, useInput, useApp } from "ink";
-import { join } from "path";
+import { join } from "node:path";
+import { Box, Text, useApp, useInput } from "ink";
+import { useEffect, useState } from "react";
+import { runCheckout } from "../commands/checkout.js";
 import type { ContainerPaths } from "../core/container.js";
 import { currentSlotName } from "../core/container.js";
-import { readState, readStateSync, writeState } from "../core/state.js";
-import type { State } from "../core/state.js";
+import * as git from "../core/git.js";
 import { reconcile } from "../core/reconcile.js";
 import { getStash, showStash } from "../core/stash.js";
-import * as git from "../core/git.js";
-import { StatusDot } from "./components/StatusDot.js";
+import type { State } from "../core/state.js";
+import { readState, readStateSync, writeState } from "../core/state.js";
 import { RelativeTime } from "./components/RelativeTime.js";
-import { runCheckout } from "../commands/checkout.js";
+import { StatusDot } from "./components/StatusDot.js";
 import { handleTextEditingKeys } from "./input-helpers.js";
 
 interface BranchEntry {
@@ -74,7 +74,10 @@ function buildInitialEntries(state: State, currentBranch?: string | null): Branc
   return entries;
 }
 
-async function loadBranchData(paths: ContainerPaths, currentBranch?: string | null): Promise<BranchEntry[]> {
+async function loadBranchData(
+  paths: ContainerPaths,
+  currentBranch?: string | null,
+): Promise<BranchEntry[]> {
   let state = await readState(paths.wtDir);
   state = await reconcile(paths.wtDir, paths.container, state);
 
@@ -82,9 +85,7 @@ async function loadBranchData(paths: ContainerPaths, currentBranch?: string | nu
   const activeBranches = new Set<string>();
 
   // Check dirty status for active slots in parallel
-  const slotEntries = Object.entries(state.slots).filter(
-    ([, slot]) => slot.branch !== null
-  );
+  const slotEntries = Object.entries(state.slots).filter(([, slot]) => slot.branch !== null);
   const slotData = await Promise.all(
     slotEntries.map(async ([slotName, slot]) => {
       const branch = slot.branch!;
@@ -97,7 +98,7 @@ async function loadBranchData(paths: ContainerPaths, currentBranch?: string | nu
         // Ignore errors — treat as clean
       }
       return { slotName, slot, branch, dirty };
-    })
+    }),
   );
 
   for (const { slotName, slot, branch, dirty } of slotData) {
@@ -220,9 +221,7 @@ export function WorktreePanel({ paths, onBack }: Props) {
     const id = setInterval(() => {
       loadBranchData(paths, currentBranch)
         .then((newData) => {
-          setEntries((prev) =>
-            JSON.stringify(prev) !== JSON.stringify(newData) ? newData : prev
-          );
+          setEntries((prev) => (JSON.stringify(prev) !== JSON.stringify(newData) ? newData : prev));
         })
         .catch(() => {
           // Silently ignore polling errors — don't disrupt the UI
@@ -234,9 +233,7 @@ export function WorktreePanel({ paths, onBack }: Props) {
 
   // Filtered branches for search
   const filteredBranches = searchQuery
-    ? allBranches.filter((b) =>
-        b.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+    ? allBranches.filter((b) => b.toLowerCase().includes(searchQuery.toLowerCase()))
     : allBranches;
 
   const reload = () => {
@@ -326,9 +323,7 @@ export function WorktreePanel({ paths, onBack }: Props) {
         setSearchIdx((i) => Math.max(0, i - 1));
       } else if (key.downArrow || (key.ctrl && input === "n")) {
         setSearchIdx((i) =>
-          filteredBranches.length === 0
-            ? 0
-            : Math.min(filteredBranches.length - 1, i + 1)
+          filteredBranches.length === 0 ? 0 : Math.min(filteredBranches.length - 1, i + 1),
         );
       } else if (handleTextEditingKeys(input, key, setSearchQuery)) {
         // Option+Backspace, Ctrl+W, Ctrl+U handled
@@ -352,15 +347,10 @@ export function WorktreePanel({ paths, onBack }: Props) {
       // Lazy-load branches on first search open
       if (allBranches.length === 0 && !loadingBranches) {
         setLoadingBranches(true);
-        Promise.all([
-          git.listLocalBranches(paths.repoDir),
-          git.listRemoteBranches(paths.repoDir),
-        ])
+        Promise.all([git.listLocalBranches(paths.repoDir), git.listRemoteBranches(paths.repoDir)])
           .then(([local, remote]) => {
             const remoteStripped = remote.map((r) => r.replace(/^origin\//, ""));
-            const combined = Array.from(
-              new Set([...local, ...remoteStripped])
-            ).sort();
+            const combined = Array.from(new Set([...local, ...remoteStripped])).sort();
             setAllBranches(combined);
           })
           .catch(() => setAllBranches([]))
@@ -372,19 +362,13 @@ export function WorktreePanel({ paths, onBack }: Props) {
     } else if (key.upArrow || input === "k" || (key.ctrl && input === "p")) {
       setSelectedIdx((i) => Math.max(0, i - 1));
     } else if (key.downArrow || input === "j" || (key.ctrl && input === "n")) {
-      setSelectedIdx((i) =>
-        entries.length === 0 ? 0 : Math.min(entries.length - 1, i + 1)
-      );
+      setSelectedIdx((i) => (entries.length === 0 ? 0 : Math.min(entries.length - 1, i + 1)));
     } else if (key.return) {
       const entry = entries[selectedIdx];
       if (entry) doCheckout(entry.branch);
     } else if (input === "p" && !key.ctrl) {
       const entry = entries[selectedIdx];
-      if (
-        entry &&
-        (entry.tier === "active" || entry.tier === "pinned") &&
-        entry.slotName
-      ) {
+      if (entry && (entry.tier === "active" || entry.tier === "pinned") && entry.slotName) {
         const slotName = entry.slotName;
         readState(paths.wtDir)
           .then((state) => {
@@ -398,11 +382,7 @@ export function WorktreePanel({ paths, onBack }: Props) {
       }
     } else if (input === "s") {
       const entry = entries[selectedIdx];
-      if (
-        entry &&
-        (entry.tier === "active" || entry.tier === "pinned") &&
-        entry.slotName
-      ) {
+      if (entry && (entry.tier === "active" || entry.tier === "pinned") && entry.slotName) {
         const worktreeDir = join(paths.container, entry.slotName);
         git
           .status(worktreeDir)
@@ -466,7 +446,7 @@ export function WorktreePanel({ paths, onBack }: Props) {
           <Text>{outputContent}</Text>
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>Esc: back  q: quit</Text>
+          <Text dimColor>Esc: back q: quit</Text>
         </Box>
       </Box>
     );
@@ -500,14 +480,10 @@ export function WorktreePanel({ paths, onBack }: Props) {
         )}
         <Box flexDirection="column" marginTop={1}>
           {filteredBranches.length === 0 && !loadingBranches ? (
-            <Text dimColor>
-              No branches match &quot;{searchQuery}&quot;
-            </Text>
+            <Text dimColor>No branches match &quot;{searchQuery}&quot;</Text>
           ) : (
             <>
-              {searchViewStart > 0 && (
-                <Text dimColor>  ↑ {searchViewStart} more</Text>
-              )}
+              {searchViewStart > 0 && <Text dimColor> ↑ {searchViewStart} more</Text>}
               {filteredBranches.slice(searchViewStart, searchViewEnd).map((branch, vi) => {
                 const i = searchViewStart + vi;
                 return (
@@ -520,15 +496,13 @@ export function WorktreePanel({ paths, onBack }: Props) {
                 );
               })}
               {searchViewEnd < filteredBranches.length && (
-                <Text dimColor>  ↓ {filteredBranches.length - searchViewEnd} more</Text>
+                <Text dimColor> ↓ {filteredBranches.length - searchViewEnd} more</Text>
               )}
             </>
           )}
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>
-            ↑/↓/^n/^p: navigate  Enter: checkout  Esc: close
-          </Text>
+          <Text dimColor>↑/↓/^n/^p: navigate Enter: checkout Esc: close</Text>
         </Box>
       </Box>
     );
@@ -539,7 +513,9 @@ export function WorktreePanel({ paths, onBack }: Props) {
       <Box flexDirection="column" padding={1}>
         <Text bold>New Branch</Text>
         <Box marginTop={1}>
-          <Text bold color="green">name: </Text>
+          <Text bold color="green">
+            name:{" "}
+          </Text>
           <Text>{newBranchName}</Text>
           <Text color="cyan">█</Text>
         </Box>
@@ -547,7 +523,7 @@ export function WorktreePanel({ paths, onBack }: Props) {
           <Text dimColor>Creates from origin/&lt;default-branch&gt;</Text>
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>Enter: create  Esc: cancel</Text>
+          <Text dimColor>Enter: create Esc: cancel</Text>
         </Box>
       </Box>
     );
@@ -563,7 +539,7 @@ export function WorktreePanel({ paths, onBack }: Props) {
     // Keep selected item roughly centered, clamped to bounds
     viewStart = Math.min(
       Math.max(0, selectedIdx - Math.floor(MAX_VISIBLE / 2)),
-      entries.length - MAX_VISIBLE
+      entries.length - MAX_VISIBLE,
     );
   }
   const viewEnd = Math.min(viewStart + MAX_VISIBLE, entries.length);
@@ -579,17 +555,13 @@ export function WorktreePanel({ paths, onBack }: Props) {
           </Text>
         ) : (
           <>
-            {viewStart > 0 && (
-              <Text dimColor>  ↑ {viewStart} more</Text>
-            )}
+            {viewStart > 0 && <Text dimColor> ↑ {viewStart} more</Text>}
             {visibleEntries.map((entry, vi) => {
               const i = viewStart + vi;
               const isSelected = i === selectedIdx;
               return (
                 <Box key={entry.branch}>
-                  <Text color={isSelected ? "cyan" : undefined}>
-                    {isSelected ? "› " : "  "}
-                  </Text>
+                  <Text color={isSelected ? "cyan" : undefined}>{isSelected ? "› " : "  "}</Text>
                   {entry.isCurrent && <Text color="green">* </Text>}
                   {entry.tier === "pinned" && <Text>📌 </Text>}
                   {(entry.tier === "pinned" || entry.tier === "active") && (
@@ -597,42 +569,30 @@ export function WorktreePanel({ paths, onBack }: Props) {
                   )}
                   <Text
                     bold={isSelected}
-                    color={
-                      isSelected
-                        ? "cyan"
-                        : entry.tier === "inactive"
-                        ? undefined
-                        : "white"
-                    }
+                    color={isSelected ? "cyan" : entry.tier === "inactive" ? undefined : "white"}
                     dimColor={entry.tier === "inactive" && !isSelected}
                   >
                     {" "}
                     {entry.branch}
                   </Text>
-                  {entry.slotName && (
-                    <Text dimColor>  {entry.slotName}</Text>
-                  )}
+                  {entry.slotName && <Text dimColor> {entry.slotName}</Text>}
                   {entry.lastUsedAt && (
                     <>
-                      <Text dimColor>  </Text>
+                      <Text dimColor> </Text>
                       <RelativeTime isoDate={entry.lastUsedAt} dimColor />
                     </>
                   )}
-                  {entry.hasStash && (
-                    <Text color="yellow">  [stash]</Text>
-                  )}
+                  {entry.hasStash && <Text color="yellow"> [stash]</Text>}
                 </Box>
               );
             })}
-            {viewEnd < entries.length && (
-              <Text dimColor>  ↓ {entries.length - viewEnd} more</Text>
-            )}
+            {viewEnd < entries.length && <Text dimColor> ↓ {entries.length - viewEnd} more</Text>}
           </>
         )}
       </Box>
       <Box marginTop={1}>
         {!currentEntry ? (
-          <Text dimColor>n: new branch  /: search  Esc: back  q: quit</Text>
+          <Text dimColor>n: new branch /: search Esc: back q: quit</Text>
         ) : currentEntry.tier === "inactive" ? (
           <Text dimColor>
             Enter: checkout
@@ -641,7 +601,7 @@ export function WorktreePanel({ paths, onBack }: Props) {
           </Text>
         ) : (
           <Text dimColor>
-            Enter: checkout  p: pin/unpin  s: git status  n: new branch  /: search  Esc: back  q: quit
+            Enter: checkout p: pin/unpin s: git status n: new branch /: search Esc: back q: quit
           </Text>
         )}
       </Box>

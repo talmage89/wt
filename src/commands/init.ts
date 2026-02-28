@@ -1,13 +1,13 @@
-import { access, appendFile, readdir, rename, rm, stat } from "fs/promises";
-import { join } from "path";
+import { access, appendFile, readdir, rename, rm, stat } from "node:fs/promises";
+import { join } from "node:path";
 import { execa } from "execa";
+import { defaultConfig, writeConfig } from "../core/config.js";
 import { createContainerStructure } from "../core/container.js";
-import { createSlots } from "../core/slots.js";
-import { writeState, defaultState } from "../core/state.js";
-import { writeConfig, defaultConfig } from "../core/config.js";
-import { writeNavFile } from "../core/nav.js";
-import { generateAllTemplates } from "../core/templates.js";
 import * as git from "../core/git.js";
+import { writeNavFile } from "../core/nav.js";
+import { createSlots } from "../core/slots.js";
+import { defaultState, writeState } from "../core/state.js";
+import { generateAllTemplates } from "../core/templates.js";
 
 export interface InitOptions {
   /** If provided, bare-clone from this URL. Otherwise, restructure the cwd repo. */
@@ -53,12 +53,12 @@ async function initFromExistingRepo(containerDir: string): Promise<string> {
   }
   if (!gitStat) {
     throw new Error(
-      "Not at the root of a git repository. Run 'wt init' from the repository root (where .git/ lives), or use 'wt init <url>' to clone a new one."
+      "Not at the root of a git repository. Run 'wt init' from the repository root (where .git/ lives), or use 'wt init <url>' to clone a new one.",
     );
   }
   if (!gitStat.isDirectory()) {
     throw new Error(
-      "Not a git repository root. Run 'wt init' from a regular git repository, not inside a worktree slot."
+      "Not a git repository root. Run 'wt init' from a regular git repository, not inside a worktree slot.",
     );
   }
 
@@ -67,7 +67,7 @@ async function initFromExistingRepo(containerDir: string): Promise<string> {
   // moving .git/ without being able to create slots leaves the repo unrecoverable.
   if (!(await git.hasCommits(containerDir))) {
     throw new Error(
-      "Repository has no commits. Create at least one commit before running 'wt init'."
+      "Repository has no commits. Create at least one commit before running 'wt init'.",
     );
   }
 
@@ -121,7 +121,7 @@ async function initFromExistingRepo(containerDir: string): Promise<string> {
     containerDir,
     config.slot_count,
     slotCommit,
-    new Set()
+    new Set(),
   );
 
   // Checkout the starting branch in slot 0
@@ -136,7 +136,7 @@ async function initFromExistingRepo(containerDir: string): Promise<string> {
     const result = await git.stashApply(slot0Dir, stashHash);
     if (result.conflicted) {
       process.stderr.write(
-        `wt: stash for '${startingBranch ?? "HEAD"}' produced conflicts. Resolve manually.\n`
+        `wt: stash for '${startingBranch ?? "HEAD"}' produced conflicts. Resolve manually.\n`,
       );
     }
   }
@@ -186,7 +186,7 @@ async function initFromUrl(containerDir: string, url: string): Promise<string> {
   const items = await readdir(containerDir);
   if (items.length > 0) {
     throw new Error(
-      "Directory is not empty. Use 'wt init' from inside an existing repository, or run from an empty directory."
+      "Directory is not empty. Use 'wt init' from inside an existing repository, or run from an empty directory.",
     );
   }
 
@@ -203,11 +203,7 @@ async function initFromUrl(containerDir: string, url: string): Promise<string> {
     // git clone --bare uses a non-standard fetch refspec (+refs/heads/*:refs/heads/*)
     // that does NOT create refs/remotes/origin/* tracking refs. Switch to the
     // standard tracking refspec so subsequent fetches populate refs/remotes/origin/*.
-    await git.setConfig(
-      repoDir,
-      "remote.origin.fetch",
-      "+refs/heads/*:refs/remotes/origin/*"
-    );
+    await git.setConfig(repoDir, "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*");
 
     // Fetch to populate refs/remotes/origin/* with the corrected refspec.
     // This enables defaultBranch() to work and origin/<branch> refs for slot creation.
@@ -235,7 +231,7 @@ async function initFromUrl(containerDir: string, url: string): Promise<string> {
       containerDir,
       config.slot_count,
       `origin/${defaultBranchName}`,
-      new Set()
+      new Set(),
     );
 
     // Checkout the default branch in slot 0
@@ -306,12 +302,10 @@ async function appendTemplateExamples(wtDir: string): Promise<void> {
 function printInitSummary(
   slotNames: string[],
   activeSlotName: string | null,
-  activeBranch: string | null
+  activeBranch: string | null,
 ): void {
   const count = slotNames.length;
-  process.stderr.write(
-    `wt: Initialized with ${count} worktree slot${count === 1 ? "" : "s"}.\n`
-  );
+  process.stderr.write(`wt: Initialized with ${count} worktree slot${count === 1 ? "" : "s"}.\n`);
   for (const name of slotNames) {
     if (name === activeSlotName && activeBranch) {
       process.stderr.write(`wt:   ${name}  (active, branch: ${activeBranch})\n`);
@@ -322,7 +316,7 @@ function printInitSummary(
   if (!process.env.WT_SHELL_INTEGRATION) {
     process.stderr.write(`wt:\n`);
     process.stderr.write(
-      `wt: To enable shell navigation (cd on checkout), add to your shell config:\n`
+      `wt: To enable shell navigation (cd on checkout), add to your shell config:\n`,
     );
     process.stderr.write(`wt:   eval "$(wt shell-init bash)"    # bash\n`);
     process.stderr.write(`wt:   eval "$(wt shell-init zsh)"     # zsh\n`);
@@ -347,10 +341,7 @@ async function exists(p: string): Promise<boolean> {
 /**
  * Remove all items in containerDir except those in `keepItems`.
  */
-async function removeWorkingTreeFiles(
-  containerDir: string,
-  keepItems: Set<string>
-): Promise<void> {
+async function removeWorkingTreeFiles(containerDir: string, keepItems: Set<string>): Promise<void> {
   const items = await readdir(containerDir);
   for (const item of items) {
     if (!keepItems.has(item)) {
@@ -363,22 +354,15 @@ async function removeWorkingTreeFiles(
  * Checkout a branch in a worktree. If the branch doesn't exist locally
  * but origin/<branch> does, create a local tracking branch.
  */
-async function checkoutOrTrack(
-  worktreeDir: string,
-  branch: string
-): Promise<void> {
+async function checkoutOrTrack(worktreeDir: string, branch: string): Promise<void> {
   try {
     await git.checkout(worktreeDir, branch);
   } catch {
     // Branch not available locally — create tracking branch from origin
-    await execa(
-      "git",
-      ["checkout", "-b", branch, "--track", `origin/${branch}`],
-      {
-        cwd: worktreeDir,
-        stdio: ["ignore", "pipe", "inherit"],
-      }
-    );
+    await execa("git", ["checkout", "-b", branch, "--track", `origin/${branch}`], {
+      cwd: worktreeDir,
+      stdio: ["ignore", "pipe", "inherit"],
+    });
   }
 }
 
@@ -394,7 +378,7 @@ async function hasRemoteRefs(repoDir: string): Promise<boolean> {
       {
         cwd: repoDir,
         stdio: ["ignore", "pipe", "inherit"],
-      }
+      },
     );
     return result.stdout.trim().length > 0;
   } catch {

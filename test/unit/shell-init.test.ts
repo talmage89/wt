@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { runShellInit } from "../../src/commands/shell-init.js";
 
 // BUG-003: shell function used `command -v wt` which returned the function name

@@ -1,14 +1,10 @@
-import { describe, it, expect, afterEach } from "vitest";
-import path from "node:path";
 import fs from "node:fs/promises";
+import path from "node:path";
 import { execa } from "execa";
-import { runInit } from "../../src/commands/init.js";
+import { afterEach, describe, expect, it } from "vitest";
 import { runFetch } from "../../src/commands/fetch.js";
-import {
-  createTempDir,
-  createBareRemote,
-  cleanup,
-} from "./helpers.js";
+import { runInit } from "../../src/commands/init.js";
+import { cleanup, createBareRemote, createTempDir } from "./helpers.js";
 
 const temps: string[] = [];
 

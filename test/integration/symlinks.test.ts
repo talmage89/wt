@@ -1,22 +1,14 @@
-import { describe, it, expect, afterEach } from "vitest";
-import path from "node:path";
 import fs from "node:fs/promises";
+import path from "node:path";
 import { execa } from "execa";
-import { runInit } from "../../src/commands/init.js";
+import { afterEach, describe, expect, it } from "vitest";
 import { runCheckout } from "../../src/commands/checkout.js";
+import { runInit } from "../../src/commands/init.js";
 import { runSync } from "../../src/commands/sync.js";
-import { readState } from "../../src/core/state.js";
 import { readConfig, writeConfig } from "../../src/core/config.js";
-import {
-  establishSymlinks,
-  syncAllSymlinks,
-} from "../../src/core/symlinks.js";
-import {
-  createTempDir,
-  createTestRepo,
-  cleanup,
-  exists,
-} from "./helpers.js";
+import { readState } from "../../src/core/state.js";
+import { establishSymlinks, syncAllSymlinks } from "../../src/core/symlinks.js";
+import { cleanup, createTempDir, createTestRepo, exists } from "./helpers.js";
 
 const temps: string[] = [];
 
@@ -64,11 +56,7 @@ describe("establishSymlinks", () => {
     // Create canonical file
     const canonicalDir = path.join(wtDir, "shared", ".claude");
     await fs.mkdir(canonicalDir, { recursive: true });
-    await fs.writeFile(
-      path.join(canonicalDir, "settings.json"),
-      '{"hello": true}',
-      "utf8"
-    );
+    await fs.writeFile(path.join(canonicalDir, "settings.json"), '{"hello": true}', "utf8");
 
     await establishSymlinks(wtDir, worktreeDir, [".claude"], "main");
 
@@ -109,11 +97,7 @@ describe("establishSymlinks", () => {
     // Create a canonical version of the same file
     const canonicalDir = path.join(wtDir, "shared", ".claude");
     await fs.mkdir(canonicalDir, { recursive: true });
-    await fs.writeFile(
-      path.join(canonicalDir, "CLAUDE.md"),
-      "# canonical version\n",
-      "utf8"
-    );
+    await fs.writeFile(path.join(canonicalDir, "CLAUDE.md"), "# canonical version\n", "utf8");
 
     // Capture stderr
     const stderrLines: string[] = [];
@@ -172,10 +156,7 @@ describe("syncAllSymlinks", () => {
 
     // Manually create a real (non-symlink, non-git-tracked) file in the slot
     await fs.mkdir(path.join(worktreeDir, ".claude"), { recursive: true });
-    await fs.writeFile(
-      path.join(worktreeDir, ".claude", "settings.json"),
-      "migrated content"
-    );
+    await fs.writeFile(path.join(worktreeDir, ".claude", "settings.json"), "migrated content");
 
     await syncAllSymlinks(wtDir, containerDir, state.slots, [".claude"]);
 
@@ -224,7 +205,9 @@ describe("syncAllSymlinks", () => {
 
     // Verify symlinks exist
     for (const slotName of Object.keys(state.slots)) {
-      expect(await exists(path.join(containerDir, slotName, ".claude", "settings.json"))).toBe(true);
+      expect(await exists(path.join(containerDir, slotName, ".claude", "settings.json"))).toBe(
+        true,
+      );
     }
 
     // Delete canonical file
@@ -275,9 +258,7 @@ describe("syncAllSymlinks", () => {
     const { containerDir, wtDir, state } = await setupContainer(dir);
 
     // Should not throw with empty dirs
-    await expect(
-      syncAllSymlinks(wtDir, containerDir, state.slots, [])
-    ).resolves.toBeUndefined();
+    await expect(syncAllSymlinks(wtDir, containerDir, state.slots, [])).resolves.toBeUndefined();
   });
 });
 
@@ -325,9 +306,7 @@ describe("checkout reconciles symlinks", () => {
     const state = await readState(wtDir);
 
     // Find a slot that has main
-    const mainSlot = Object.entries(state.slots).find(
-      ([, s]) => s.branch === "main"
-    )?.[0];
+    const mainSlot = Object.entries(state.slots).find(([, s]) => s.branch === "main")?.[0];
     expect(mainSlot).toBeDefined();
 
     // Add a canonical file after init
@@ -354,7 +333,7 @@ describe("checkout reconciles symlinks", () => {
     // Find the slot for feature-symlink
     const newState = await readState(wtDir);
     const featureSlot = Object.entries(newState.slots).find(
-      ([, s]) => s.branch === "feature-symlink"
+      ([, s]) => s.branch === "feature-symlink",
     )?.[0];
     expect(featureSlot).toBeDefined();
 

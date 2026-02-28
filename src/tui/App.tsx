@@ -1,12 +1,12 @@
-import React, { useState } from "react";
 import { Box } from "ink";
-import { MainMenu } from "./MainMenu.js";
-import { WorktreePanel } from "./WorktreePanel.js";
-import { StashPanel } from "./StashPanel.js";
-import { ConfigPanel } from "./ConfigPanel.js";
-import { TemplatePanel } from "./TemplatePanel.js";
-import { HooksPanel } from "./HooksPanel.js";
+import { useState } from "react";
 import type { ContainerPaths } from "../core/container.js";
+import { ConfigPanel } from "./ConfigPanel.js";
+import { HooksPanel } from "./HooksPanel.js";
+import { MainMenu } from "./MainMenu.js";
+import { StashPanel } from "./StashPanel.js";
+import { TemplatePanel } from "./TemplatePanel.js";
+import { WorktreePanel } from "./WorktreePanel.js";
 
 type Screen = "menu" | "worktrees" | "stashes" | "config" | "templates" | "hooks";
 
@@ -19,44 +19,17 @@ export function App({ containerPaths }: AppProps) {
 
   switch (screen) {
     case "menu":
-      return (
-        <MainMenu onSelect={(s) => setScreen(s as Screen)} />
-      );
+      return <MainMenu onSelect={(s) => setScreen(s as Screen)} />;
     case "worktrees":
-      return (
-        <WorktreePanel
-          paths={containerPaths}
-          onBack={() => setScreen("menu")}
-        />
-      );
+      return <WorktreePanel paths={containerPaths} onBack={() => setScreen("menu")} />;
     case "stashes":
-      return (
-        <StashPanel
-          paths={containerPaths}
-          onBack={() => setScreen("menu")}
-        />
-      );
+      return <StashPanel paths={containerPaths} onBack={() => setScreen("menu")} />;
     case "config":
-      return (
-        <ConfigPanel
-          paths={containerPaths}
-          onBack={() => setScreen("menu")}
-        />
-      );
+      return <ConfigPanel paths={containerPaths} onBack={() => setScreen("menu")} />;
     case "templates":
-      return (
-        <TemplatePanel
-          paths={containerPaths}
-          onBack={() => setScreen("menu")}
-        />
-      );
+      return <TemplatePanel paths={containerPaths} onBack={() => setScreen("menu")} />;
     case "hooks":
-      return (
-        <HooksPanel
-          paths={containerPaths}
-          onBack={() => setScreen("menu")}
-        />
-      );
+      return <HooksPanel paths={containerPaths} onBack={() => setScreen("menu")} />;
     default:
       return <Box />;
   }

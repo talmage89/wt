@@ -1,7 +1,7 @@
-import { describe, it, expect, afterEach } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import { acquireLock } from "../../src/core/lock.js";
 
 const temps: string[] = [];
@@ -45,7 +45,7 @@ describe("acquireLock", () => {
     const release = await acquireLock(wtDir);
     try {
       await expect(acquireLock(wtDir)).rejects.toThrow(
-        "Another wt operation is in progress. If this is stale, remove .wt/lock."
+        "Another wt operation is in progress. If this is stale, remove .wt/lock.",
       );
     } finally {
       await release();

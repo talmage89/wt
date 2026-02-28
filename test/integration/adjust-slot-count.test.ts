@@ -1,13 +1,12 @@
-import { describe, it, expect, afterEach } from "vitest";
-import path from "node:path";
 import fs from "node:fs/promises";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import { runInit } from "../../src/commands/init.js";
 import { runList } from "../../src/commands/list.js";
-import { runCheckout } from "../../src/commands/checkout.js";
-import { readState, writeState } from "../../src/core/state.js";
 import { readConfig, writeConfig } from "../../src/core/config.js";
 import { adjustSlotCount } from "../../src/core/slots.js";
-import { createTempDir, createTestRepo, cleanup, exists } from "./helpers.js";
+import { readState, writeState } from "../../src/core/state.js";
+import { cleanup, createTempDir, createTestRepo, exists } from "./helpers.js";
 
 const temps: string[] = [];
 
@@ -151,9 +150,9 @@ describe("adjustSlotCount — decrease", () => {
     const config = await readConfig(wtDir);
     config.slot_count = 2; // 3 pinned > 2 target
 
-    await expect(
-      adjustSlotCount(repoDir, containerDir, wtDir, state, config)
-    ).rejects.toThrow("Cannot reduce slot count to 2: 3 worktrees are pinned");
+    await expect(adjustSlotCount(repoDir, containerDir, wtDir, state, config)).rejects.toThrow(
+      "Cannot reduce slot count to 2: 3 worktrees are pinned",
+    );
   });
 
   it("saves stash when evicting a dirty slot", async () => {
@@ -182,7 +181,7 @@ describe("adjustSlotCount — decrease", () => {
       containerDir,
       wtDir,
       state,
-      config
+      config,
     );
 
     // Slot was evicted

@@ -1,4 +1,3 @@
-import React from "react";
 import { Text } from "ink";
 
 function formatRelative(isoDate: string): string {

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import yargs from "yargs";
 
 // BUG-004: `wt checkout --no-restore <branch>` failed with "Unknown argument: restore"
@@ -14,14 +14,12 @@ function buildCheckoutParser() {
       "checkout <branch>",
       "Check out a branch",
       (y) =>
-        y
-          .positional("branch", { type: "string", demandOption: true })
-          .option("restore", {
-            type: "boolean",
-            default: true,
-            describe: "Automatically restore stash on checkout (use --no-restore to skip)",
-          }),
-      () => {}
+        y.positional("branch", { type: "string", demandOption: true }).option("restore", {
+          type: "boolean",
+          default: true,
+          describe: "Automatically restore stash on checkout (use --no-restore to skip)",
+        }),
+      () => {},
     )
     .strict()
     .help(false)

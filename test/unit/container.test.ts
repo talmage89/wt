@@ -1,12 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, mkdir, rm } from "fs/promises";
-import { join, resolve } from "path";
-import { tmpdir } from "os";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  findContainer,
   createContainerStructure,
-  validateContainer,
   currentSlotName,
+  findContainer,
+  validateContainer,
 } from "../../src/core/container.js";
 
 let tmpDir: string;
@@ -64,7 +64,7 @@ describe("createContainerStructure", () => {
     const wtDir = await createContainerStructure(tmpDir);
     expect(wtDir).toBe(join(tmpDir, ".wt"));
 
-    const { stat } = await import("fs/promises");
+    const { stat } = await import("node:fs/promises");
     const expected = [
       join(tmpDir, ".wt"),
       join(tmpDir, ".wt", "repo"),
@@ -107,7 +107,7 @@ describe("validateContainer", () => {
       repoDir: join(tmpDir, ".wt", "repo"),
     };
     await expect(validateContainer(paths)).rejects.toThrow(
-      "Container is corrupted: .wt/repo/ is missing."
+      "Container is corrupted: .wt/repo/ is missing.",
     );
   });
 });

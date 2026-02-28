@@ -1,12 +1,19 @@
-import { join } from "path";
-import { generateSlotName } from "./words.js";
-import { worktreeAdd, worktreeRemove, defaultBranch, hardReset, cleanUntracked, refExists } from "./git.js";
-import type { State, SlotState } from "./state.js";
-import { writeState } from "./state.js";
+import { join } from "node:path";
 import type { Config } from "./config.js";
+import {
+  cleanUntracked,
+  defaultBranch,
+  hardReset,
+  refExists,
+  worktreeAdd,
+  worktreeRemove,
+} from "./git.js";
 import { saveStash } from "./stash.js";
-import { generateTemplates } from "./templates.js";
+import type { SlotState, State } from "./state.js";
+import { writeState } from "./state.js";
 import { establishSymlinks } from "./symlinks.js";
+import { generateTemplates } from "./templates.js";
+import { generateSlotName } from "./words.js";
 
 /**
  * Create N worktree slots in the container directory.
@@ -18,7 +25,7 @@ export async function createSlots(
   containerDir: string,
   count: number,
   commit: string,
-  existingSlotNames: Set<string>
+  existingSlotNames: Set<string>,
 ): Promise<string[]> {
   const names: string[] = [];
   const allNames = new Set(existingSlotNames);
@@ -73,14 +80,13 @@ export function selectSlotForCheckout(state: State): string {
   const unpinned = entries.filter(([, slot]) => !slot.pinned);
   if (unpinned.length === 0) {
     throw new Error(
-      "All worktree slots are pinned. Unpin a worktree or increase the slot count to continue."
+      "All worktree slots are pinned. Unpin a worktree or increase the slot count to continue.",
     );
   }
 
   // Sort by last_used_at ascending (oldest first)
   unpinned.sort(
-    ([, a], [, b]) =>
-      new Date(a.last_used_at).getTime() - new Date(b.last_used_at).getTime()
+    ([, a], [, b]) => new Date(a.last_used_at).getTime() - new Date(b.last_used_at).getTime(),
   );
 
   return unpinned[0][0];
@@ -89,11 +95,7 @@ export function selectSlotForCheckout(state: State): string {
 /**
  * Mark a slot as used with a branch. Updates LRU timestamp.
  */
-export function markSlotUsed(
-  state: State,
-  slotName: string,
-  branch: string
-): void {
+export function markSlotUsed(state: State, slotName: string, branch: string): void {
   const slot = state.slots[slotName];
   if (!slot) {
     throw new Error(`Slot not found: ${slotName}`);
@@ -123,7 +125,7 @@ export async function adjustSlotCount(
   containerDir: string,
   wtDir: string,
   state: State,
-  config: Config
+  config: Config,
 ): Promise<State> {
   const currentCount = Object.keys(state.slots).length;
   const targetCount = config.slot_count;
@@ -171,7 +173,7 @@ export async function adjustSlotCount(
 
     if (pinnedCount > targetCount) {
       throw new Error(
-        `Cannot reduce slot count to ${targetCount}: ${pinnedCount} worktrees are pinned. Unpin worktrees first or choose a higher count.`
+        `Cannot reduce slot count to ${targetCount}: ${pinnedCount} worktrees are pinned. Unpin worktrees first or choose a higher count.`,
       );
     }
 
@@ -198,7 +200,13 @@ export async function adjustSlotCount(
 
       if (slot.branch !== null) {
         // Save stash if dirty, then clean so worktree remove succeeds
-        const stashed = await saveStash(wtDir, repoDir, slot.branch, slotPath, config.shared.directories);
+        const stashed = await saveStash(
+          wtDir,
+          repoDir,
+          slot.branch,
+          slotPath,
+          config.shared.directories,
+        );
         if (stashed) {
           await hardReset(slotPath);
           await cleanUntracked(slotPath);

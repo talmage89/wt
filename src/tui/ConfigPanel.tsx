@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from "react";
+import { spawn } from "node:child_process";
+import { join } from "node:path";
 import { Box, Text, useApp, useInput, useStdin } from "ink";
-import { spawn } from "child_process";
-import { join } from "path";
+import { useEffect, useState } from "react";
+import { type Config, readConfig } from "../core/config.js";
 import type { ContainerPaths } from "../core/container.js";
-import { readConfig, type Config } from "../core/config.js";
-import { readState } from "../core/state.js";
 import { adjustSlotCount } from "../core/slots.js";
+import { readState } from "../core/state.js";
 
 interface Props {
   paths: ContainerPaths;
@@ -18,14 +18,12 @@ function diffConfig(before: Config, after: Config): string[] {
   if (before.slot_count !== after.slot_count) {
     changes.push(
       `slot_count: ${before.slot_count} → ${after.slot_count}` +
-        `  (new slots will be created/evicted on next wt command)`
+        `  (new slots will be created/evicted on next wt command)`,
     );
   }
 
   if (before.archive_after_days !== after.archive_after_days) {
-    changes.push(
-      `archive_after_days: ${before.archive_after_days} → ${after.archive_after_days}`
-    );
+    changes.push(`archive_after_days: ${before.archive_after_days} → ${after.archive_after_days}`);
   }
 
   const beforeDirs = JSON.stringify(before.shared.directories.slice().sort());
@@ -59,7 +57,7 @@ export function ConfigPanel({ paths, onBack }: Props) {
   const [triggerApply, setTriggerApply] = useState(false);
 
   useEffect(() => {
-    const editor = process.env["EDITOR"] ?? "vi";
+    const editor = process.env.EDITOR ?? "vi";
     const configPath = join(paths.wtDir, "config.toml");
 
     const openEditor = (before: Config | null) => {
@@ -82,9 +80,7 @@ export function ConfigPanel({ paths, onBack }: Props) {
 
             if (before.slot_count !== after.slot_count) {
               // Filter out the slot_count line — handled via the apply prompt
-              const otherChanges = allChanges.filter(
-                (l) => !l.startsWith("slot_count:")
-              );
+              const otherChanges = allChanges.filter((l) => !l.startsWith("slot_count:"));
               setChanges(otherChanges);
               setSlotCountChange({
                 before: before.slot_count,
@@ -127,7 +123,7 @@ export function ConfigPanel({ paths, onBack }: Props) {
           paths.container,
           paths.wtDir,
           state,
-          afterConfig
+          afterConfig,
         );
         const newSlotNames = new Set(Object.keys(newState.slots));
 
@@ -139,12 +135,12 @@ export function ConfigPanel({ paths, onBack }: Props) {
         ];
         if (created.length > 0) {
           resultLines.push(
-            `  Created ${created.length} new slot${created.length !== 1 ? "s" : ""}: ${created.join(", ")}`
+            `  Created ${created.length} new slot${created.length !== 1 ? "s" : ""}: ${created.join(", ")}`,
           );
         }
         if (evicted.length > 0) {
           resultLines.push(
-            `  Evicted ${evicted.length} slot${evicted.length !== 1 ? "s" : ""}: ${evicted.join(", ")}`
+            `  Evicted ${evicted.length} slot${evicted.length !== 1 ? "s" : ""}: ${evicted.join(", ")}`,
           );
         }
 
@@ -221,9 +217,7 @@ export function ConfigPanel({ paths, onBack }: Props) {
         {changes.length === 0 ? (
           <Text dimColor>No changes.</Text>
         ) : (
-          changes.map((line, i) => (
-            <Text key={i}>{line}</Text>
-          ))
+          changes.map((line, i) => <Text key={i}>{line}</Text>)
         )}
       </Box>
       <Box marginTop={1}>

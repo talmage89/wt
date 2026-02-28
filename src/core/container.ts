@@ -1,5 +1,5 @@
-import { stat, mkdir } from "fs/promises";
-import { join, dirname, resolve } from "path";
+import { mkdir, stat } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 
 export interface ContainerPaths {
   container: string; // the parent directory holding .wt/ and slots
@@ -23,9 +23,7 @@ async function isDir(p: string): Promise<boolean> {
  * Walk up from `startDir` looking for a directory that contains `.wt/`.
  * Returns null if not inside a managed container.
  */
-export async function findContainer(
-  startDir: string
-): Promise<ContainerPaths | null> {
+export async function findContainer(startDir: string): Promise<ContainerPaths | null> {
   let dir = resolve(startDir);
 
   while (true) {
@@ -53,9 +51,7 @@ export async function findContainer(
  *          .wt/shared/, .wt/templates/, .wt/hooks/
  * Returns the path to .wt/.
  */
-export async function createContainerStructure(
-  containerDir: string
-): Promise<string> {
+export async function createContainerStructure(containerDir: string): Promise<string> {
   const wtDir = join(containerDir, ".wt");
 
   const dirs = [
@@ -90,10 +86,7 @@ export async function validateContainer(paths: ContainerPaths): Promise<void> {
  * Determine which worktree slot the given directory is inside, if any.
  * Returns the slot name (directory name) or null.
  */
-export function currentSlotName(
-  startDir: string,
-  containerPaths: ContainerPaths
-): string | null {
+export function currentSlotName(startDir: string, containerPaths: ContainerPaths): string | null {
   const container = resolve(containerPaths.container);
   let dir = resolve(startDir);
 

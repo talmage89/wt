@@ -1,27 +1,21 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { PassThrough } from "node:stream";
-import path from "node:path";
 import fs from "node:fs/promises";
+import path from "node:path";
+import { PassThrough } from "node:stream";
 import { execa } from "execa";
-import { runInit } from "../../src/commands/init.js";
+import { afterEach, describe, expect, it } from "vitest";
 import { runCheckout } from "../../src/commands/checkout.js";
-import { runFetch } from "../../src/commands/fetch.js";
 import { runClean } from "../../src/commands/clean.js";
+import { runFetch } from "../../src/commands/fetch.js";
+import { runInit } from "../../src/commands/init.js";
 import {
-  getStash,
-  listStashes,
-  dropStash,
   archiveScan,
   archiveStash,
+  dropStash,
+  getStash,
   isZstdAvailable,
 } from "../../src/core/stash.js";
 import { readState, writeState } from "../../src/core/state.js";
-import {
-  createTempDir,
-  createBareRemote,
-  cleanup,
-  exists,
-} from "./helpers.js";
+import { cleanup, createBareRemote, createTempDir, exists } from "./helpers.js";
 
 const temps: string[] = [];
 
@@ -71,7 +65,7 @@ async function setupRemoteContainer(containerDir: string) {
 async function createStashForFeatureBranch(
   containerDir: string,
   wtDir: string,
-  repoDir: string
+  repoDir: string,
 ): Promise<void> {
   // Checkout feature-branch
   await runCheckout({ branch: "feature-branch", cwd: containerDir, noRestore: true });
@@ -79,14 +73,11 @@ async function createStashForFeatureBranch(
   // Modify a tracked file to create dirty state
   const state = await readState(wtDir);
   const featureSlot = Object.entries(state.slots).find(
-    ([, s]) => s.branch === "feature-branch"
+    ([, s]) => s.branch === "feature-branch",
   )?.[0];
   expect(featureSlot).toBeDefined();
 
-  await fs.writeFile(
-    path.join(containerDir, featureSlot!, "feature.txt"),
-    "modified\n"
-  );
+  await fs.writeFile(path.join(containerDir, featureSlot!, "feature.txt"), "modified\n");
 
   // Force feature-branch to be LRU so it gets evicted
   state.slots[featureSlot!].last_used_at = new Date(0).toISOString();
@@ -115,7 +106,7 @@ async function createStashForFeatureBranch(
 async function deleteRemoteBranch(
   remoteDir: string,
   repoDir: string,
-  branch: string
+  branch: string,
 ): Promise<void> {
   await execa("git", ["branch", "-D", branch], { cwd: remoteDir });
   // Prune stale remote-tracking ref
@@ -125,11 +116,7 @@ async function deleteRemoteBranch(
 /**
  * Set a stash's last_used_at to N days ago.
  */
-async function ageStash(
-  wtDir: string,
-  branch: string,
-  daysAgo: number
-): Promise<void> {
+async function ageStash(wtDir: string, branch: string, daysAgo: number): Promise<void> {
   const meta = await getStash(wtDir, branch);
   expect(meta).not.toBeNull();
   const past = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
@@ -138,14 +125,18 @@ async function ageStash(
   const { stringify } = await import("smol-toml");
   const encoded = (await import("../../src/core/branch-encode.js")).encodeBranch(branch);
   const filePath = path.join(wtDir, "stashes", `${encoded}.toml`);
-  await fs.writeFile(filePath, stringify({
-    branch: meta!.branch,
-    commit: meta!.commit,
-    stash_ref: meta!.stash_ref,
-    created_at: meta!.created_at,
-    last_used_at: meta!.last_used_at,
-    status: meta!.status,
-  }), "utf8");
+  await fs.writeFile(
+    filePath,
+    stringify({
+      branch: meta!.branch,
+      commit: meta!.commit,
+      stash_ref: meta!.stash_ref,
+      created_at: meta!.created_at,
+      last_used_at: meta!.last_used_at,
+      status: meta!.status,
+    }),
+    "utf8",
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -183,7 +174,7 @@ describe("archiveScan", () => {
     const refResult = await execa(
       "git",
       ["show-ref", "--verify", `refs/wt/stashes/feature-branch`],
-      { cwd: repoDir, reject: false }
+      { cwd: repoDir, reject: false },
     );
     expect(refResult.exitCode).not.toBe(0);
   });
@@ -260,14 +251,18 @@ describe("archiveScan", () => {
     const filePath = path.join(wtDir, "stashes", `${encoded}.toml`);
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
-    await fs.writeFile(filePath, stringify({
-      branch: meta!.branch,
-      commit: meta!.commit,
-      stash_ref: meta!.stash_ref,
-      created_at: thirtyDaysAgo,
-      last_used_at: twoDaysAgo,
-      status: "active",
-    }), "utf8");
+    await fs.writeFile(
+      filePath,
+      stringify({
+        branch: meta!.branch,
+        commit: meta!.commit,
+        stash_ref: meta!.stash_ref,
+        created_at: thirtyDaysAgo,
+        last_used_at: twoDaysAgo,
+        status: "active",
+      }),
+      "utf8",
+    );
 
     const { archived } = await archiveScan(wtDir, repoDir, 7);
 
@@ -299,7 +294,7 @@ describe("dropStash", () => {
     const refResult = await execa(
       "git",
       ["show-ref", "--verify", "refs/wt/stashes/feature-branch"],
-      { cwd: repoDir, reject: false }
+      { cwd: repoDir, reject: false },
     );
     expect(refResult.exitCode).not.toBe(0);
   });
@@ -342,18 +337,18 @@ describe("archiveStash captures untracked files", () => {
 
     const state = await readState(wtDir);
     const featureSlot = Object.entries(state.slots).find(
-      ([, s]) => s.branch === "feature-branch"
+      ([, s]) => s.branch === "feature-branch",
     )?.[0];
     expect(featureSlot).toBeDefined();
 
     // Create dirty state: one tracked modification AND one untracked file
     await fs.writeFile(
       path.join(containerDir, featureSlot!, "feature.txt"),
-      "modified for archive test\n"
+      "modified for archive test\n",
     );
     await fs.writeFile(
       path.join(containerDir, featureSlot!, "untracked-file.txt"),
-      "untracked content for archive\n"
+      "untracked content for archive\n",
     );
 
     // Force feature-branch to be LRU
@@ -374,11 +369,10 @@ describe("archiveStash captures untracked files", () => {
     expect(stashMeta!.status).toBe("active");
 
     // Verify the stash has a third parent (untracked files)
-    const thirdParent = await execa(
-      "git",
-      ["rev-parse", "--verify", `${stashMeta!.stash_ref}^3`],
-      { cwd: repoDir, reject: false }
-    );
+    const thirdParent = await execa("git", ["rev-parse", "--verify", `${stashMeta!.stash_ref}^3`], {
+      cwd: repoDir,
+      reject: false,
+    });
     expect(thirdParent.exitCode).toBe(0);
 
     // Archive the stash with zstd disabled for easy patch reading
@@ -439,7 +433,7 @@ describe("checkout triggers archive scan", () => {
     const state = await readState(wtDir);
     // Find a vacant slot or pick any non-feature slot
     const anyBranch = Object.entries(state.slots).find(
-      ([, s]) => s.branch !== "feature-branch"
+      ([, s]) => s.branch !== "feature-branch",
     )?.[1]?.branch;
 
     if (anyBranch) {
@@ -468,7 +462,7 @@ describe("checkout does not archive the target branch stash (BUG-021)", () => {
 
     const state = await readState(wtDir);
     const featureSlot = Object.entries(state.slots).find(
-      ([, s]) => s.branch === "feature-branch"
+      ([, s]) => s.branch === "feature-branch",
     )?.[0];
     expect(featureSlot).toBeDefined();
 
@@ -504,7 +498,7 @@ describe("checkout does not archive the target branch stash (BUG-021)", () => {
     // The sentinel file must be present (stash was restored, not archived)
     const state2 = await readState(wtDir);
     const newSlot = Object.entries(state2.slots).find(
-      ([, s]) => s.branch === "feature-branch"
+      ([, s]) => s.branch === "feature-branch",
     )?.[0];
     expect(newSlot).toBeDefined();
     const restoredSentinel = path.join(containerDir, newSlot!, "beta-wip.txt");
@@ -733,7 +727,7 @@ describe("checkout notifies user about archived stash (BUG-025)", () => {
     // Checkout must have succeeded
     const state2 = await readState(wtDir);
     const newSlot = Object.entries(state2.slots).find(
-      ([, s]) => s.branch === "feature-branch"
+      ([, s]) => s.branch === "feature-branch",
     )?.[0];
     expect(newSlot).toBeDefined();
 
