@@ -300,7 +300,7 @@ export async function archiveStash(
     archivePath = join(archiveDir, `${encoded}.patch.zst`);
     await execa("zstd", ["-f", "-o", archivePath], {
       input: patch,
-      stdio: ["pipe", "pipe", "inherit"],
+      stdio: ["pipe", "pipe", "pipe"],
     });
   } else {
     archivePath = join(archiveDir, `${encoded}.patch`);

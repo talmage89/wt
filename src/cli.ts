@@ -56,12 +56,14 @@ if (process.argv.length <= 2) {
 
 /**
  * Handle errors from CLI command handlers.
- * ExecaErrors (git failures): stderr has already been printed via stdio inherit.
- * Just exit with the same exit code — no extra message.
+ * ExecaErrors (git failures): print captured stderr verbatim, then exit with
+ * the same exit code — no wrapping or suppression.
  * Other errors: print `wt: <message>` and exit 1.
  */
 function handleCliError(err: unknown): never {
   if (typeof (err as { exitCode?: unknown }).exitCode === "number") {
+    const stderr = (err as { stderr?: string }).stderr;
+    if (stderr) process.stderr.write(stderr.endsWith("\n") ? stderr : `${stderr}\n`);
     process.exit((err as { exitCode: number }).exitCode);
   }
   process.stderr.write(`wt: ${(err as Error).message}\n`);

@@ -361,7 +361,7 @@ async function checkoutOrTrack(worktreeDir: string, branch: string): Promise<voi
     // Branch not available locally — create tracking branch from origin
     await execa("git", ["checkout", "-b", branch, "--track", `origin/${branch}`], {
       cwd: worktreeDir,
-      stdio: ["ignore", "pipe", "inherit"],
+      stdio: ["ignore", "pipe", "pipe"],
     });
   }
 }
@@ -377,7 +377,7 @@ async function hasRemoteRefs(repoDir: string): Promise<boolean> {
       ["for-each-ref", "--count=1", "--format=x", "refs/remotes/"],
       {
         cwd: repoDir,
-        stdio: ["ignore", "pipe", "inherit"],
+        stdio: ["ignore", "pipe", "pipe"],
       },
     );
     return result.stdout.trim().length > 0;
