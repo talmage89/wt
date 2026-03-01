@@ -861,7 +861,7 @@ describe("wt checkout — BUG-009: symlinks removed before git checkout", () => 
     const canonicalDir = path.join(wtDir, "shared", ".config");
     await fs.mkdir(canonicalDir, { recursive: true });
     await fs.writeFile(path.join(canonicalDir, "app.json"), '{"shared":true}\n');
-    await syncAllSymlinks(wtDir, dir, state.slots, [".config"]);
+    await syncAllSymlinks(wtDir, dir, state.slots, { directories: [".config"], files: [] });
 
     // Sanity check: at least one slot has the symlink installed
     const hasSymlink = (

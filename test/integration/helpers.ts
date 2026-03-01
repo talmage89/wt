@@ -8,7 +8,10 @@ import type { ContainerPaths } from "../../src/core/container.js";
  * Create a temporary directory for a test.
  */
 export async function createTempDir(): Promise<string> {
-  return await fs.mkdtemp(path.join(os.tmpdir(), "wt-test-"));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "wt-test-"));
+  // Resolve symlinks (e.g. macOS /var -> /private/var) so paths match
+  // what git worktree list returns.
+  return await fs.realpath(dir);
 }
 
 /**

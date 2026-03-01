@@ -188,7 +188,7 @@ describe("wt stash apply", () => {
     // Establish symlinks in all existing slots (simulating wt sync)
     const state = await readState(wtDir);
     for (const slotName of Object.keys(state.slots)) {
-      await establishSymlinks(wtDir, path.join(dir, slotName), [".config"], "");
+      await establishSymlinks(wtDir, path.join(dir, slotName), { directories: [".config"], files: [] }, "");
     }
 
     // Find the main slot and verify its symlink exists
