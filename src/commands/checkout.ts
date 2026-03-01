@@ -187,7 +187,7 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
         paths.repoDir,
         evictedBranch,
         worktreeDir,
-        config.shared.directories,
+        config.shared,
       );
       if (wasStashed) {
         await git.hardReset(worktreeDir);
@@ -202,7 +202,7 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
     // 9. CHECKOUT BRANCH
     // Remove managed symlinks from target slot before git checkout.
     // git refuses to checkout if a symlink exists for a file the target branch tracks.
-    await removeSymlinks(paths.wtDir, worktreeDir, config.shared.directories);
+    await removeSymlinks(paths.wtDir, worktreeDir, config.shared);
 
     if (options.create) {
       // -b flag: create a new local branch at the given start point
@@ -272,7 +272,7 @@ export async function runCheckout(options: CheckoutOptions): Promise<string> {
     await generateTemplates(paths.wtDir, worktreeDir, targetSlot, options.branch, config.templates);
 
     // 12. ESTABLISH SYMLINKS
-    await establishSymlinks(paths.wtDir, worktreeDir, config.shared.directories, options.branch);
+    await establishSymlinks(paths.wtDir, worktreeDir, config.shared, options.branch);
 
     // 13. UPDATE STATE
     markSlotUsed(state, targetSlot, options.branch);

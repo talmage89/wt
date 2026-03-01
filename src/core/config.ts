@@ -8,7 +8,8 @@ export interface TemplateConfig {
 }
 
 export interface SharedConfig {
-  directories: string[]; // paths relative to worktree root
+  directories: string[]; // directory paths relative to worktree root (recursive)
+  files: string[]; // individual file paths relative to worktree root
 }
 
 export interface Config {
@@ -27,7 +28,7 @@ export function defaultConfig(): Config {
     slot_count: 5,
     archive_after_days: 7,
     fetch_cooldown_minutes: 10,
-    shared: { directories: [] },
+    shared: { directories: [], files: [] },
     templates: [],
   };
 }
@@ -67,6 +68,7 @@ export async function readConfig(wtDir: string): Promise<Config> {
     const sharedRaw = parsed.shared as Record<string, unknown>;
     shared = {
       directories: Array.isArray(sharedRaw.directories) ? (sharedRaw.directories as string[]) : [],
+      files: Array.isArray(sharedRaw.files) ? (sharedRaw.files as string[]) : [],
     };
   }
 
@@ -90,7 +92,7 @@ export async function writeConfig(wtDir: string, config: Config): Promise<void> 
     slot_count: config.slot_count,
     archive_after_days: config.archive_after_days,
     fetch_cooldown_minutes: config.fetch_cooldown_minutes,
-    shared: { directories: config.shared.directories },
+    shared: { directories: config.shared.directories, files: config.shared.files },
   };
   if (config.templates.length > 0) {
     data.templates = config.templates;

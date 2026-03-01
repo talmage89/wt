@@ -21,6 +21,7 @@ describe("defaultConfig", () => {
     expect(cfg.archive_after_days).toBe(7);
     expect(cfg.fetch_cooldown_minutes).toBe(10);
     expect(cfg.shared.directories).toEqual([]);
+    expect(cfg.shared.files).toEqual([]);
     expect(cfg.templates).toEqual([]);
   });
 });
@@ -38,6 +39,7 @@ archive_after_days = 14
 
 [shared]
 directories = ["node_modules", ".env"]
+files = [".prettierrc", ".env.local"]
 
 [[templates]]
 source = "templates/env.tmpl"
@@ -52,6 +54,7 @@ target = "Makefile"
     expect(cfg.slot_count).toBe(3);
     expect(cfg.archive_after_days).toBe(14);
     expect(cfg.shared.directories).toEqual(["node_modules", ".env"]);
+    expect(cfg.shared.files).toEqual([".prettierrc", ".env.local"]);
     expect(cfg.templates).toHaveLength(2);
     expect(cfg.templates[0]).toEqual({
       source: "templates/env.tmpl",
@@ -71,6 +74,7 @@ target = "Makefile"
     expect(cfg.archive_after_days).toBe(7);
     expect(cfg.fetch_cooldown_minutes).toBe(10);
     expect(cfg.shared.directories).toEqual([]);
+    expect(cfg.shared.files).toEqual([]);
     expect(cfg.templates).toEqual([]);
   });
 
@@ -88,7 +92,7 @@ describe("writeConfig / round-trip", () => {
       slot_count: 4,
       archive_after_days: 30,
       fetch_cooldown_minutes: 15,
-      shared: { directories: ["vendor"] },
+      shared: { directories: ["vendor"], files: [".env.local"] },
       templates: [{ source: "src.tmpl", target: "dest.txt" }],
     };
     await writeConfig(tmpDir, original);
@@ -97,6 +101,7 @@ describe("writeConfig / round-trip", () => {
     expect(loaded.archive_after_days).toBe(30);
     expect(loaded.fetch_cooldown_minutes).toBe(15);
     expect(loaded.shared.directories).toEqual(["vendor"]);
+    expect(loaded.shared.files).toEqual([".env.local"]);
     expect(loaded.templates).toEqual([{ source: "src.tmpl", target: "dest.txt" }]);
   });
 

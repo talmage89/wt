@@ -28,8 +28,10 @@ function diffConfig(before: Config, after: Config): string[] {
 
   const beforeDirs = JSON.stringify(before.shared.directories.slice().sort());
   const afterDirs = JSON.stringify(after.shared.directories.slice().sort());
-  if (beforeDirs !== afterDirs) {
-    changes.push(`shared.directories changed  (run 'wt sync' to apply)`);
+  const beforeFiles = JSON.stringify(before.shared.files.slice().sort());
+  const afterFiles = JSON.stringify(after.shared.files.slice().sort());
+  if (beforeDirs !== afterDirs || beforeFiles !== afterFiles) {
+    changes.push(`shared config changed  (run 'wt sync' to apply)`);
   }
 
   const beforeTemplates = JSON.stringify(before.templates);

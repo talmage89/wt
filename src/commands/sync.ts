@@ -39,7 +39,7 @@ export async function runSync(options: SyncOptions = {}): Promise<void> {
     await writeState(paths.wtDir, state);
 
     // 4. SYNC ALL SYMLINKS
-    await syncAllSymlinks(paths.wtDir, paths.container, state.slots, config.shared.directories);
+    await syncAllSymlinks(paths.wtDir, paths.container, state.slots, config.shared);
 
     // 5. REGENERATE ALL TEMPLATES
     await generateAllTemplates(paths.wtDir, paths.container, state.slots, config.templates);

@@ -301,18 +301,20 @@ In `.wt/config.toml`:
 ```toml
 [shared]
 directories = [".claude", ".env.local.d"]
+files = [".prettierrc", ".env.local"]
 ```
 
-Each entry is a path relative to the worktree root. All files within these directories (recursively) are managed as shared symlinks.
+`directories` entries are paths relative to the worktree root. All files within these directories (recursively) are managed as shared symlinks. `files` entries are individual file paths relative to the worktree root, shared without requiring a wrapping directory.
 
 ### 6.2 Canonical Storage
 
-Shared files live in `.wt/shared/<directory>/`. For example, if `.claude` is configured:
+Shared files live in `.wt/shared/`, mirroring the worktree-relative path. For example, if `.claude` is a shared directory and `.env.local` is a shared file:
 
 ```
 .wt/shared/.claude/
   settings.json
   CLAUDE.md
+.wt/shared/.env.local
 ```
 
 Each worktree slot gets:
@@ -320,6 +322,7 @@ Each worktree slot gets:
 ```
 a3f2/.claude/settings.json  -> ../../.wt/shared/.claude/settings.json
 a3f2/.claude/CLAUDE.md      -> ../../.wt/shared/.claude/CLAUDE.md
+a3f2/.env.local              -> ../.wt/shared/.env.local
 ```
 
 Editing the file in any worktree edits the single canonical copy.
@@ -582,10 +585,11 @@ Configuration lives in `.wt/config.toml`.
 # Number of worktree slots to maintain.
 slot_count = 5
 
-# Directories to share across worktrees via symlinks.
+# Directories and files to share across worktrees via symlinks.
 # Paths are relative to the worktree root.
 [shared]
 directories = [".claude"]
+files = [".env.local"]
 
 # Template file definitions.
 [[templates]]

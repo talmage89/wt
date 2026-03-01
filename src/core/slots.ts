@@ -162,7 +162,7 @@ export async function adjustSlotCount(
     for (const name of newNames) {
       const slotDir = join(containerDir, name);
       await generateTemplates(wtDir, slotDir, name, "", config.templates);
-      await establishSymlinks(wtDir, slotDir, config.shared.directories, "");
+      await establishSymlinks(wtDir, slotDir, config.shared, "");
     }
 
     await writeState(wtDir, state);
@@ -205,7 +205,7 @@ export async function adjustSlotCount(
           repoDir,
           slot.branch,
           slotPath,
-          config.shared.directories,
+          config.shared,
         );
         if (stashed) {
           await hardReset(slotPath);

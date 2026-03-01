@@ -1,5 +1,6 @@
 import { access, lstat, mkdir, readdir, readlink, rename, rm, symlink } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
+import type { SharedConfig } from "./config.js";
 import * as git from "./git.js";
 
 /**
@@ -41,21 +42,66 @@ export async function isGitTracked(worktreeDir: string, relativePath: string): P
 }
 
 /**
+ * Establish or fix a single symlink from a worktree file to its canonical copy.
+ * - If the file is git-tracked in this worktree's branch: skip, warn.
+ * - If a real file (not symlink) exists at the target: leave it (sync handles migration).
+ * - If no file exists at the target: create the symlink.
+ * - If a symlink exists but points elsewhere: fix it.
+ * - If a symlink exists and is correct: skip.
+ */
+async function establishOneSymlink(
+  wtDir: string,
+  worktreeDir: string,
+  relativeToWorktree: string,
+  branch: string,
+): Promise<void> {
+  const canonicalPath = join(wtDir, "shared", relativeToWorktree);
+  const targetPath = join(worktreeDir, relativeToWorktree);
+  const relativeLinkTarget = relative(dirname(targetPath), canonicalPath);
+
+  // Check git-tracked conflict
+  if (await isGitTracked(worktreeDir, relativeToWorktree)) {
+    process.stderr.write(
+      `wt: Skipping symlink for ${relativeToWorktree}: file is tracked by git in branch ${branch}.\n`,
+    );
+    return;
+  }
+
+  // Check current state at targetPath
+  let st = null;
+  try {
+    st = await lstat(targetPath);
+  } catch {
+    // targetPath doesn't exist
+  }
+
+  if (st === null) {
+    // No file — create parent dirs and symlink
+    await mkdir(dirname(targetPath), { recursive: true });
+    await symlink(relativeLinkTarget, targetPath);
+  } else if (st.isSymbolicLink()) {
+    // Check if it points to the right place
+    const current = await readlink(targetPath);
+    if (current !== relativeLinkTarget) {
+      await rm(targetPath);
+      await symlink(relativeLinkTarget, targetPath);
+    }
+    // else: already correct, skip
+  }
+}
+
+/**
  * Establish symlinks for a single worktree slot.
- * For each configured shared directory, for each file in `.wt/shared/<dir>/`:
- *   - If the file is git-tracked in this worktree's branch: skip, warn.
- *   - If a real file (not symlink) exists at the target: leave it (sync handles migration).
- *   - If no file exists at the target: create the symlink.
- *   - If a symlink exists but points elsewhere: fix it.
- *   - If a symlink exists and is correct: skip.
+ * Handles both shared directories (recursive) and individual shared files.
  */
 export async function establishSymlinks(
   wtDir: string,
   worktreeDir: string,
-  sharedDirs: string[],
+  shared: SharedConfig,
   branch: string,
 ): Promise<void> {
-  for (const sharedDir of sharedDirs) {
+  // Shared directories: walk each canonical dir and link every file
+  for (const sharedDir of shared.directories) {
     const canonicalDir = join(wtDir, "shared", sharedDir);
 
     // Check if canonical dir exists
@@ -66,48 +112,85 @@ export async function establishSymlinks(
     }
 
     for await (const file of walkFiles(canonicalDir)) {
-      const targetPath = join(worktreeDir, sharedDir, file);
-      const canonicalPath = join(canonicalDir, file);
-      const relativeLinkTarget = relative(dirname(targetPath), canonicalPath);
+      await establishOneSymlink(wtDir, worktreeDir, join(sharedDir, file), branch);
+    }
+  }
 
-      // Check git-tracked conflict
-      const relativeToWorktree = join(sharedDir, file);
-      if (await isGitTracked(worktreeDir, relativeToWorktree)) {
-        process.stderr.write(
-          `wt: Skipping symlink for ${relativeToWorktree}: file is tracked by git in branch ${branch}.\n`,
-        );
-        continue;
-      }
+  // Individual shared files
+  for (const file of shared.files) {
+    const canonicalPath = join(wtDir, "shared", file);
+    try {
+      await lstat(canonicalPath);
+    } catch {
+      continue; // canonical file doesn't exist yet
+    }
+    await establishOneSymlink(wtDir, worktreeDir, file, branch);
+  }
+}
 
-      // Check current state at targetPath
-      let st = null;
-      try {
-        st = await lstat(targetPath);
-      } catch {
-        // targetPath doesn't exist
-      }
+/**
+ * Migrate a single real (non-symlink, non-git-tracked) file from a worktree
+ * to the canonical location in `.wt/shared/` and replace it with a symlink.
+ */
+async function migrateOneFile(
+  wtDir: string,
+  worktreeDir: string,
+  relativeToWorktree: string,
+): Promise<void> {
+  const fullPath = join(worktreeDir, relativeToWorktree);
+  let st: Awaited<ReturnType<typeof lstat>> | undefined;
+  try {
+    st = await lstat(fullPath);
+  } catch {
+    return;
+  }
 
-      if (st === null) {
-        // No file — create parent dirs and symlink
-        await mkdir(dirname(targetPath), { recursive: true });
-        await symlink(relativeLinkTarget, targetPath);
-      } else if (st.isSymbolicLink()) {
-        // Check if it points to the right place
-        const current = await readlink(targetPath);
-        if (current !== relativeLinkTarget) {
-          await rm(targetPath);
-          await symlink(relativeLinkTarget, targetPath);
-        }
-        // else: already correct, skip
-      } else {
-      }
+  if (st.isSymbolicLink() || !st.isFile()) return;
+  if (await isGitTracked(worktreeDir, relativeToWorktree)) return;
+
+  const canonicalPath = join(wtDir, "shared", relativeToWorktree);
+  await mkdir(dirname(canonicalPath), { recursive: true });
+
+  let canonicalExists = false;
+  try {
+    await lstat(canonicalPath);
+    canonicalExists = true;
+  } catch {
+    // canonical doesn't exist
+  }
+
+  if (!canonicalExists) {
+    await rename(fullPath, canonicalPath);
+  } else {
+    await rm(fullPath);
+  }
+
+  const relativeLinkTarget = relative(dirname(fullPath), canonicalPath);
+  await symlink(relativeLinkTarget, fullPath);
+}
+
+/**
+ * Remove a symlink if it is broken (target no longer exists).
+ */
+async function cleanBrokenSymlink(fullPath: string): Promise<void> {
+  let st: Awaited<ReturnType<typeof lstat>> | undefined;
+  try {
+    st = await lstat(fullPath);
+  } catch {
+    return;
+  }
+  if (st.isSymbolicLink()) {
+    try {
+      await access(fullPath); // follows symlink — if target missing, throws
+    } catch {
+      await rm(fullPath); // broken symlink
     }
   }
 }
 
 /**
  * Full sync across all worktrees.
- * For each configured shared directory, for each worktree slot:
+ * For each configured shared directory and individual file, for each worktree slot:
  *   1. If a real file exists in the worktree (not symlink, not git-tracked):
  *      Move it to `.wt/shared/` and replace with symlink.
  *   2. If a file exists in `.wt/shared/` but worktree lacks the symlink:
@@ -118,9 +201,10 @@ export async function syncAllSymlinks(
   wtDir: string,
   containerDir: string,
   slots: Record<string, { branch: string | null }>,
-  sharedDirs: string[],
+  shared: SharedConfig,
 ): Promise<void> {
-  for (const sharedDir of sharedDirs) {
+  // --- Shared directories ---
+  for (const sharedDir of shared.directories) {
     const canonicalDir = join(wtDir, "shared", sharedDir);
 
     // STEP 1: Migrate real files to canonical location
@@ -139,42 +223,7 @@ export async function syncAllSymlinks(
       if (!worktreeSharedExists) continue;
 
       for await (const file of walkFiles(worktreeSharedDir)) {
-        const fullPath = join(worktreeSharedDir, file);
-        let st: Awaited<ReturnType<typeof lstat>> | undefined;
-        try {
-          st = await lstat(fullPath);
-        } catch {
-          continue;
-        }
-
-        if (st.isSymbolicLink()) continue; // already a symlink
-
-        if (st.isFile()) {
-          const relativeToWorktree = join(sharedDir, file);
-          if (await isGitTracked(worktreeDir, relativeToWorktree)) continue; // git-tracked, don't move
-
-          // Move to canonical
-          const canonicalPath = join(canonicalDir, file);
-          await mkdir(dirname(canonicalPath), { recursive: true });
-
-          let canonicalExists = false;
-          try {
-            await lstat(canonicalPath);
-            canonicalExists = true;
-          } catch {
-            // canonical doesn't exist
-          }
-
-          if (!canonicalExists) {
-            await rename(fullPath, canonicalPath);
-          } else {
-            await rm(fullPath);
-          }
-
-          // Create symlink
-          const relativeLinkTarget = relative(dirname(fullPath), canonicalPath);
-          await symlink(relativeLinkTarget, fullPath);
-        }
+        await migrateOneFile(wtDir, worktreeDir, join(sharedDir, file));
       }
     }
 
@@ -182,7 +231,15 @@ export async function syncAllSymlinks(
     for (const [slotName, slotState] of Object.entries(slots)) {
       const worktreeDir = join(containerDir, slotName);
       const branch = slotState.branch ?? "(detached)";
-      await establishSymlinks(wtDir, worktreeDir, [sharedDir], branch);
+      // Walk the canonical dir and establish each file
+      try {
+        await lstat(canonicalDir);
+      } catch {
+        continue;
+      }
+      for await (const file of walkFiles(canonicalDir)) {
+        await establishOneSymlink(wtDir, worktreeDir, join(sharedDir, file), branch);
+      }
     }
 
     // STEP 3: Clean broken symlinks in all worktrees
@@ -201,22 +258,62 @@ export async function syncAllSymlinks(
       if (!worktreeSharedExists) continue;
 
       for await (const file of walkFiles(worktreeSharedDir)) {
-        const fullPath = join(worktreeSharedDir, file);
-        let st: Awaited<ReturnType<typeof lstat>> | undefined;
-        try {
-          st = await lstat(fullPath);
-        } catch {
-          continue;
-        }
-
-        if (st.isSymbolicLink()) {
-          try {
-            await access(fullPath); // follows symlink — if target missing, throws
-          } catch {
-            await rm(fullPath); // broken symlink
-          }
-        }
+        await cleanBrokenSymlink(join(worktreeSharedDir, file));
       }
+    }
+  }
+
+  // --- Individual shared files ---
+  for (const file of shared.files) {
+    // STEP 1: Migrate real files
+    for (const slotName of Object.keys(slots)) {
+      const worktreeDir = join(containerDir, slotName);
+      await migrateOneFile(wtDir, worktreeDir, file);
+    }
+
+    // STEP 2: Propagate
+    for (const [slotName, slotState] of Object.entries(slots)) {
+      const worktreeDir = join(containerDir, slotName);
+      const branch = slotState.branch ?? "(detached)";
+      const canonicalPath = join(wtDir, "shared", file);
+      try {
+        await lstat(canonicalPath);
+      } catch {
+        continue;
+      }
+      await establishOneSymlink(wtDir, worktreeDir, file, branch);
+    }
+
+    // STEP 3: Clean broken symlinks
+    for (const slotName of Object.keys(slots)) {
+      const worktreeDir = join(containerDir, slotName);
+      await cleanBrokenSymlink(join(worktreeDir, file));
+    }
+  }
+}
+
+/**
+ * Remove a single managed symlink if it points to the expected canonical location.
+ */
+async function removeOneSymlink(wtDir: string, worktreeDir: string, relativeToWorktree: string): Promise<void> {
+  const fullPath = join(worktreeDir, relativeToWorktree);
+  let st: Awaited<ReturnType<typeof lstat>> | undefined;
+  try {
+    st = await lstat(fullPath);
+  } catch {
+    return;
+  }
+
+  if (st.isSymbolicLink()) {
+    const canonicalPath = join(wtDir, "shared", relativeToWorktree);
+    const expectedTarget = relative(dirname(fullPath), canonicalPath);
+    try {
+      const current = await readlink(fullPath);
+      if (current === expectedTarget) {
+        await rm(fullPath);
+      }
+    } catch {
+      // ignore
     }
   }
 }
@@ -227,9 +324,10 @@ export async function syncAllSymlinks(
 export async function removeSymlinks(
   wtDir: string,
   worktreeDir: string,
-  sharedDirs: string[],
+  shared: SharedConfig,
 ): Promise<void> {
-  for (const sharedDir of sharedDirs) {
+  // Shared directories
+  for (const sharedDir of shared.directories) {
     const worktreeSharedDir = join(worktreeDir, sharedDir);
 
     try {
@@ -239,28 +337,12 @@ export async function removeSymlinks(
     }
 
     for await (const file of walkFiles(worktreeSharedDir)) {
-      const fullPath = join(worktreeSharedDir, file);
-      let st: Awaited<ReturnType<typeof lstat>> | undefined;
-      try {
-        st = await lstat(fullPath);
-      } catch {
-        continue;
-      }
-
-      if (st.isSymbolicLink()) {
-        // Only remove if it points into .wt/shared/
-        const canonicalDir = join(wtDir, "shared", sharedDir);
-        const canonicalPath = join(canonicalDir, file);
-        const expectedTarget = relative(dirname(fullPath), canonicalPath);
-        try {
-          const current = await readlink(fullPath);
-          if (current === expectedTarget) {
-            await rm(fullPath);
-          }
-        } catch {
-          // ignore
-        }
-      }
+      await removeOneSymlink(wtDir, worktreeDir, join(sharedDir, file));
     }
+  }
+
+  // Individual shared files
+  for (const file of shared.files) {
+    await removeOneSymlink(wtDir, worktreeDir, file);
   }
 }

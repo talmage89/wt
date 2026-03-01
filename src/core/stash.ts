@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { execa } from "execa";
 import { parse, stringify } from "smol-toml";
 import { encodeBranch } from "./branch-encode.js";
+import type { SharedConfig } from "./config.js";
 import * as git from "./git.js";
 import { removeSymlinks } from "./symlinks.js";
 
@@ -68,13 +69,13 @@ export async function saveStash(
   repoDir: string,
   branch: string,
   worktreeDir: string,
-  sharedDirs: string[] = [],
+  shared: SharedConfig = { directories: [], files: [] },
 ): Promise<boolean> {
   // Remove managed shared symlinks before stashing — they are wt infrastructure,
   // not user state, and are always recreated on checkout. Including them in the
   // stash causes "already exists, no checkout" errors on stash apply (BUG-007).
-  if (sharedDirs.length > 0) {
-    await removeSymlinks(wtDir, worktreeDir, sharedDirs);
+  if (shared.directories.length > 0 || shared.files.length > 0) {
+    await removeSymlinks(wtDir, worktreeDir, shared);
   }
 
   const hash = await git.stashCreate(worktreeDir);
