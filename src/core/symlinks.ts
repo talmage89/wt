@@ -295,7 +295,11 @@ export async function syncAllSymlinks(
 /**
  * Remove a single managed symlink if it points to the expected canonical location.
  */
-async function removeOneSymlink(wtDir: string, worktreeDir: string, relativeToWorktree: string): Promise<void> {
+async function removeOneSymlink(
+  wtDir: string,
+  worktreeDir: string,
+  relativeToWorktree: string,
+): Promise<void> {
   const fullPath = join(worktreeDir, relativeToWorktree);
   let st: Awaited<ReturnType<typeof lstat>> | undefined;
   try {

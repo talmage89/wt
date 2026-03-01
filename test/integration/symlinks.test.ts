@@ -158,7 +158,10 @@ describe("syncAllSymlinks", () => {
     await fs.mkdir(path.join(worktreeDir, ".claude"), { recursive: true });
     await fs.writeFile(path.join(worktreeDir, ".claude", "settings.json"), "migrated content");
 
-    await syncAllSymlinks(wtDir, containerDir, state.slots, { directories: [".claude"], files: [] });
+    await syncAllSymlinks(wtDir, containerDir, state.slots, {
+      directories: [".claude"],
+      files: [],
+    });
 
     // Canonical file now exists
     const canonicalPath = path.join(wtDir, "shared", ".claude", "settings.json");
@@ -181,7 +184,10 @@ describe("syncAllSymlinks", () => {
     await fs.mkdir(canonicalDir, { recursive: true });
     await fs.writeFile(path.join(canonicalDir, "settings.json"), "shared content");
 
-    await syncAllSymlinks(wtDir, containerDir, state.slots, { directories: [".claude"], files: [] });
+    await syncAllSymlinks(wtDir, containerDir, state.slots, {
+      directories: [".claude"],
+      files: [],
+    });
 
     // All slots should have a symlink
     for (const slotName of Object.keys(state.slots)) {
@@ -201,7 +207,10 @@ describe("syncAllSymlinks", () => {
     const canonicalFile = path.join(canonicalDir, "settings.json");
     await fs.writeFile(canonicalFile, "will be deleted");
 
-    await syncAllSymlinks(wtDir, containerDir, state.slots, { directories: [".claude"], files: [] });
+    await syncAllSymlinks(wtDir, containerDir, state.slots, {
+      directories: [".claude"],
+      files: [],
+    });
 
     // Verify symlinks exist
     for (const slotName of Object.keys(state.slots)) {
@@ -214,7 +223,10 @@ describe("syncAllSymlinks", () => {
     await fs.rm(canonicalFile);
 
     // Run sync again — broken symlinks should be removed
-    await syncAllSymlinks(wtDir, containerDir, state.slots, { directories: [".claude"], files: [] });
+    await syncAllSymlinks(wtDir, containerDir, state.slots, {
+      directories: [".claude"],
+      files: [],
+    });
 
     for (const slotName of Object.keys(state.slots)) {
       const symlinkPath = path.join(containerDir, slotName, ".claude", "settings.json");
@@ -243,7 +255,10 @@ describe("syncAllSymlinks", () => {
     };
 
     try {
-      await syncAllSymlinks(wtDir, containerDir, state.slots, { directories: [".claude"], files: [] });
+      await syncAllSymlinks(wtDir, containerDir, state.slots, {
+        directories: [".claude"],
+        files: [],
+      });
     } finally {
       process.stderr.write = originalWrite;
     }
@@ -258,7 +273,9 @@ describe("syncAllSymlinks", () => {
     const { containerDir, wtDir, state } = await setupContainer(dir);
 
     // Should not throw with empty dirs
-    await expect(syncAllSymlinks(wtDir, containerDir, state.slots, { directories: [], files: [] })).resolves.toBeUndefined();
+    await expect(
+      syncAllSymlinks(wtDir, containerDir, state.slots, { directories: [], files: [] }),
+    ).resolves.toBeUndefined();
   });
 });
 
@@ -295,7 +312,10 @@ describe("individual shared files", () => {
     // Place a real file in the slot
     await fs.writeFile(path.join(worktreeDir, ".env.local"), "migrated");
 
-    await syncAllSymlinks(wtDir, containerDir, state.slots, { directories: [], files: [".env.local"] });
+    await syncAllSymlinks(wtDir, containerDir, state.slots, {
+      directories: [],
+      files: [".env.local"],
+    });
 
     // Canonical file now exists
     const canonicalPath = path.join(wtDir, "shared", ".env.local");
@@ -355,12 +375,16 @@ describe("individual shared files", () => {
     await establishSymlinks(wtDir, worktreeDir, shared, "main");
 
     // Both should be symlinks
-    expect((await fs.lstat(path.join(worktreeDir, ".claude", "settings.json"))).isSymbolicLink()).toBe(true);
+    expect(
+      (await fs.lstat(path.join(worktreeDir, ".claude", "settings.json"))).isSymbolicLink(),
+    ).toBe(true);
     expect((await fs.lstat(path.join(worktreeDir, ".env.local"))).isSymbolicLink()).toBe(true);
 
     // Remove both
     await removeSymlinks(wtDir, worktreeDir, shared);
-    expect(await fs.lstat(path.join(worktreeDir, ".claude", "settings.json")).catch(() => null)).toBeNull();
+    expect(
+      await fs.lstat(path.join(worktreeDir, ".claude", "settings.json")).catch(() => null),
+    ).toBeNull();
     expect(await fs.lstat(path.join(worktreeDir, ".env.local")).catch(() => null)).toBeNull();
   });
 });
